@@ -1,92 +1,26 @@
 <template>
   <div class='tree-view-wrapper'>
-    <tree-view-item class='tree-view-item-root' :data='parsedData' :max-depth='allOptions.maxDepth' :current-depth='0' :modifiable='allOptions.modifiable' @change-data='onChangeData'></tree-view-item>
+    <tree-view-item class='tree-view-item-root' :data='tree.root' :max-depth='allOptions.maxDepth' :current-depth='0' @nodeClicked='nodeClicked'></tree-view-item>
   </div>
 </template>
 
 <script>
 import _ from 'lodash';
 import TreeViewItem from './TreeViewItem.vue';
+import { Tree } from './Tree';
 
 export default {
   components: {
     TreeViewItem,
   },
   name: 'tree-view',
-  props: ['data', 'options'],
+  props: {
+    'data': Object,
+    'jsonTree': Tree,
+    'options': Object, 
+  },
   methods: {
-    // Transformer for the non-Collection types,
-    // like String, Integer of Float
-    transformValue(valueToTransform, keyForValue) {
-      return {
-        key: keyForValue,
-        type: 'value',
-        value: valueToTransform,
-      };
-    },
-
-    // Since we use lodash, the _.map method will work on
-    // both Objects and Arrays, returning either the Key as
-    // a string or the Index as an integer
-    generateChildrenFromCollection(collection) {
-      return _.map(collection, (value, keyOrIndex) => {
-        if (this.isObject(value)) {
-          return this.transformObject(value, keyOrIndex);
-        }
-        if (this.isArray(value)) {
-          return this.transformArray(value, keyOrIndex);
-        }
-        if (this.isValue(value)) {
-          return this.transformValue(value, keyOrIndex);
-        }
-        throw new Error('unknown type');
-      });
-    },
-
-    // Transformer for the Array type
-    transformArray(arrayToTransform, keyForArray) {
-      return {
-        key: keyForArray,
-        type: 'array',
-        children: this.generateChildrenFromCollection(arrayToTransform),
-      };
-    },
-
-    // Transformer for the Object type
-    transformObject(objectToTransform, keyForObject, isRootObject = false) {
-      return {
-        key: keyForObject,
-        type: 'object',
-        isRoot: isRootObject,
-        children: this.generateChildrenFromCollection(objectToTransform),
-      };
-    },
-
-    // Helper Methods for value type detection
-    isObject(value) {
-      return _.isPlainObject(value);
-    },
-
-    isArray(value) {
-      return _.isArray(value);
-    },
-
-    isValue(value) {
-      return !this.isObject(value) && !this.isArray(value);
-    },
-
-    onChangeData(path, value) {
-      const lastKey = _.last(path);
-      const data = _.cloneDeep(this.data);
-      let targetObject = data;
-      _.forEach(_.dropRight(_.drop(path)), (key) => {
-        targetObject = targetObject[key];
-      });
-      if (targetObject[lastKey] !== value) {
-        targetObject[lastKey] = value;
-        this.$emit('change-data', data);
-      }
-    },
+    nodeClicked(data) { this.$emit('nodeClicked', data); },
   },
   computed: {
     allOptions() {
@@ -96,18 +30,8 @@ export default {
         modifiable: false,
       }, (this.options || {}));
     },
-    parsedData() {
-      // Take the JSON data and transform
-      // it into the Tree View DSL
-
-      // Strings or Integers should not be attempted to be split, so we generate
-      // a new object with the string/number as the value
-      if (this.isValue(this.data)) {
-        return this.transformValue(this.data, this.allOptions.rootObjectKey);
-      }
-
-      // If it's an object or an array, transform as an object
-      return this.transformObject(this.data, this.allOptions.rootObjectKey, true);
+    tree() {
+      return this.jsonTree != null ? this.jsonTree : new Tree(this.data, this.allOptions.rootObjectKey);
     },
   },
 };

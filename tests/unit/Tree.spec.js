@@ -1,7 +1,7 @@
-import {Tree, TreeNode} from '../../src/components/Tree';
 import * as util from 'util'; // has no default export
+import { Tree } from '../../src/components/Tree';
 
-//import HelloWorld from '@/components/HelloWorld.vue';
+// import HelloWorld from '@/components/HelloWorld.vue';
 
 describe('Tree', () => {
   const data = {
@@ -22,11 +22,13 @@ describe('Tree', () => {
     },
   };
   console.log(`tree=${util.inspect(Tree)}`);
-  const tree = new Tree(data);
+  const tree = new Tree(data.root);
   console.log(tree.toString());
-  console.log(util.inspect(tree, true, 10, true));
-  
+  // console.log(util.inspect(tree, true, 10, true));
+  // console.log(`children=${util.inspect(tree.root.children, true, 10, true)}`);
+
   it('', () => {
     expect(tree.root.label).toMatch('root');
+    expect(tree.root.children.child1.label).toMatch('child1');
   });
 });

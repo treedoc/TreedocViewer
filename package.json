@@ -5,26 +5,30 @@
   "scripts": {
     "serve": "vue-cli-service serve",
     "build": "vue-cli-service build",
-    "test:unit": "vue-cli-service test:unit"
+    "test:unit": "vue-cli-service test:unit",
+    "lint": "vue-cli-service lint"
   },
   "dependencies": {
     "bootstrap-vue": "^2.0.0-rc.11",
     "jest": "^23.4.1",
     "jquery": "^3.3.1",
     "lodash": "^4.17.10",
-    "vue": "^2.5.16",
+    "vue": "^2.5.17",
     "vue-multipane": "^0.9.5",
+    "vue-split-panel": "^1.0.4",
     "vue2-datatable-component": "github:TrueCarry/vue2-datatable"
   },
   "devDependencies": {
     "@vue/cli-plugin-babel": "^3.0.0-rc.5",
+    "@vue/cli-plugin-eslint": "^3.0.0-beta.15",
     "@vue/cli-plugin-unit-jest": "^3.0.0-rc.5",
     "@vue/cli-service": "^3.0.0-rc.5",
-    "@vue/test-utils": "^1.0.0-beta.20",
+    "@vue/eslint-config-airbnb": "^3.0.0-beta.15",
+    "@vue/test-utils": "^1.0.0-beta.24",
     "babel-core": "7.0.0-bridge.0",
-    "babel-jest": "^23.0.1",
+    "babel-jest": "^23.4.2",
     "babel-preset-env": "^1.7.0",
-    "vue-template-compiler": "^2.5.16"
+    "vue-template-compiler": "^2.5.17"
   },
   "browserslist": [
     "> 1%",

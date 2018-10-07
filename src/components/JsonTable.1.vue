@@ -6,6 +6,7 @@
 </template>
 
 <script>
+import _ from 'lodash';
 import DataFilter from './DataFilter';
 import thFilter from './th-Filter.vue';
 
@@ -33,34 +34,44 @@ export default {
       if (this.columns.some(c => c.field === field))
         return;
 
-      const tdClass = idx === 0 ? 'jsontable-min' : '';
       this.columns.splice(idx, 0, {
         title: field,
         field,
         sortable: true,
         thComp: thFilter,
-        thClass: tdClass,
-        tdClass,
       });
     },
 
-    buildTable(val) {
-      if (!val)
-        return;
-      const keyCol = val.isObject() ? COL_KEY : COL_NO;
-      this.addColumn(keyCol);
-      for (const k of Object.keys(val.children)) {
-        const v = val.children[k];
-        const row = { [keyCol]: k };
+    buildForArray(val) {
+      this.addColumn(COL_NO);
+      for (const e of val) {
+        const row = { [COL_NO]: this.rawData.length };
         this.rawData.push(row);
-        if (v && !v.isLeaf()) {
-          for (const ck of Object.keys(v.children)) {
-            this.addColumn(ck);
-            row[ck] = v.children[ck].obj;
+        if (e && _.isObject(e)) {
+          for (const k of Object.keys(e)) {
+            this.addColumn(k);
+            row[k] = e[k];
           }
         } else {
           this.addColumn(COL_VALUE, 1);
-          row[COL_VALUE] = v.obj;
+          row[COL_VALUE] = e;
+        }
+      }
+    },
+    buildForObject(val) {
+      this.addColumn(COL_KEY);
+      for (const k of Object.keys(val)) {
+        const row = { [COL_KEY]: k };
+        this.rawData.push(row);
+        const v = val[k];
+        if (v && _.isObject(v)) {
+          for (const ck of Object.keys(v)) {
+            this.addColumn(ck);
+            row[ck] = v[ck];
+          }
+        } else {
+          this.addColumn(COL_VALUE, 1);
+          row[COL_VALUE] = v;
         }
       }
     },
@@ -71,9 +82,12 @@ export default {
       handler(val) {
         this.columns = [];
         this.rawData = [];
-        this.buildTable(val);
+        if (_.isArray(val)) {
+          this.buildForArray(val);
+        } else if (_.isObject(val)) {
+          this.buildForObject(val);
+        }
         this.total = this.rawData.length;
-        this.data = this.rawData;
       },
     },
     query: {
@@ -86,8 +100,6 @@ export default {
 };
 </script>
 
-<style>
-.jsontable-min {
-  width:1%;
-}
+<style scoped>
+
 </style>

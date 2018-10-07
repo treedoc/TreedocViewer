@@ -1,44 +1,27 @@
 <template>
   <div class='tree-view-item'>
-    <div v-if='isObject(data)' class='tree-view-item-leaf'>
+    <div v-if='!data.isLeaf()' class='tree-view-item-leaf'>
       <div class='tree-view-item-node' @click.stop='toggleOpen()' >
-        <span :class='{opened: isOpen()}' class='tree-view-item-key tree-view-item-key-with-chevron'>{{getKey(data)}}</span>
-        <span class='tree-view-item-hint' v-show='!isOpen() && data.children.length === 1'>{{data.children.length}} property</span>
-        <span class='tree-view-item-hint' v-show='!isOpen() && data.children.length !== 1'>{{data.children.length}} properties</span>
+        <span :class='{opened: isOpen()}' class='tree-view-item-key tree-view-item-key-with-chevron'> <a @click.stop="$emit('nodeClicked', data)">{{data.label}} </a></span>
+        <span class='tree-view-item-hint' v-show='!isOpen()'>{{data.size}} item(s)</span>
       </div>
-      <template v-for="child in data.children" >
-        <keep-alive :key='getKey(child)'>
-            <tree-view-item :key='getKey(child)' :max-depth='maxDepth' :current-depth='currentDepth+1' v-if='isOpen()'
-                :data='child' :modifiable='modifiable' @change-data='onChangeData'></tree-view-item>
+      <template v-for="(v, k) in data.children" >
+        <keep-alive :key='k'>
+            <tree-view-item :key='k' :max-depth='maxDepth' :current-depth='currentDepth+1' v-if='isOpen()' :data='v' @nodeClicked='nodeClicked' />
         </keep-alive>
       </template>
     </div>
-    <div v-if='isArray(data)' class='tree-view-item-leaf'>
-      <div class='tree-view-item-node' @click.stop='toggleOpen()'>
-        <span :class='{opened: isOpen()}'  class='tree-view-item-key tree-view-item-key-with-chevron'>{{getKey(data)}}</span>
-        <span class='tree-view-item-hint' v-show='!isOpen() && data.children.length === 1'>{{data.children.length}} item</span>
-        <span class='tree-view-item-hint' v-show='!isOpen() && data.children.length !== 1'>{{data.children.length}} items</span>
-      </div>
-      <template v-for="child in data.children" >
-        <keep-alive :key='getKey(child)'>
-            <tree-view-item :key='getKey(child)' :max-depth='maxDepth' :current-depth='currentDepth+1' v-if='isOpen()'
-                :data='child' :modifiable='modifiable' @change-data='onChangeData'></tree-view-item>
-        </keep-alive>
-      </template>
+    <div v-else>
+      <span class='tree-view-item-key'>{{data.key}}: </span>
+      <span class='tree-view-item-value' >{{ data.obj }}</span>
     </div>
-    <tree-view-item-value v-if='isValue(data)' class='tree-view-item-leaf' :key-string='getKey(data)' :data='data.value' :modifiable='modifiable' @change-data='onChangeData'>
-    </tree-view-item-value>
   </div>
 </template>
 
 <script>
 import _ from 'lodash';
-import TreeViewItemValue from './TreeViewItemValue.vue';
 
 export default {
-  components: {
-    TreeViewItemValue,
-  },
   name: 'tree-view-item',
   props: ['data', 'max-depth', 'current-depth', 'modifiable'],
   data() {
@@ -52,9 +35,7 @@ export default {
     isValue(value) { return value.type === 'value'; },
     getKey(value) { return _.isInteger(value.key) ? `${value.key}:` : `'${value.key}':`; },
     isRootObject(value = this.data) { return value.isRoot; },
-    onChangeData(path, value) {
-      this.$emit('change-data', _.concat(this.data.key, path), value);
-    },
+    nodeClicked(data) { this.$emit('nodeClicked', data); },
   },
 };
 </script>

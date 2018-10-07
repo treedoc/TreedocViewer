@@ -1,6 +1,6 @@
 // {
 //   "compilerOptions": {
-//     "target": "ES5",
-//     "module": "commonjs"
+//   "target": "ES5",
+//   "module": "commonjs"
 //   }
 // }

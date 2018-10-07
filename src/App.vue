@@ -1,53 +1,17 @@
 <template>
 
   <div id='app' class='components-container'>
-    <multipane class="foo" layout="vertical" style='flex-grow:1;'>
-      <div :style="{ width: '100px', maxWidth: '500px', 'min-height':'100%', 'max-height':'100%'}">
-        <tree-view :data="sampleJSON" :options="{maxDepth: 2, rootObjectKey: 'The Test String'}"></tree-view>
-      </div>
-      <multipane-resizer/>
-      <div :style="{ width: '25%', maxWidth: '50%' }">
-        pane2
-      </div>
-      <multipane-resizer/>
-      <div :style="{ flexGrow: 1 }">
-        <!-- <div><json-table :tableData='sampleArray' /></div> -->
-        <div><json-table :tableData='sampleJSON' /></div>
-      </div>
-    </multipane>
-    <!-- <Split style="flex-grow: 1; display:flex;">
-    <SplitArea :size="25">
-        <tree-view :data="sampleJSON" :options="{maxDepth: 2, rootObjectKey: 'The Test String'}"></tree-view>
-    </SplitArea>
-    <SplitArea :size="75">
-        panel right
-    </SplitArea>
-    </Split> -->
-    <!-- <split-pane v-on:resize="resize" :min-percent='20' :default-percent='30' split="vertical">
-      <template slot="paneL">
-        <tree-view :data="sampleJSON" :options="{maxDepth: 2, rootObjectKey: 'The Test String'}"></tree-view>
-      </template>
-      <template slot="paneR">
-        B
-      </template>
-    </split-pane> -->
+    <json-tree-table :data='sampleJSON' />
   </div>
 </template>
 
 <script>
-import { Multipane, MultipaneResizer } from 'vue-multipane';
-
-import TreeView from './components/TreeView.vue';
-import JsonTable from './components/JsonTable.vue';
-
+import JsonTreeTable from './components/JsonTreeTable.vue';
 
 export default {
   name: 'app',
   components: {
-    Multipane,
-    MultipaneResizer,
-    TreeView,
-    JsonTable,
+    JsonTreeTable,
   },
   data() {
     return {
@@ -83,29 +47,17 @@ export default {
       ],
     };
   },
-  methods: {
-    resize() {
-    },
-  },
 };
 </script>
 
 <style>
-  .components-container {
-    display: flex;
-    position: absolute;
-    flex-direction: column;
-    min-height:100%;
-    min-width:100%;
-  }
-
-.multipane.foo.layout-v .multipane-resizer {
-  margin: 0; left: 0; /* reset default styling */
-  width: 5px;
-  height: unset;
-  background: lightgray;
+.components-container {
+  display: flex;
+  position: absolute;
+  flex-direction: column;
+  min-height:100%;
+  min-width:100%;
 }
-
 html {
   height: 100%;
 }
