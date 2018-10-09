@@ -222,7 +222,7 @@
     box-sizing: border-box;
     border-collapse: collapse;
     display: flex;
-    overflow: hidden;
+    overflow: auto;
   }
   .split-panel__size-handle {
     position: absolute;

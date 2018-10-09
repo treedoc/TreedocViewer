@@ -4,7 +4,9 @@
   "private": true,
   "scripts": {
     "serve": "vue-cli-service serve",
-    "build": "vue-cli-service build",
+    "build-app": "vue-cli-service build --dest dist/app",
+    "build-lib": "vue-cli-service build --dest dist/lib --target lib --name lib src/lib.js",
+    "build": "yarn build-app && yarn build-lib",
     "test:unit": "vue-cli-service test:unit",
     "lint": "vue-cli-service lint"
   },
@@ -18,6 +20,14 @@
     "vue-split-panel": "^1.0.4",
     "vue2-datatable-component": "github:TrueCarry/vue2-datatable"
   },
+  "main": "./dist/lib/lib.common.js",
+  "files": [
+    "dist/lib/*",
+    "src/*",
+    "public/*",
+    "*.json",
+    "*.js"
+  ],
   "devDependencies": {
     "@vue/cli-plugin-babel": "^3.0.0-rc.5",
     "@vue/cli-plugin-eslint": "^3.0.0-beta.15",

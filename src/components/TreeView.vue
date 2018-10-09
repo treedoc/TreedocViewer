@@ -15,9 +15,9 @@ export default {
   },
   name: 'tree-view',
   props: {
-    'data': Object,
-    'jsonTree': Tree,
-    'options': Object, 
+    data: Object,
+    jsonTree: Tree,
+    optionss: Object,
   },
   methods: {
     nodeClicked(data) { this.$emit('nodeClicked', data); },
@@ -38,7 +38,6 @@ export default {
 </script>
 
 <style scoped>
-
 .tree-view-wrapper {
   overflow: auto;
 }

@@ -6,6 +6,10 @@
         <b-btn :size="'sm'" :variant="showTree?'primary': 'secondary'" @click="showTree=!showTree">Tree</b-btn>
         <b-btn :size="'sm'" :variant="showTable?'primary': 'secondary'" @click="showTable=!showTable">Table</b-btn>
       </b-button-group>
+      <b-button-group class="mx-1" style="">
+        <b-btn :size="'sm'" @click='back()' :disabled='historyPos <= 0'>Back</b-btn>
+        <b-btn :size="'sm'" @click='forward()' :disabled='historyPos >= history.length - 1'>Forward</b-btn>
+      </b-button-group>
     </div>
 
     <!-- <Split style="height: 500px; width:100%">
@@ -44,8 +48,7 @@
         </split-panel>
       </div>   
       <div slot="panel2">
-        <div>here</div>
-        <div><json-table :tableData='selectedNode' /></div>
+        <div><json-table :tableData='selectedNode' v-on:nodeClicked='nodeClicked'/></div>
       </div>
     </split-panel>
   </div>
@@ -63,8 +66,8 @@ import SplitPanel from './SplitPanel.vue';
 export default {
   name: 'app',
   components: {
-    Multipane,
-    MultipaneResizer,
+    // Multipane,
+    // MultipaneResizer,
     TreeView,
     JsonTable,
     SplitPanel,
@@ -81,40 +84,63 @@ export default {
       selectedNode: null,
       jsonStr: String,
       jsonObj: Object,
+      history: [],
+      historyPos: -1,
     };
   },
-  created() {
-    if (_.isString(this.data)) {
-      this.jsonStr = this.data;
-      this.jsonObj = JSON.parse(this.data);
-    } else {
-      this.jsonObj = this.data;
-      this.jsonStr = JSON.stringify(this.data, null, "  ");
-    }
-  },
+
   mounted() {
     this.$refs.splitPanel.sizeChanged(this)
     this.$refs.splitPanelLeft.sizeChanged(this)
   },
   watch: {
-    jsonStr() {
-      this.jsonObj = JSON.parse(this.jsonStr);
+    data: {
+      immediate: true,
+      handler(data) {
+        if (_.isString(data)) {
+          this.jsonStr = data;
+        } else {
+          this.jsonStr = JSON.stringify(data, null, "  ");
+        }
+      },
+    },
+    jsonStr: {
+      immediate: true,
+      handler(data) {                
+        this.jsonObj = JSON.parse(this.jsonStr);
+      },
     },
     jsonObj() {
-      this.selectedNode = this.tree.root;
+      this.history.length = 0;
+      this.historyPos = -1;
+      this.nodeClicked(this.tree.root);
     },
   },
   methods: {
     nodeClicked(data) {
       console.log(`node clicked: ${data}`);
       this.selectedNode = data;
+      this.history.length = this.historyPos + 1;
+      this.history.push(data);
+      this.historyPos = this.history.length - 1;
     },
+    back() {
+      if (this.historyPos <= 0)
+        return;
+      this.selectedNode = this.history[--this.historyPos];
+    },
+    forward() {
+      if (this.historyPos >= this.history.length-1) 
+        return;
+      this.selectedNode = this.history[++this.historyPos];
+    }
   },
   computed: {
     tree() {
       return this.jsonObj ? new Tree(this.jsonObj, this.rootObjectKey || "root") : null;
     },
   }
+  
 };
 </script>
 

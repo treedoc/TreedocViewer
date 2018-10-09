@@ -1,13 +1,16 @@
 <template>
   <div>
-    <code>query: {{ query }}</code>
-    <datatable v-bind="$data"></datatable>
+    <b-check v-model="isExpanded">Expanded</b-check><code>query: {{ query }}</code>
+    <datatable v-bind="$data"><json-path :tree-node="tableData" v-on:nodeClicked='nodeClicked' /></datatable>
   </div>
 </template>
 
 <script>
 import DataFilter from './DataFilter';
 import thFilter from './th-Filter.vue';
+import tdValue from './td-Value.vue';
+import JsonPath from './JsonPath.vue';
+
 
 const COL_VALUE = '@value';
 const COL_NO = '#';
@@ -16,7 +19,7 @@ const COL_KEY = '@key';
 export default {
   name: 'json-table',
   props: ['tableData', 'options'],
-  components: { thFilter },
+  components: { thFilter, JsonPath },
   data() {
     return {
       tblClass: 'table-bordered',
@@ -26,6 +29,8 @@ export default {
       rawData: [],
       total: 0,
       query: { limit: 1000 },
+      isExpanded: false,
+      xprops: {jsonTable: this},
     };
   },
   methods: {
@@ -39,11 +44,11 @@ export default {
         field,
         sortable: true,
         thComp: thFilter,
+        tdComp: tdValue,
         thClass: tdClass,
         tdClass,
       });
     },
-
     buildTable(val) {
       if (!val)
         return;
@@ -53,17 +58,36 @@ export default {
         const v = val.children[k];
         const row = { [keyCol]: k };
         this.rawData.push(row);
-        if (v && !v.isLeaf()) {
+        if (this.isExpanded && v && !v.isLeaf()) {
           for (const ck of Object.keys(v.children)) {
             this.addColumn(ck);
-            row[ck] = v.children[ck].obj;
+            row[ck] = v.children[ck];
           }
         } else {
           this.addColumn(COL_VALUE, 1);
-          row[COL_VALUE] = v.obj;
+          row[COL_VALUE] = v;
         }
       }
     },
+    needExpand(val) {
+      if (!val)
+        return false;
+
+      const cols = {};
+      let cellCnt = 0;
+      for (const k of Object.keys(val.children)) {
+        const v = val.children[k];
+        if (v && !v.isLeaf()) {
+          for (const ck of Object.keys(v.children)) {
+            cols[ck] = null;
+            cellCnt ++;
+          }
+        }
+      }
+      const totalCell = Object.keys(cols).length * Object.keys(val.children).length;
+      return cellCnt * 4 > totalCell;  // Fill ratio > 1/4
+    },
+    nodeClicked(data) { this.$emit('nodeClicked', data); },
   },
   watch: {
     tableData: {
@@ -71,9 +95,10 @@ export default {
       handler(val) {
         this.columns = [];
         this.rawData = [];
-        this.buildTable(val);
         this.total = this.rawData.length;
         this.data = this.rawData;
+        this.isExpanded = this.needExpand(val);
+        this.buildTable(val);
       },
     },
     query: {
@@ -81,6 +106,14 @@ export default {
       handler(val) {
         this.data = DataFilter.filter(this.columns, this.rawData, val);
       },
+    },
+    isExpanded() {
+      console.log("isExpanded:" + this.isExpanded);
+      this.columns = [];
+      this.rawData = [];
+      this.total = this.rawData.length;
+      this.data = this.rawData;
+      this.buildTable(this.tableData);
     },
   },
 };

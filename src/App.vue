@@ -20,7 +20,8 @@ export default {
         component: 'vue-json-tree-view',
         descripton: 'A JSON Tree View built in Vue.js',
         tags: [{ name: 'vue.js' }, { name: 'JSON' }],
-        steps: ['HTML Template', 'Root Component', 'View Component', { 'Transformation Logic': ['Transform Objects', 'Transform Arrays', 'Transform Values'] },
+        steps: ['HTML Template', 'Root Component', 'View Component', {
+          'Transformation Logic': ['Transform Objects', 'Transform Arrays', 'Transform Values'] },
           'Animate', 'Allow Options', 'Blog about it...'],
         obj: { key1: 'val1', key2: 'val2' },
       },
