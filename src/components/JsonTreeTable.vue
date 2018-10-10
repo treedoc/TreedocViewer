@@ -44,11 +44,15 @@
       <div slot="panel1" style='overflow:auto;display:flex;flex-grow:1'>
         <split-panel ref="splitPanelLeft" orientation="vertical" :show-border="true" :init-position="100">
           <textarea slot="panel1" style="width: 100%; height: auto; flex-grow:1; overflow:auto;" v-model="jsonStr"></textarea>
-          <tree-view  slot="panel2" :json-tree="tree" :options="{maxDepth: 2, rootObjectKey: 'root'}" v-on:nodeClicked='nodeClicked'></tree-view>
+          <div slot="panel2">
+            <tree-view v-if="tree" :json-tree="tree" :options="{maxDepth: 2, rootObjectKey: 'root'}" v-on:nodeClicked='nodeClicked'></tree-view>
+            <div v-else>No Data</div>
+          </div>          
         </split-panel>
       </div>
       <div slot="panel2">
-        <div><json-table :tableData='selectedNode' v-on:nodeClicked='nodeClicked'/></div>
+        <div v-if="selectedNode" ><json-table :tableData='selectedNode' v-on:nodeClicked='nodeClicked'/></div>
+        <div v-else>No Data</div>
       </div>
     </split-panel>
   </div>
@@ -63,6 +67,7 @@ import TreeView from './TreeView.vue';
 import JsonTable from './JsonTable.vue';
 import SplitPanel from './SplitPanel.vue';
 
+var o;
 export default {
   name: 'app',
   components: {
@@ -107,13 +112,24 @@ export default {
     jsonStr: {
       immediate: true,
       handler(data) {
-        this.jsonObj = JSON.parse(data);
+        try {
+          this.jsonObj = JSON.parse(data);
+        } catch(e) {
+          try {
+            console.log('var o=' + data);
+            eval('o=' + data);
+            this.jsonObj = o;
+          } catch(e) {
+            console.log(e);
+            this.jsonObj = null;
+          }
+        }
       },
     },
     jsonObj() {
       this.history.length = 0;
       this.historyPos = -1;
-      this.nodeClicked(this.tree.root);
+      this.tree ? this.nodeClicked(this.tree.root) : this.selectedNode = null;      
     },
   },
   methods: {
