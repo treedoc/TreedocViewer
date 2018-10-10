@@ -116,7 +116,7 @@ export default {
       },
     },
     isExpanded() {
-      this.rebuildTable(val);
+      this.rebuildTable(this.tableData);
     },
   },
 };
