@@ -1,7 +1,13 @@
 <template>
   <div>
-    <b-check v-model="isExpanded">Expanded</b-check><code>query: {{ query }}</code>
-    <datatable v-bind="$data"><json-path :tree-node="tableData" v-on:nodeClicked='nodeClicked' /></datatable>
+    
+    <!-- <code>query: {{ query }}</code> -->
+    <datatable v-bind="$data">
+      <div style="display: flex">
+        <b-btn size='sm' variant='outline-secondary' :pressed.sync='isExpanded'>Expaned</b-btn> &nbsp;
+        <json-path :tree-node="tableData" v-on:nodeClicked='nodeClicked' />
+      </div>
+    </datatable>
   </div>
 </template>
 
@@ -80,7 +86,7 @@ export default {
         if (v && !v.isLeaf()) {
           for (const ck of Object.keys(v.children)) {
             cols[ck] = null;
-            cellCnt ++;
+            cellCnt++;
           }
         }
       }
@@ -108,7 +114,6 @@ export default {
       },
     },
     isExpanded() {
-      console.log("isExpanded:" + this.isExpanded);
       this.columns = [];
       this.rawData = [];
       this.total = this.rawData.length;

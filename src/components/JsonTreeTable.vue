@@ -2,9 +2,9 @@
   <div>
     <div style="width:100%">
       <b-button-group class="mx-1" style="">
-        <b-btn :size="'sm'" :variant="showSource?'primary': 'secondary'" @click="showSource=!showSource">Source</b-btn>
-        <b-btn :size="'sm'" :variant="showTree?'primary': 'secondary'" @click="showTree=!showTree">Tree</b-btn>
-        <b-btn :size="'sm'" :variant="showTable?'primary': 'secondary'" @click="showTable=!showTable">Table</b-btn>
+        <b-btn size='sm' variant='outline-secondary' :pressed.sync='showSource'>Source</b-btn>
+        <b-btn size='sm' variant='outline-secondary' :pressed.sync='showTree'>Tree</b-btn>
+        <b-btn size='sm' variant='outline-secondary' :pressed.sync='showTable'>Table</b-btn>
       </b-button-group>
       <b-button-group class="mx-1" style="">
         <b-btn :size="'sm'" @click='back()' :disabled='historyPos <= 0'>Back</b-btn>
@@ -40,13 +40,13 @@
     </multipane>-->
 
 
-    <split-panel ref="splitPanel" orientation="vertical" :show-border="true" :init-position="300">
+    <split-panel ref="splitPanel" orientation="vertical" :show-border="true" :init-position="400">
       <div slot="panel1" style='overflow:auto;display:flex;flex-grow:1'>
         <split-panel ref="splitPanelLeft" orientation="vertical" :show-border="true" :init-position="100">
           <textarea slot="panel1" style="width: 100%; height: auto; flex-grow:1; overflow:auto;" v-model="jsonStr"></textarea>
           <tree-view  slot="panel2" :json-tree="tree" :options="{maxDepth: 2, rootObjectKey: 'root'}" v-on:nodeClicked='nodeClicked'></tree-view>
         </split-panel>
-      </div>   
+      </div>
       <div slot="panel2">
         <div><json-table :tableData='selectedNode' v-on:nodeClicked='nodeClicked'/></div>
       </div>
@@ -55,7 +55,7 @@
 </template>
 
 <script>
-import { Multipane, MultipaneResizer } from 'vue-multipane';
+// import { Multipane, MultipaneResizer } from 'vue-multipane';
 import _ from 'lodash';
 
 import { Tree } from './Tree';
@@ -74,7 +74,7 @@ export default {
   },
   props: {
     data: Object,
-    options: Object, 
+    options: Object,
   },
   data() {
     return {
@@ -90,8 +90,8 @@ export default {
   },
 
   mounted() {
-    this.$refs.splitPanel.sizeChanged(this)
-    this.$refs.splitPanelLeft.sizeChanged(this)
+    this.$refs.splitPanel.sizeChanged(this);
+    this.$refs.splitPanelLeft.sizeChanged(this);
   },
   watch: {
     data: {
@@ -100,14 +100,14 @@ export default {
         if (_.isString(data)) {
           this.jsonStr = data;
         } else {
-          this.jsonStr = JSON.stringify(data, null, "  ");
+          this.jsonStr = JSON.stringify(data, null, '  ');
         }
       },
     },
     jsonStr: {
       immediate: true,
-      handler(data) {                
-        this.jsonObj = JSON.parse(this.jsonStr);
+      handler(data) {
+        this.jsonObj = JSON.parse(data);
       },
     },
     jsonObj() {
@@ -119,6 +119,8 @@ export default {
   methods: {
     nodeClicked(data) {
       console.log(`node clicked: ${data}`);
+      if (this.selectedNode === data)
+        return;
       this.selectedNode = data;
       this.history.length = this.historyPos + 1;
       this.history.push(data);
@@ -130,17 +132,16 @@ export default {
       this.selectedNode = this.history[--this.historyPos];
     },
     forward() {
-      if (this.historyPos >= this.history.length-1) 
+      if (this.historyPos >= this.history.length - 1)
         return;
       this.selectedNode = this.history[++this.historyPos];
-    }
+    },
   },
   computed: {
     tree() {
-      return this.jsonObj ? new Tree(this.jsonObj, this.rootObjectKey || "root") : null;
+      return this.jsonObj ? new Tree(this.jsonObj, this.rootObjectKey || 'root') : null;
     },
-  }
-  
+  },
 };
 </script>
 
@@ -166,4 +167,11 @@ export default {
 .vertical-panes > .pane ~ .pane {
   border-left: 1px solid #ccc;
 }
+
+.btn-outline-secondary:hover {
+  /* border-width: 2px; */
+  color: black;
+  background-color: lightgray;
+}
+
 </style>

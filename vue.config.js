@@ -7,5 +7,6 @@ module.exports = {
     https: false,
     publicPath: '/',
     hotOnly: false,
+    historyApiFallback: true,
   },
 };
