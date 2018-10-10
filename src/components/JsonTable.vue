@@ -4,7 +4,7 @@
     <!-- <code>query: {{ query }}</code> -->
     <datatable v-bind="$data">
       <div style="display: flex">
-        <b-btn size='sm' variant='outline-secondary' :pressed.sync='isExpanded'>Expaned</b-btn> &nbsp;
+        <b-btn size='sm' variant='outline-secondary' :pressed.sync='isExpanded'>Expanded</b-btn> &nbsp;
         <json-path :tree-node="tableData" v-on:nodeClicked='nodeClicked' />
       </div>
     </datatable>
