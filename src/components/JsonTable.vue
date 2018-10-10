@@ -17,7 +17,6 @@ import thFilter from './th-Filter.vue';
 import tdValue from './td-Value.vue';
 import JsonPath from './JsonPath.vue';
 
-
 const COL_VALUE = '@value';
 const COL_NO = '#';
 const COL_KEY = '@key';
@@ -54,6 +53,13 @@ export default {
         thClass: tdClass,
         tdClass,
       });
+    },
+    rebuildTable(val) {
+      this.columns = [];
+      this.rawData = [];
+      this.buildTable(val);
+      this.data = this.rawData;
+      this.total = this.rawData.length;
     },
     buildTable(val) {
       if (!val)
@@ -99,12 +105,8 @@ export default {
     tableData: {
       immediate: true,
       handler(val) {
-        this.columns = [];
-        this.rawData = [];
-        this.total = this.rawData.length;
-        this.data = this.rawData;
         this.isExpanded = this.needExpand(val);
-        this.buildTable(val);
+        this.rebuildTable(val);
       },
     },
     query: {
@@ -114,11 +116,7 @@ export default {
       },
     },
     isExpanded() {
-      this.columns = [];
-      this.rawData = [];
-      this.total = this.rawData.length;
-      this.data = this.rawData;
-      this.buildTable(this.tableData);
+      this.rebuildTable(val);
     },
   },
 };

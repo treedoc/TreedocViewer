@@ -54727,12 +54727,12 @@ var TreeView_component = normalizeComponent(
 
 TreeView_component.options.__file = "TreeView.vue"
 /* harmony default export */ var TreeView = (TreeView_component.exports);
-// CONCATENATED MODULE: ./node_modules/cache-loader/dist/cjs.js?{"cacheDirectory":"node_modules/.cache/vue-loader","cacheIdentifier":"d50f023a-vue-loader-template"}!./node_modules/vue-loader/lib/loaders/templateLoader.js??vue-loader-options!./node_modules/cache-loader/dist/cjs.js??ref--0-0!./node_modules/vue-loader/lib??vue-loader-options!./src/components/JsonTable.vue?vue&type=template&id=70044793&
-var JsonTablevue_type_template_id_70044793_render = function () {var _vm=this;var _h=_vm.$createElement;var _c=_vm._self._c||_h;return _c('div',[_c('datatable',_vm._b({},'datatable',_vm.$data,false),[_c('div',{staticStyle:{"display":"flex"}},[_c('b-btn',{attrs:{"size":"sm","variant":"outline-secondary","pressed":_vm.isExpanded},on:{"update:pressed":function($event){_vm.isExpanded=$event}}},[_vm._v("Expaned")]),_vm._v("  \n      "),_c('json-path',{attrs:{"tree-node":_vm.tableData},on:{"nodeClicked":_vm.nodeClicked}})],1)])],1)}
-var JsonTablevue_type_template_id_70044793_staticRenderFns = []
+// CONCATENATED MODULE: ./node_modules/cache-loader/dist/cjs.js?{"cacheDirectory":"node_modules/.cache/vue-loader","cacheIdentifier":"d50f023a-vue-loader-template"}!./node_modules/vue-loader/lib/loaders/templateLoader.js??vue-loader-options!./node_modules/cache-loader/dist/cjs.js??ref--0-0!./node_modules/vue-loader/lib??vue-loader-options!./src/components/JsonTable.vue?vue&type=template&id=9ca1825a&
+var JsonTablevue_type_template_id_9ca1825a_render = function () {var _vm=this;var _h=_vm.$createElement;var _c=_vm._self._c||_h;return _c('div',[_c('datatable',_vm._b({},'datatable',_vm.$data,false),[_c('div',{staticStyle:{"display":"flex"}},[_c('b-btn',{attrs:{"size":"sm","variant":"outline-secondary","pressed":_vm.isExpanded},on:{"update:pressed":function($event){_vm.isExpanded=$event}}},[_vm._v("Expanded")]),_vm._v("  \n      "),_c('json-path',{attrs:{"tree-node":_vm.tableData},on:{"nodeClicked":_vm.nodeClicked}})],1)])],1)}
+var JsonTablevue_type_template_id_9ca1825a_staticRenderFns = []
 
 
-// CONCATENATED MODULE: ./src/components/JsonTable.vue?vue&type=template&id=70044793&
+// CONCATENATED MODULE: ./src/components/JsonTable.vue?vue&type=template&id=9ca1825a&
 
 // EXTERNAL MODULE: ./node_modules/core-js/modules/es7.array.includes.js
 var es7_array_includes = __webpack_require__("6762");
@@ -55015,6 +55015,9 @@ JsonPath_component.options.__file = "JsonPath.vue"
 
 
 
+
+
+
 //
 //
 //
@@ -55075,6 +55078,13 @@ var COL_KEY = '@key';
         thClass: tdClass,
         tdClass: tdClass
       });
+    },
+    rebuildTable: function rebuildTable(val) {
+      this.columns = [];
+      this.rawData = [];
+      this.buildTable(val);
+      this.data = this.rawData;
+      this.total = this.rawData.length;
     },
     buildTable: function buildTable(val) {
       if (!val) return;
@@ -55138,12 +55148,8 @@ var COL_KEY = '@key';
     tableData: {
       immediate: true,
       handler: function handler(val) {
-        this.columns = [];
-        this.rawData = [];
-        this.total = this.rawData.length;
-        this.data = this.rawData;
         this.isExpanded = this.needExpand(val);
-        this.buildTable(val);
+        this.rebuildTable(val);
       }
     },
     query: {
@@ -55153,11 +55159,7 @@ var COL_KEY = '@key';
       }
     },
     isExpanded: function isExpanded() {
-      this.columns = [];
-      this.rawData = [];
-      this.total = this.rawData.length;
-      this.data = this.rawData;
-      this.buildTable(this.tableData);
+      this.rebuildTable(val);
     }
   }
 });
@@ -55177,8 +55179,8 @@ var JsonTablevue_type_style_index_0_lang_css_ = __webpack_require__("00df");
 
 var JsonTable_component = normalizeComponent(
   components_JsonTablevue_type_script_lang_js_,
-  JsonTablevue_type_template_id_70044793_render,
-  JsonTablevue_type_template_id_70044793_staticRenderFns,
+  JsonTablevue_type_template_id_9ca1825a_render,
+  JsonTablevue_type_template_id_9ca1825a_staticRenderFns,
   false,
   null,
   null,
