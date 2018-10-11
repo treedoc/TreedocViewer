@@ -1,6 +1,5 @@
 <template>
   <div>
-    
     <!-- <code>query: {{ query }}</code> -->
     <datatable v-bind="$data">
       <div style="display: flex">
@@ -35,7 +34,7 @@ export default {
       total: 0,
       query: { limit: 1000 },
       isExpanded: false,
-      xprops: {jsonTable: this},
+      xprops: { jsonTable: this },
     };
   },
   methods: {

@@ -25,14 +25,14 @@ export default {
   computed: {
     strVal() {
       if (!this.value)
-        return "";
+        return '';
       if (!this.value.isObject)
         return this.value;
       if (!this.value.isObject())
         return this.value.obj;
       return null;
-    }
-  }
+    },
+  },
 };
 </script>
 <style>

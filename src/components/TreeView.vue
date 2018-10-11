@@ -7,7 +7,7 @@
 <script>
 import _ from 'lodash';
 import TreeViewItem from './TreeViewItem.vue';
-import { Tree } from './Tree';
+import { Tree } from '../models/Tree';
 
 export default {
   components: {
@@ -15,9 +15,9 @@ export default {
   },
   name: 'tree-view',
   props: {
-    data: Object,
+    data: [String, Object],
     jsonTree: Tree,
-    optionss: Object,
+    options: Object,
   },
   methods: {
     nodeClicked(data) { this.$emit('nodeClicked', data); },

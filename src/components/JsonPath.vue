@@ -13,25 +13,25 @@
 export default {
   props: ['treeNode'],
   methods: {
-    onclick(item) { 
-      console.log("onClick:" + item);
-      this.$emit('nodeClicked', item.node); 
+    onclick(item) {
+      console.log(`onClick:${item}`);
+      this.$emit('nodeClicked', item.node);
     },
   },
   computed: {
     items() {
       const paths = [];
       if (!this.treeNode)
-        return;
-      
-      paths.unshift({text: this.treeNode.key, active: true});
+        return null;
+
+      paths.unshift({ text: this.treeNode.key, active: true });
       for (let pNode = this.treeNode.parent; pNode !== null; pNode = pNode.parent) {
-        paths.unshift({text: pNode.key, href: '', node: pNode});
+        paths.unshift({ text: pNode.key, href: '', node: pNode });
       }
       return paths;
-    }
-  }
-}
+    },
+  },
+};
 </script>
 <style>
   .breadcrumb {

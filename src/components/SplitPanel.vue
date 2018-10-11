@@ -122,7 +122,7 @@
       }
     },
     methods: {
-    validateSettings () {
+      validateSettings () {
         // validate the properties
         if (this.orientation === 'vertical') {
           if (this.containerWidth) {
@@ -208,7 +208,7 @@
         })
       }
     }
-  }
+  };
 </script>
 <style scoped>
   .split-panel {

@@ -16,8 +16,6 @@
     "jquery": "^3.3.1",
     "lodash": "^4.17.10",
     "vue": "^2.5.17",
-    "vue-multipane": "^0.9.5",
-    "vue-split-panel": "^1.0.4",
     "vue2-datatable-component": "github:TrueCarry/vue2-datatable"
   },
   "main": "./dist/lib/lib.common.js",

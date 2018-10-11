@@ -22,17 +22,17 @@ export default {
       jsonTypes: {
         jsonStr: `
         {
-          sellerActualRefundAmtMoney:"USD 15.32",
-          activityHistoryBos:[
+          refundAmtMoney:"USD 15.32",
+          activityHistory:[
           {
-            $type:"PoclActivityHistBoImpl",
+            $type:"ActivityHist",
             creationDate:"2014/10/02 10:20:37",
             lastModifiedDate:"2014/10/02 10:20:37",
-            runtimeContext:"m=phx5qa01c-3336.stratus.phx.qa.ebay.com,i=10.109.178.128,t=118,p=r1cancelsvc-envf7jokk59vh,u=0,e=raptorqa",
+            runtimeContext:"t=118",
             partitionKey:0,
             activityType:"1-buyerCreateCancel",
-            poclCancelRequestId:5000001470,
-            poclActivityHistId:5000007162,
+            CancelRequestId:5000001470,
+            ActivityHistId:5000007162,
             fromState:"0-initial",
             toState:"4-approvalPending",
             actionDate:"2014/10/02 10:20:35",
@@ -41,14 +41,14 @@ export default {
             $hash:"70f48ae6"
           },
           {
-            $type:"PoclActivityHistBoImpl",
+            $type:"ActivityHistBoImpl",
             creationDate:"2014/10/02 11:15:13",
             lastModifiedDate:"2014/10/02 11:15:13",
-            runtimeContext:"m=phx5qa01c-3336.stratus.phx.qa.ebay.com,i=10.109.178.128,t=148,p=r1cancelsvc-envf7jokk59vh,u=0,e=raptorqa",
+            runtimeContext:"m=t=148",
             partitionKey:0,
             activityType:"6-sellerApprove",
-            poclCancelRequestId:5000001470,
-            poclActivityHistId:5000007163,
+            CancelRequestId:5000001470,
+            ActivityHistId:5000007163,
             fromState:"4-approvalPending",
             toState:"1-refundPending",
             actionDate:"2014/10/02 11:15:11",
@@ -63,9 +63,17 @@ export default {
           component: 'vue-json-tree-view',
           descripton: 'A JSON Tree View built in Vue.js',
           tags: [{ name: 'vue.js' }, { name: 'JSON' }],
-          steps: ['HTML Template', 'Root Component', 'View Component', {
-            'Transformation Logic': ['Transform Objects', 'Transform Arrays', 'Transform Values'] },
-            'Animate', 'Allow Options', 'Blog about it...'],
+          steps: [
+            'HTML Template',
+            'Root Component',
+            'View Component',
+            {
+              'Transformation Logic': ['Transform Objects', 'Transform Arrays', 'Transform Values'],
+            },
+            'Animate',
+            'Allow Options',
+            'Blog about it...',
+          ],
           obj: { key1: 'val1', key2: 'val2' },
         },
         sampleArray: [
@@ -89,7 +97,7 @@ export default {
             { a: 1, b: 2 },
           ],
         ],
-      }
+      },
     };
   },
 };
