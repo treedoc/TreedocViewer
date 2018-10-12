@@ -1,20 +1,21 @@
 <template>
   <div>
-    <!-- <code>query: {{ query }}</code> -->
     <datatable v-bind="$data">
       <div style="display: flex">
         <b-btn size='sm' variant='outline-secondary' :pressed.sync='isExpanded'>Expanded</b-btn> &nbsp;
-        <json-path :tree-node="tableData" v-on:nodeClicked='nodeClicked' />
+        <json-path :tree-node="selected" v-on:nodeClicked='nodeClicked' />
       </div>
     </datatable>
   </div>
 </template>
 
 <script>
+import _ from 'lodash';
 import DataFilter from './DataFilter';
 import thFilter from './th-Filter.vue';
 import tdValue from './td-Value.vue';
 import JsonPath from './JsonPath.vue';
+import TreeState from '../models/TreeState';
 
 const COL_VALUE = '@value';
 const COL_NO = '#';
@@ -22,7 +23,10 @@ const COL_KEY = '@key';
 
 export default {
   name: 'json-table',
-  props: ['tableData', 'options'],
+  props: {
+    tstate: TreeState,
+    options: Object,  // columns:Object: similar as the one defined in Vue2DataTable, exception field is the key
+  },
   components: { thFilter, JsonPath },
   data() {
     return {
@@ -34,7 +38,7 @@ export default {
       total: 0,
       query: { limit: 1000 },
       isExpanded: false,
-      xprops: { jsonTable: this },
+      xprops: { tstate: this.tstate },
     };
   },
   methods: {
@@ -43,7 +47,7 @@ export default {
         return;
 
       const tdClass = idx === 0 ? 'jsontable-min' : '';
-      this.columns.splice(idx, 0, {
+      let col = {
         title: field,
         field,
         sortable: true,
@@ -51,7 +55,18 @@ export default {
         tdComp: tdValue,
         thClass: tdClass,
         tdClass,
-      });
+      };
+      if (this.tstate.isInitialNodeSelected() && idx > 0 && this.options && this.options.columns)
+        col = this.applyColOption(col);
+
+      this.columns.splice(idx, 0, col);
+    },
+    applyColOption(col) {
+      const optCol = _.find(this.options.columns, { field: col.field });
+      col.visible = !!optCol;
+      if (optCol)
+        col = { ...col, ...optCol };
+      return col;
     },
     rebuildTable(val) {
       this.columns = [];
@@ -98,10 +113,10 @@ export default {
       const totalCell = Object.keys(cols).length * Object.keys(val.children).length;
       return cellCnt * 4 > totalCell;  // Fill ratio > 1/4
     },
-    nodeClicked(data) { this.$emit('nodeClicked', data); },
+    nodeClicked(data) { this.tstate.select(data); },
   },
   watch: {
-    tableData: {
+    selected: {
       immediate: true,
       handler(val) {
         this.isExpanded = this.needExpand(val);
@@ -110,13 +125,14 @@ export default {
     },
     query: {
       deep: true,
-      handler(val) {
-        this.data = DataFilter.filter(this.columns, this.rawData, val);
-      },
+      handler(val) { this.data = DataFilter.filter(this.columns, this.rawData, val); },
     },
-    isExpanded() {
-      this.rebuildTable(this.tableData);
-    },
+    isExpanded() { this.rebuildTable(this.selected); },
+    tstate() { this.xprops = { tstate: this.tstate }; },
+    options() { this.rebuildTable(this.selected); },
+  },
+  computed: {
+    selected() { return this.tstate && this.tstate.selected; },
   },
 };
 </script>

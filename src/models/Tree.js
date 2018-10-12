@@ -10,7 +10,7 @@ class Util {
   }
 }
 
-export class Tree {
+export default class Tree {
   static TAG_TYPE = '$type';
   static TAG_HASH = '$hash';
   static TAG_HASH_PREFIX = '$hash:';
@@ -106,6 +106,25 @@ export class TreeNode {
       }
     }
     return this._children;
+  }
+
+  /**
+   * @param {Array} path
+   */
+  getByPath(path) {
+    if (path.length === 0)
+      return this;
+    let node = null;
+    if (path[0] === '..')
+      node = this.parent;
+    else if (path[0] === '')
+      node = this.tree.root;
+    else if (path[0] === '.')
+      node = this;
+    else
+      node = this.children[path[0]];
+    path.shift();
+    return node ? node.getByPath(path) : null;
   }
 }
 

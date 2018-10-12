@@ -7,8 +7,8 @@
         <b-btn size='sm' variant='outline-secondary' :pressed.sync='showTable'>Table</b-btn>
       </b-button-group>
       <b-button-group class="mx-1" style="">
-        <b-btn :size="'sm'" @click='back()' :disabled='!history.canBack()'>Back</b-btn>
-        <b-btn :size="'sm'" @click='forward()' :disabled='!history.canForward()'>Forward</b-btn>
+        <b-btn :size="'sm'" @click='tstate.back()' :disabled='!tstate.canBack()'>Back</b-btn>
+        <b-btn :size="'sm'" @click='tstate.forward()' :disabled='!tstate.canForward()'>Forward</b-btn>
       </b-button-group>
     </div>
     <split-panel ref="splitPanel" orientation="vertical" :show-border="true" :init-position="400">
@@ -16,13 +16,13 @@
         <split-panel ref="splitPanelLeft" orientation="vertical" :show-border="true" :init-position="100">
           <textarea slot="panel1" style="width: 100%; height: auto; flex-grow:1; overflow:auto;" v-model="jsonStr"></textarea>
           <div slot="panel2">
-            <tree-view v-if="tree" :json-tree="tree" :options="{maxDepth: 2, rootObjectKey: 'root'}" v-on:nodeClicked='nodeClicked'></tree-view>
+            <tree-view v-if="tstate.tree" :json-tree="tstate.tree" :options="{maxDepth: 2, rootObjectKey: 'root'}" v-on:nodeClicked='nodeClicked'></tree-view>
             <div v-else>No Data</div>
           </div>
         </split-panel>
       </div>
       <div slot="panel2">
-        <div v-if="selectedNode" ><json-table :tableData='selectedNode' v-on:nodeClicked='nodeClicked'/></div>
+        <div v-if="tstate.tree" ><json-table :tstate='tstate' v-on:nodeClicked='nodeClicked'/></div>
         <div v-else>No Data</div>
       </div>
     </split-panel>
@@ -33,8 +33,7 @@
 // import { Multipane, MultipaneResizer } from 'vue-multipane';
 import _ from 'lodash';
 
-import { Tree } from '../models/Tree';
-import History from '../models/History';
+import TreeState from '../models/TreeState';
 import TreeView from './TreeView.vue';
 import JsonTable from './JsonTable.vue';
 import SplitPanel from './SplitPanel.vue';
@@ -58,8 +57,7 @@ export default {
       showTable: true,
       selectedNode: null,
       jsonStr: null,
-      jsonObj: null,
-      history: new History(),
+      tstate: null,
     };
   },
 
@@ -70,56 +68,17 @@ export default {
   watch: {
     data: {
       immediate: true,
-      handler(data) {
-        if (_.isString(data)) {
-          this.jsonStr = data;
-        } else {
-          this.jsonStr = JSON.stringify(data, null, '  ');
-        }
-      },
+      handler(data) { this.jsonStr = _.isString(data) ? data : this.jsonStr = JSON.stringify(data, null, '  '); },
     },
     jsonStr: {
       immediate: true,
-      handler(data) {
-        try {
-          this.jsonObj = JSON.parse(data);
-        } catch (e) {
-          try {
-            /* eslint-disable no-eval */
-            eval(`o=${data}`);
-            this.jsonObj = o;
-          } catch (e1) {
-            console.log(e1);
-            this.jsonObj = null;
-          }
-        }
-      },
-    },
-    jsonObj: {
-      immediate: true,
-      handler(data) {
-        this.history = new History();
-        if (this.tree)
-          this.nodeClicked(this.tree.root);
-        else
-          this.selectedNode = null;
-      }
+      handler(data) { this.tstate = new TreeState(data, this.rootObjectKey); },
     },
   },
   methods: {
     nodeClicked(data) {
       console.log(`node clicked: ${data}`);
-      if (this.selectedNode === data)
-        return;
-      this.selectedNode = data;
-      this.history.append(data);
-    },
-    back() { this.selectedNode = this.history.back(); },
-    forward() { this.selectedNode = this.history.forward(); },
-  },
-  computed: {
-    tree() {
-      return this.jsonObj ? new Tree(this.jsonObj, this.rootObjectKey || 'root') : null;
+      this.tstate.select(data);
     },
   },
 };
