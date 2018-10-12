@@ -24,6 +24,32 @@ export default class TreeState {
     return jsonObj ? new Tree(jsonObj, root) : null;
   }
 
+  select(node, initialNode) {
+    if (initialNode)
+      this.initialNode = node;
+    if (this.selected === node)
+      return;
+    this.selected = node;
+    this.history.append(node);
+  }
+
+  isInitialNodeSelected() {
+    return this.tree != null && this.selected === this.initialNode;
+  }
+
+  canBack() {
+    return this.history.canBack();
+  }
+  canForward() {
+    return this.history.canForward();
+  }
+  back() {
+    this.selected = this.history.back();
+  }
+  forward() {
+    this.selected = this.history.forward();
+  }
+
   static parseJson(jsonStr) {
     try {
       return JSON.parse(jsonStr);
@@ -38,22 +64,4 @@ export default class TreeState {
       }
     }
   }
-
-  select(node, initialNode) {
-    this.selected = node;
-    if (initialNode)
-      this.initialNode = node;
-    if (this.selected === node)
-      return;
-    this.history.append(node);
-  }
-
-  isInitialNodeSelected() {
-    return this.tree != null && this.selected === this.initialNode;
-  }
-
-  canBack() { return this.history.canBack(); }
-  canForward() { return this.history.canForward(); }
-  back() { this.selected = this.history.back(); }
-  forward() { this.selected = this.history.forward(); }
 }

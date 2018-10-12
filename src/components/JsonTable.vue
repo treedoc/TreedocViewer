@@ -3,6 +3,10 @@
     <datatable v-bind="$data">
       <div style="display: flex">
         <b-btn size='sm' variant='outline-secondary' :pressed.sync='isExpanded'>Expanded</b-btn> &nbsp;
+        <b-button-group class="mx-1" style="">
+          <b-btn :size="'sm'" @click='tstate.back()' :disabled='!tstate.canBack()'>Back</b-btn>
+          <b-btn :size="'sm'" @click='tstate.forward()' :disabled='!tstate.canForward()'>Forward</b-btn>
+        </b-button-group>
         <json-path :tree-node="selected" v-on:nodeClicked='nodeClicked' />
       </div>
     </datatable>

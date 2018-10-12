@@ -1,14 +1,10 @@
 <template>
   <div>
     <div style="width:100%">
-      <b-button-group class="mx-1" style="">
+      <b-button-group class="mx-1" style="" v-if="false">
         <b-btn size='sm' variant='outline-secondary' :pressed.sync='showSource'>Source</b-btn>
         <b-btn size='sm' variant='outline-secondary' :pressed.sync='showTree'>Tree</b-btn>
         <b-btn size='sm' variant='outline-secondary' :pressed.sync='showTable'>Table</b-btn>
-      </b-button-group>
-      <b-button-group class="mx-1" style="">
-        <b-btn :size="'sm'" @click='tstate.back()' :disabled='!tstate.canBack()'>Back</b-btn>
-        <b-btn :size="'sm'" @click='tstate.forward()' :disabled='!tstate.canForward()'>Forward</b-btn>
       </b-button-group>
     </div>
     <split-panel ref="splitPanel" orientation="vertical" :show-border="true" :init-position="400">
@@ -38,6 +34,7 @@ import TreeView from './TreeView.vue';
 import JsonTable from './JsonTable.vue';
 import SplitPanel from './SplitPanel.vue';
 
+/* eslint-disable no-unused-vars */
 let o;  // Used by eval
 export default {
   name: 'app',

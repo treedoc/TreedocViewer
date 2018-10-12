@@ -7,9 +7,6 @@
     <json-tree-table v-if="selected" :data='jsonData' />
     <hr />
     <div>Json Table</div>
-    <div class="inputline">JsonTable Option:
-      <b-input v-model="jsonTableOptionStr" style="width:500px"/><b-button @click="updateJsonTableOption">Update</b-button>
-    </div>
     <json-table :tstate="tstateTable" :options="jsonTableOptions"/>
   </div>
 </template>
