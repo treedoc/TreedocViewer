@@ -24,7 +24,20 @@ export default class TreeState {
     return jsonObj ? new Tree(jsonObj, root) : null;
   }
 
+  /**
+   * @param {TreeNode | String} node
+   * @param {Boolean} initialNode
+   */
   select(node, initialNode) {
+    if (this.tree == null)
+      return;
+
+    if (_.isString(node)) {
+      node = this.tree.root.getByPath(node);
+      if (!node)
+        return;
+    }
+
     if (initialNode)
       this.initialNode = node;
     if (this.selected === node)

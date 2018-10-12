@@ -46,6 +46,7 @@ export default {
   props: {
     data: [Object, Array, String],
     options: Object,
+    initalPath: String,
   },
   data() {
     return {
@@ -69,7 +70,11 @@ export default {
     },
     jsonStr: {
       immediate: true,
-      handler(data) { this.tstate = new TreeState(data, this.rootObjectKey); },
+      handler(data) { 
+        this.tstate = new TreeState(data, this.rootObjectKey); 
+        if (this.initalPath)
+          this.tstate.select(this.initalPath, true);
+      },
     },
   },
   methods: {

@@ -109,9 +109,12 @@ export class TreeNode {
   }
 
   /**
-   * @param {Array} path
+   * @param {Array | String} path
    */
   getByPath(path) {
+    if (_.isString(path))
+      path = path.split('/');
+
     if (path.length === 0)
       return this;
     let node = null;
