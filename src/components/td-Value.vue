@@ -28,8 +28,6 @@ export default {
     strVal() {
       if (!this.value)
         return '';
-      if (!this.value.isObject)
-        return this.value;
       if (!this.value.isObject())
         return this.value.obj;
       return null;

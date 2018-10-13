@@ -1,5 +1,5 @@
 import * as util from 'util'; // has no default export
-import { Tree } from '../../src/components/Tree';
+import { Tree } from '../../src/models/Tree';
 
 // import HelloWorld from '@/components/HelloWorld.vue';
 

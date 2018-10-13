@@ -29,14 +29,14 @@ export default {
       ...sampleData,
       jsonTableOptions: {
         columns: [
+          { field: 'activityType' },
+          { field: 'partitionKey' },
           {
             field: 'creationDate',
             html: (value, row) => {
               return `<a href="http://abc.com/${row.runtimeContext.obj}">${value.obj}</a>`
             },
           },
-          { field: 'partitionKey' },
-          { field: 'activityType' },
         ],
       },
     };

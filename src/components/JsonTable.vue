@@ -26,6 +26,7 @@ import thFilter from './th-Filter.vue';
 import tdValue from './td-Value.vue';
 import JsonPath from './JsonPath.vue';
 import TreeState from '../models/TreeState';
+import tdValueVue from './td-Value.vue';
 
 const COL_VALUE = '@value';
 const COL_NO = '#';
@@ -52,32 +53,6 @@ export default {
     };
   },
   methods: {
-    addColumn(field, idx = this.columns.length) {
-      if (this.columns.some(c => c.field === field))
-        return;
-
-      const tdClass = idx === 0 ? 'jsontable-min' : '';
-      let col = {
-        title: field,
-        field,
-        sortable: true,
-        thComp: thFilter,
-        tdComp: tdValue,
-        thClass: tdClass,
-        tdClass,
-      };
-      if (this.tstate.isInitialNodeSelected() && idx > 0 && this.options && this.options.columns)
-        col = this.applyColOption(col);
-
-      this.columns.splice(idx, 0, col);
-    },
-    applyColOption(col) {
-      const optCol = _.find(this.options.columns, { field: col.field });
-      col.visible = !!optCol;
-      if (optCol)
-        col = { ...col, ...optCol };
-      return col;
-    },
     rebuildTable(val) {
       this.columns = [];
       this.rawData = [];
@@ -104,8 +79,48 @@ export default {
           row[COL_VALUE] = v;
         }
       }
+      if (this.tstate.isInitialNodeSelected() && this.options && this.options.columns)
+        this.applyColOption();
     },
-    needExpand(val) {
+    addColumn(field, idx = this.columns.length) {
+      if (this.columns.some(c => c.field === field))
+        return;
+      const isKeyCol = idx === 0;
+      const tdClass =  isKeyCol ? 'jsontable-min' : '';
+      const col = {
+        title: field,
+        field,
+        sortable: true,
+        thComp: thFilter,
+      };
+      if (!isKeyCol)
+        col.tdComp = tdValue;
+      this.columns.splice(idx, 0, col);
+    },
+    applyColOption() {
+      const cols = []
+      for (let i=0; i<2 && i < this.columns.length; i++) {
+        if (i > 0 && this.columns[i].field !== COL_VALUE)
+          continue;
+        cols[cols.length] = this.columns[i];
+        this.columns.splice(0, 1);
+      }
+
+      for (const cOpt of this.options.columns) {
+        const i = this.columns.findIndex(c => c.field === cOpt.field)
+        if (i < 0)
+          continue;
+        const col = { ...this.columns[i], ...{visible: true}, ...cOpt };
+        cols[cols.length] = col;
+        this.columns.splice(i, 1);
+      }
+      for(const c of this.columns) {
+        c.visible = false;
+        cols[cols.length] = c;
+      }
+      this.columns = cols;
+    },
+    defaultExpand(val) {
       if (!val)
         return false;
 
@@ -129,7 +144,7 @@ export default {
     selected: {
       immediate: true,
       handler(val) {
-        this.isExpanded = this.needExpand(val);
+        this.isExpanded = this.defaultExpand(val);
         this.rebuildTable(val);
       },
     },
