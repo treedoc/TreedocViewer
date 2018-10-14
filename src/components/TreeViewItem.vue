@@ -1,9 +1,9 @@
 <template>
-  <div class='tree-view-item'>
-    <div v-if='!data.isLeaf()' class='tree-view-item-leaf'>
-      <div class='tree-view-item-node' @click.stop='toggleOpen()' >
-        <span :class='{opened: isOpen()}' class='tree-view-item-key tree-view-item-key-with-chevron'> <a @click.stop="$emit('nodeClicked', data)">{{data.label}} </a></span>
-        <span class='tree-view-item-hint' v-show='!isOpen()'>{{data.size}} item(s)</span>
+  <div class='item'>
+    <div v-if='!data.isSimpleType()' class='leaf'>
+      <div class='node' @click.stop='toggleOpen()' >
+        <span :class='{opened: isOpen()}' class='key key-with-chevron'> <a href="#" @click.stop="$emit('nodeClicked', data)">{{data.key}}</a></span>
+        <span class='hint'>{{data.typeSizeLabel}}</span>
       </div>
       <template v-for="(v, k) in data.children" >
         <keep-alive :key='k'>
@@ -12,29 +12,29 @@
       </template>
     </div>
     <div v-else>
-      <span class='tree-view-item-key'>{{data.key}}: </span>
-      <span class='tree-view-item-value' >{{ data.obj }}</span>
+      <span class='key'>{{data.key}}: </span>
+      <span class='value' >{{ data.obj }}</span>
     </div>
   </div>
 </template>
 
 <script>
-import _ from 'lodash';
+import { TreeNode } from '../models/Tree';
 
 export default {
   name: 'tree-view-item',
-  props: ['data', 'max-depth', 'current-depth', 'modifiable'],
+  props: {
+    data: TreeNode,
+    maxDepth: Number,
+    currentDepth: Number,
+    modifiable: Boolean,
+  },
   data() {
     return { open: this.currentDepth < this.maxDepth };
   },
   methods: {
     isOpen() { return this.open; },
     toggleOpen() { this.open = !this.open; },
-    isObject(value) { return value.type === 'object'; },
-    isArray(value) { return value.type === 'array'; },
-    isValue(value) { return value.type === 'value'; },
-    getKey(value) { return _.isInteger(value.key) ? `${value.key}:` : `'${value.key}':`; },
-    isRootObject(value = this.data) { return value.isRoot; },
     nodeClicked(data) { this.$emit('nodeClicked', data); },
   },
 };
@@ -42,38 +42,37 @@ export default {
 
 <style scoped>
 
-.tree-view-item {
+.item {
   font-family: monaco, monospace;
   font-size: 14px;
   margin-left: 18px;
 }
 
-.tree-view-item-node {
+.node {
   cursor: pointer;
   position: relative;
   white-space: nowrap;
 }
 
-.tree-view-item-leaf {
+.leaf {
   white-space: nowrap;
 }
 
-.tree-view-item-key {
+.key {
   font-weight: bold;
 }
 
-.tree-view-item-key-with-chevron {
+.key-with-chevron {
   padding-left: 14px;
 }
 
-
-.tree-view-item-key-with-chevron.opened::before {
+.key-with-chevron.opened::before {
     top:4px;
     transform: rotate(90deg);
     -webkit-transform: rotate(90deg);
 }
 
-.tree-view-item-key-with-chevron::before {
+.key-with-chevron::before {
     color: #444;
     content: '\25b6';
     font-size: 10px;
@@ -86,7 +85,7 @@ export default {
     -webkit-transition: -webkit-transform .1s ease;
 }
 
-.tree-view-item-hint {
+.hint {
   color: #ccc
 }
 </style>

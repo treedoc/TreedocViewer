@@ -50,8 +50,8 @@ export class TreeNode {
     return this.obj && this.obj[key];
   }
 
-  get label() {
-    let label = _.isArray(this.obj) ? `${this.key}[${this.obj.length}]` : this.key;
+  get typeSizeLabel() {
+    let label = _.isArray(this.obj) ? `[${this.obj.length}]` : `{${Object.keys(this.obj).length}}`;
     let tl = this.typeLabel;
     if (this.hash)
       tl += ` @ ${this.hash}`;
@@ -85,6 +85,7 @@ export class TreeNode {
   isLeaf() { return _.isEmpty(this.children); }
   isArray() { return _.isArray(this.obj); }
   isObject() { return _.isObject(this.obj); }
+  isSimpleType() { return !this.isArray() && !this.isObject(); }
 
   get size() { return _.size(this.children); }
   get children() {
@@ -92,7 +93,7 @@ export class TreeNode {
       this._children = {};
       const ia = _.isArray(this.obj);
       const io = _.isObject(this.obj);
-      if (!ia && !io)
+      if (!io)
         return this._children;
       const cks = this.obj ? Object.keys(this.obj) : [];
       if (!ia && this.tree.sorted)
@@ -110,6 +111,7 @@ export class TreeNode {
 
   /**
    * @param {Array | String} path
+   * @returns TreeNode
    */
   getByPath(path) {
     if (_.isString(path))

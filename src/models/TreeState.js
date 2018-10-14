@@ -46,22 +46,12 @@ export default class TreeState {
     this.history.append(node);
   }
 
-  isInitialNodeSelected() {
-    return this.tree != null && this.selected === this.initialNode;
-  }
-
-  canBack() {
-    return this.history.canBack();
-  }
-  canForward() {
-    return this.history.canForward();
-  }
-  back() {
-    this.selected = this.history.back();
-  }
-  forward() {
-    this.selected = this.history.forward();
-  }
+  isRootSelected() { return this.tree != null && this.selected === this.tree.root; }
+  isInitialNodeSelected() { return this.tree != null && this.selected === this.initialNode; }
+  canBack() { return this.history.canBack(); }
+  canForward() { return this.history.canForward(); }
+  back() { this.selected = this.history.back(); }
+  forward() { this.selected = this.history.forward(); }
 
   static parseJson(jsonStr) {
     try {

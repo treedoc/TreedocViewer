@@ -4,7 +4,7 @@
       <b-button tabindex='0' size='sm' variant='link' :id="filterBtnId" style='padding: 0px;'>
         <i class="m-2 fa fa-filter" :class="{ 'text-muted': !keyword}" style='margin: 1px !important;'></i>
       </b-button>
-      <b-popover :target="filterBtnId" triggers="click blur" placement='bottom' @show='showPopover'>
+      <b-popover :target="filterBtnId" triggers="click blur" placement='bottom' @show='onShowPopover'>
         <div class="input-group input-group-sm" >
           <input type="search" class="form-control" ref="input"
             v-model="keyword" @keydown.enter="search" :placeholder="`Search ${field}...`">
@@ -38,8 +38,8 @@ export default {
       query.offset = 0; // reset pagination
       this.$root.$emit('bv::hide::popover');
     },
-    showPopover() {
-      Vue.nextTick(() => this.$refs.input.focus());
+    onShowPopover() {
+      Vue.nextTick(() => this.$refs.input.focus({ preventScroll: true }));
     },
   },
   computed: {

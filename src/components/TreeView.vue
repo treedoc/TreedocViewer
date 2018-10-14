@@ -1,6 +1,6 @@
 <template>
-  <div class='tree-view-wrapper'>
-    <tree-view-item class='tree-view-item-root' :data='tree.root' :max-depth='allOptions.maxDepth' :current-depth='0' @nodeClicked='nodeClicked'></tree-view-item>
+  <div class='wrapper'>
+    <tree-view-item class='item-root' :data='tree.root' :max-depth='allOptions.maxDepth' :current-depth='0' @nodeClicked='nodeClicked'></tree-view-item>
   </div>
 </template>
 
@@ -38,17 +38,11 @@ export default {
 </script>
 
 <style scoped>
-.tree-view-wrapper {
+.wrapper {
   overflow: auto;
 }
 
-/* Find the first nested node and override the indentation */
-.tree-view-item-root > .tree-view-item-leaf > .tree-view-item {
-  margin-left: 0!important;
-}
-
-/* Root node should not be indented */
-.tree-view-item-root {
+.item-root {
   margin-left: 0!important;
 }
 </style>

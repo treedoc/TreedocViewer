@@ -19,10 +19,7 @@ export default {
   },
   props: ['field', 'value', 'row', 'xprops', 'columns'],
   methods: {
-    nodeClicked(data) {
-      console.log(`node clicked: ${data}`);
-      this.xprops.tstate.select(data);
-    },
+    nodeClicked(data) { this.xprops.tstate.select(data); },
   },
   computed: {
     strVal() {
