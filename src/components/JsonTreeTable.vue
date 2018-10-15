@@ -18,7 +18,7 @@
         </split-panel>
       </div>
       <div slot="panel2">
-        <div v-if="tstate.tree" ><json-table :tstate='tstate' v-on:nodeClicked='nodeClicked'/></div>
+        <div v-if="tstate.tree" ><json-table :table-data='tstate' v-on:nodeClicked='nodeClicked'/></div>
         <div v-else>No Data</div>
       </div>
     </split-panel>
@@ -70,8 +70,8 @@ export default {
     },
     jsonStr: {
       immediate: true,
-      handler(data) { 
-        this.tstate = new TreeState(data, this.rootObjectKey); 
+      handler(data) {
+        this.tstate = new TreeState(data, this.rootObjectKey);
         if (this.initalPath)
           this.tstate.select(this.initalPath, true);
       },

@@ -7,7 +7,7 @@
     <json-tree-table v-if="selected" :data='jsonData' :inital-path="'activityHistory'" />
     <hr />
     <div>Json Table</div>
-    <json-table :tstate="tstateTable" :options="jsonTableOptions"/>
+    <json-table :table-data="tstateTable" :options="jsonTableOptions"/>
   </div>
 </template>
 
@@ -33,9 +33,7 @@ export default {
           { field: 'partitionKey' },
           {
             field: 'creationDate',
-            html: (value, row) => {
-              return `<a href="http://abc.com/${row.runtimeContext.obj}">${value.obj}</a>`
-            },
+            html: (value, row) => `<a href="http://abc.com/${row.runtimeContext.obj}">${value.obj}</a>`,
           },
         ],
       },

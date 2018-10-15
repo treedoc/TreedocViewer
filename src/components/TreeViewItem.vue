@@ -2,7 +2,7 @@
   <div class='item'>
     <div v-if='!data.isSimpleType()' class='leaf'>
       <div class='node' @click.stop='toggleOpen()' >
-        <span :class='{opened: isOpen()}' class='key key-with-chevron'> <a href="#" @click.stop="$emit('nodeClicked', data)">{{data.key}}</a></span>
+        <span :class='{opened: isOpen()}' class='key key-with-chevron'> <a href="#/" @click.stop="$emit('nodeClicked', data)">{{data.key}}</a></span>
         <span class='hint'>{{data.typeSizeLabel}}</span>
       </div>
       <template v-for="(v, k) in data.children" >

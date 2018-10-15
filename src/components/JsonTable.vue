@@ -26,6 +26,7 @@ import tdValue from './td-Value.vue';
 import tdKey from './td-Key1.vue';
 import JsonPath from './JsonPath.vue';
 import TreeState from '../models/TreeState';
+import Tree from '../models/Tree';
 
 const COL_VALUE = '@value';
 const COL_NO = '#';
@@ -34,12 +35,14 @@ const COL_KEY = '@key';
 export default {
   name: 'json-table',
   props: {
-    tstate: TreeState,
+    /* eslint-disable object-curly-newline */
+    tableData: { TreeState, Tree, Object, String },
     options: Object,  // columns:Object: similar as the one defined in Vue2DataTable, exception field is the key
   },
   components: { thFilter, JsonPath },
   data() {
     return {
+      tstate: null,
       tblClass: 'table-bordered',
       pageSizeOptions: [20, 50, 100, 200],
       columns: [],
@@ -162,7 +165,18 @@ export default {
       handler() { this.queryData(); },
     },
     isExpanded() { this.rebuildTable(this.selected); },
-    tstate() { this.xprops = { tstate: this.tstate }; },
+    tstate: {
+      immediate: true,
+      handler(tstate) {
+        this.xprops = { tstate };
+      },
+    },
+    tableData: {  // Can't use computed as change state of computed won't work
+      immediate: true,
+      handler(tableData) {
+        this.tstate = tableData && tableData.constructor.name === 'TreeState' ? tableData : new TreeState(tableData);
+      },
+    },
     options() { this.rebuildTable(this.selected); },
   },
   computed: {
