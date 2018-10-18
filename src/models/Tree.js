@@ -39,11 +39,11 @@ export class TreeNode {
     this._children = null;
 
     if (this.hash)
-      this.hashMap[this.hash] = this;
+      this.tree.hashMap[this.hash] = this;
   }
 
   get hash() {
-    return this.getChildValue(this.tagHash);
+    return this.getChildValue(this.tree.tagHash);
   }
 
   getChildValue(key) {
@@ -54,7 +54,7 @@ export class TreeNode {
     let label = _.isArray(this.obj) ? `[${this.obj.length}]` : `{${Object.keys(this.obj).length}}`;
     let tl = this.typeLabel;
     if (this.hash)
-      tl += ` @ ${this.hash}`;
+      tl += `@${this.hash}`;
 
     if (tl.length > 0) // Speical handling for type and hash
       label += ` <${tl}>`;

@@ -79,7 +79,6 @@ export default {
   },
   methods: {
     nodeClicked(data) {
-      console.log(`node clicked: ${data}`);
       this.tstate.select(data);
     },
   },
