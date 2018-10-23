@@ -7,7 +7,7 @@
 <script>
 import _ from 'lodash';
 import TreeViewItem from './TreeViewItem.vue';
-import { Tree } from '../models/Tree';
+import Tree from '../models/Tree';
 
 export default {
   components: {

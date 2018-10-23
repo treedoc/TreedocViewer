@@ -56,7 +56,7 @@ export class TreeNode {
     if (this.hash)
       tl += `@${this.hash}`;
 
-    if (tl.length > 0) // Speical handling for type and hash
+    if (tl.length > 0) // Special handling for type and hash
       label += ` <${tl}>`;
     return label;
   }
@@ -75,7 +75,8 @@ export class TreeNode {
   }
 
   toString(indent = '') {
-    let str = `${indent}${this.label}: ${this.obj}\n`;
+    const typeLabel = !_.isObject(this.obj) ? '' : `(${this.typeSizeLabel})`;
+    let str = `${indent}${this.key}${typeLabel}: ${this.obj}\n`;
     for (const c of Object.keys(this.children)) {
       str += this.children[c].toString(`${indent}  `);
     }
@@ -133,5 +134,5 @@ export class TreeNode {
   }
 }
 
-Object.defineProperty(TreeNode.prototype, 'label', { enumerable: true });
+Object.defineProperty(TreeNode.prototype, 'typeSizeLabel', { enumerable: true });
 Object.defineProperty(TreeNode.prototype, 'children', { enumerable: true });

@@ -14,7 +14,6 @@ export default {
   props: ['treeNode'],
   methods: {
     onclick(item) {
-      console.log(`onClick:${item}`);
       this.$emit('nodeClicked', item.node);
     },
   },

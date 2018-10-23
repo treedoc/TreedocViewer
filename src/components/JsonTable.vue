@@ -125,7 +125,8 @@ export default {
       }
       for (const c of this.columns) {
         c.visible = false;
-        cols[cols.length] = c;
+        // cols[cols.length] = c; // This col won't be reactive, not sure the reason
+        cols[cols.length] = { ...c };  // Use spread to make the col reactive
       }
       this.columns = cols;
     },

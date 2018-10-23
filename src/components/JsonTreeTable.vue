@@ -79,12 +79,12 @@ export default {
   },
   methods: {
     nodeClicked(data) {
+      // console.log(data.toString());
       this.tstate.select(data);
     },
   },
 };
 </script>
-
 <style>
 .multipane.foo.layout-v .multipane-resizer {
   margin: 0; left: 0; /* reset default styling */
@@ -113,5 +113,4 @@ export default {
   color: black;
   background-color: lightgray;
 }
-
 </style>
