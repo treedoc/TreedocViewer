@@ -28,6 +28,7 @@ export default {
       selected: sampleData.jsonTypeNames[0],
       ...sampleData,
       jsonTableOptions: {
+        Pagination: false,
         columns: [
           { field: 'activityType' },
           { field: 'partitionKey' },

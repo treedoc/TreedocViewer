@@ -1,6 +1,6 @@
 <template>
   <div>
-    <datatable v-bind="$data">
+    <datatable v-bind="tableOpt">
       <div style="display: flex">
         <b-btn size='sm' variant='outline-secondary' :pressed.sync='isExpanded' v-b-tooltip.hover title="expand">
           <i class="fa fa-arrows-h"></i>
@@ -42,41 +42,49 @@ export default {
   components: { thFilter, JsonPath },
   data() {
     return {
+      tableOpt: {
+        tblClass: 'table-bordered',
+        pageSizeOptions: [20, 50, 100, 200],
+        columns: [],
+        data: [],
+        rawData: [],
+        total: 0,
+        query: { limit: 100 },
+        xprops: { tstate: this.tstate },
+      },
+      defTableOpt: null,
       tstate: null,
-      tblClass: 'table-bordered',
-      pageSizeOptions: [20, 50, 100, 200],
-      columns: [],
-      data: [],
-      rawData: [],
-      total: 0,
-      query: { limit: 100 },
       isExpanded: false,
-      xprops: { tstate: this.tstate },
     };
   },
   methods: {
     /** @param {TreeNode} val */
     rebuildTable(val) {
-      this.columns = [];
-      this.rawData = [];
+      if (!this.defTableOpt)  // backup for the first time, we have to intialize tableOpt attributes to make them reacti
+        this.defTableOpt = this.tableOpt;
+
+      this.defTableOpt.columns = [];
+      this.tableOpt = { ...this.defTableOpt, ...(this.applyCustomOpts && this.options) };
       this.buildTable(val);
       this.queryData();
-      this.total = this.rawData.length;
+      this.tableOpt.xprops.tstate = this.tstate;
     },
     /** @param {TreeNode} val */
     buildTable(val) {
+      this.tableOpt.rawData = [];
+
       if (!val)
         return;
       const ia = val.isArray();
       const keyCol = ia ? COL_NO : COL_KEY;
-      this.addColumn(keyCol);
+      this.addColumn(keyCol, 0);
       for (const k of Object.keys(val.children)) {
         const v = val.children[k];
         const row = {
           [keyCol]: ia ? Number(k) : k,
           [COL_VALUE]: v,
         };
-        this.rawData.push(row);
+        this.tableOpt.rawData.push(row);
         if (this.isExpanded && v && !v.isLeaf()) {
           for (const ck of Object.keys(v.children)) {
             this.addColumn(ck);
@@ -86,51 +94,32 @@ export default {
           this.addColumn(COL_VALUE, 1);
         }
       }
-      if (this.tstate.isInitialNodeSelected() && this.options && this.options.columns)
-        this.applyColOption();
     },
-    addColumn(field, idx = this.columns.length) {
-      if (this.columns.some(c => c.field === field))
-        return;
+    addColumn(field, idx = this.tableOpt.columns.length) {
       const isKeyCol = idx === 0;
-      const col = {
-        title: field,
-        field,
-        sortable: true,
-        thComp: thFilter,
-        tdComp: isKeyCol ? tdKey : tdValue,
-      };
+      const cols = this.tableOpt.columns;
+      let col = cols.find(c => c.field === field);
+      if (!col) {
+        col = {
+          field,
+          visible: isKeyCol || !(this.applyCustomOpts && this.options.columns),
+        };
+        cols.splice(idx, 0, col);
+      }
+      if (col.processed)
+        return;
+
+      col.title = col.title || field;
+      col.sortable = true;
+      col.thComp = col.thComp || thFilter;
+      col.tdComp = col.tdComp || isKeyCol ? tdKey : tdValue;
+      col.processed = true;
+
       if (isKeyCol) {
         col.thClass = 'jsontable-min';
         col.tdClass = 'jsontable-min';
-      } else {
-        col.tdComp = tdValue;
       }
-
-      this.columns.splice(idx, 0, col);
     },
-    applyColOption() {
-      const cols = [];
-      while (this.columns.length > 0 && this.isSpecialCol(this.columns[0].field)) {
-        [cols[cols.length]] = this.columns;
-        this.columns.shift();
-      }
-      for (const cOpt of this.options.columns) {
-        const i = this.columns.findIndex(c => c.field === cOpt.field);
-        if (i < 0)
-          continue;
-        const col = { ...this.columns[i], ...{ visible: true }, ...cOpt };
-        cols[cols.length] = col;
-        this.columns.splice(i, 1);
-      }
-      for (const c of this.columns) {
-        c.visible = false;
-        // cols[cols.length] = c; // This col won't be reactive, not sure the reason
-        cols[cols.length] = { ...c };  // Use spread to make the col reactive
-      }
-      this.columns = cols;
-    },
-    isSpecialCol(col) { return col === COL_VALUE || col === COL_KEY || col === COL_NO; },
     defaultExpand(val) {
       if (!val)
         return false;
@@ -150,10 +139,23 @@ export default {
     },
     nodeClicked(data) { this.tstate.select(data); },
     queryData() {
-      this.data = DataFilter.filter(this.columns, this.rawData, this.query);
+      const opt = this.tableOpt;
+      opt.data = DataFilter.filter(opt.columns, opt.rawData, opt.query);
+      opt.total = opt.data.length;
     },
   },
   watch: {
+    query: {
+      deep: true,
+      handler() { this.queryData(); },
+    },
+    isExpanded() { this.rebuildTable(this.selected); },
+    tableData: {  // Can't use computed as change state of computed won't work
+      immediate: true,
+      handler(tableData) {
+        this.tstate = tableData && tableData.constructor.name === 'TreeState' ? tableData : new TreeState(tableData);
+      },
+    },
     selected: {
       immediate: true,
       handler(val) {
@@ -161,27 +163,12 @@ export default {
         this.rebuildTable(val);
       },
     },
-    query: {
-      deep: true,
-      handler() { this.queryData(); },
-    },
-    isExpanded() { this.rebuildTable(this.selected); },
-    tstate: {
-      immediate: true,
-      handler(tstate) {
-        this.xprops = { tstate };
-      },
-    },
-    tableData: {  // Can't use computed as change state of computed won't work
-      immediate: true,
-      handler(tableData) {
-        this.tstate = tableData && tableData.constructor.name === 'TreeState' ? tableData : new TreeState(tableData);
-      },
-    },
     options() { this.rebuildTable(this.selected); },
   },
   computed: {
     selected() { return this.tstate && this.tstate.selected; },
+    applyCustomOpts() { return this.tstate.isInitialNodeSelected() && this.isExpanded && this.options; },
+    query() { return this.tableOpt.query; },
   },
 };
 </script>
