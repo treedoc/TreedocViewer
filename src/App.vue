@@ -4,7 +4,7 @@
     <div class="inputline">Select JSON data:
       <b-form-select v-model="selected" :options="jsonTypeNames" class="mb-3" style="width:auto"/>
     </div>
-    <json-tree-table v-if="selected" :data='jsonData' :inital-path="'activityHistory'" />
+    <!-- <json-tree-table v-if="selected" :data='jsonData' :inital-path="'activityHistory'" /> -->
     <hr />
     <div>Json Table</div>
     <json-table :table-data="tstateTable" :options="jsonTableOptions"/>
@@ -16,6 +16,7 @@ import JsonTreeTable from './components/JsonTreeTable.vue';
 import JsonTable from './components/JsonTable.vue';
 import sampleData from './sampleData';
 import TreeState from './models/TreeState';
+import TDSample from './tdSample.vue';
 
 export default {
   name: 'app',
@@ -31,7 +32,10 @@ export default {
         Pagination: false,
         columns: [
           { field: 'activityType' },
-          { field: 'partitionKey' },
+          { 
+            field: 'partitionKey',
+            tdComp: TDSample,
+          },
           {
             field: 'creationDate',
             html: (value, row) => `<a href="http://abc.com/${row.runtimeContext.obj}">${value.obj}</a>`,

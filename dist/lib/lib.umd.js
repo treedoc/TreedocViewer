@@ -55084,12 +55084,12 @@ var TreeView_component = normalizeComponent(
 
 TreeView_component.options.__file = "TreeView.vue"
 /* harmony default export */ var TreeView = (TreeView_component.exports);
-// CONCATENATED MODULE: ./node_modules/cache-loader/dist/cjs.js?{"cacheDirectory":"node_modules/.cache/vue-loader","cacheIdentifier":"d50f023a-vue-loader-template"}!./node_modules/vue-loader/lib/loaders/templateLoader.js??vue-loader-options!./node_modules/cache-loader/dist/cjs.js??ref--0-0!./node_modules/vue-loader/lib??vue-loader-options!./src/components/JsonTable.vue?vue&type=template&id=d723dbfa&
-var JsonTablevue_type_template_id_d723dbfa_render = function () {var _vm=this;var _h=_vm.$createElement;var _c=_vm._self._c||_h;return _c('div',[_c('datatable',_vm._b({},'datatable',_vm.tableOpt,false),[_c('div',{staticStyle:{"display":"flex"}},[_c('b-btn',{directives:[{name:"b-tooltip",rawName:"v-b-tooltip.hover",modifiers:{"hover":true}}],attrs:{"size":"sm","variant":"outline-secondary","pressed":_vm.isExpanded,"title":"expand"},on:{"update:pressed":function($event){_vm.isExpanded=$event}}},[_c('i',{staticClass:"fa fa-arrows-h"})]),_vm._v("  \n      "),_c('b-button-group',{staticClass:"mx-1"},[(_vm.tstate.canBack())?_c('b-btn',{attrs:{"size":'sm',"title":"back"},on:{"click":function($event){_vm.tstate.back()}}},[_c('i',{staticClass:"fa fa-arrow-left"})]):_vm._e(),(_vm.tstate.canForward())?_c('b-btn',{attrs:{"size":'sm',"title":"forward"},on:{"click":function($event){_vm.tstate.forward()}}},[_c('i',{staticClass:"fa fa-arrow-right"})]):_vm._e()],1),(!_vm.tstate.isRootSelected())?_c('json-path',{attrs:{"tree-node":_vm.selected},on:{"nodeClicked":_vm.nodeClicked}}):_vm._e()],1)])],1)}
-var JsonTablevue_type_template_id_d723dbfa_staticRenderFns = []
+// CONCATENATED MODULE: ./node_modules/cache-loader/dist/cjs.js?{"cacheDirectory":"node_modules/.cache/vue-loader","cacheIdentifier":"d50f023a-vue-loader-template"}!./node_modules/vue-loader/lib/loaders/templateLoader.js??vue-loader-options!./node_modules/cache-loader/dist/cjs.js??ref--0-0!./node_modules/vue-loader/lib??vue-loader-options!./src/components/JsonTable.vue?vue&type=template&id=0118eb1c&
+var JsonTablevue_type_template_id_0118eb1c_render = function () {var _vm=this;var _h=_vm.$createElement;var _c=_vm._self._c||_h;return _c('div',[_c('datatable',_vm._b({},'datatable',_vm.tableOpt,false),[_c('div',{staticStyle:{"display":"flex"}},[_c('b-btn',{directives:[{name:"b-tooltip",rawName:"v-b-tooltip.hover",modifiers:{"hover":true}}],attrs:{"size":"sm","variant":"outline-secondary","pressed":_vm.isExpanded,"title":"expand"},on:{"update:pressed":function($event){_vm.isExpanded=$event}}},[_c('i',{staticClass:"fa fa-arrows-h"})]),_vm._v("  \n      "),_c('b-button-group',{staticClass:"mx-1"},[(_vm.tstate.canBack())?_c('b-btn',{attrs:{"size":'sm',"title":"back"},on:{"click":function($event){_vm.tstate.back()}}},[_c('i',{staticClass:"fa fa-arrow-left"})]):_vm._e(),(_vm.tstate.canForward())?_c('b-btn',{attrs:{"size":'sm',"title":"forward"},on:{"click":function($event){_vm.tstate.forward()}}},[_c('i',{staticClass:"fa fa-arrow-right"})]):_vm._e()],1),(!_vm.tstate.isRootSelected())?_c('json-path',{attrs:{"tree-node":_vm.selected},on:{"nodeClicked":_vm.nodeClicked}}):_vm._e()],1)])],1)}
+var JsonTablevue_type_template_id_0118eb1c_staticRenderFns = []
 
 
-// CONCATENATED MODULE: ./src/components/JsonTable.vue?vue&type=template&id=d723dbfa&
+// CONCATENATED MODULE: ./src/components/JsonTable.vue?vue&type=template&id=0118eb1c&
 
 // EXTERNAL MODULE: ./node_modules/core-js/modules/es6.function.name.js
 var es6_function_name = __webpack_require__("7f7f");
@@ -55432,9 +55432,6 @@ JsonPath_component.options.__file = "JsonPath.vue"
 
 
 
-
-
-
 //
 //
 //
@@ -55567,7 +55564,7 @@ var COL_KEY = '@key';
       col.title = col.title || field;
       col.sortable = true;
       col.thComp = col.thComp || th_Filter;
-      col.tdComp = col.tdComp || isKeyCol ? td_Key1 : td_Value;
+      col.tdComp = col.tdComp || (isKeyCol ? td_Key1 : td_Value);
       col.processed = true;
 
       if (isKeyCol) {
@@ -55665,8 +55662,8 @@ var JsonTablevue_type_style_index_0_lang_css_ = __webpack_require__("00df");
 
 var JsonTable_component = normalizeComponent(
   components_JsonTablevue_type_script_lang_js_,
-  JsonTablevue_type_template_id_d723dbfa_render,
-  JsonTablevue_type_template_id_d723dbfa_staticRenderFns,
+  JsonTablevue_type_template_id_0118eb1c_render,
+  JsonTablevue_type_template_id_0118eb1c_staticRenderFns,
   false,
   null,
   null,

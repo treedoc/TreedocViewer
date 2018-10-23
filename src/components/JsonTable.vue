@@ -112,7 +112,7 @@ export default {
       col.title = col.title || field;
       col.sortable = true;
       col.thComp = col.thComp || thFilter;
-      col.tdComp = col.tdComp || isKeyCol ? tdKey : tdValue;
+      col.tdComp = col.tdComp || (isKeyCol ? tdKey : tdValue);
       col.processed = true;
 
       if (isKeyCol) {
