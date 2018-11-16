@@ -7,7 +7,19 @@
         <b-btn size='sm' variant='outline-secondary' :pressed.sync='showTable'>Table</b-btn>
       </b-button-group>
     </div>
-    <split-panel ref="splitPanel" orientation="vertical" :show-border="true" :init-position="400">
+    <m-split-panel :initPositions='[100, 300]'>
+      <textarea slot="0" style="width: 100%; height: auto; flex-grow:1; overflow:auto;" v-model="jsonStr"></textarea>
+      <div slot="1">
+        <tree-view v-if="tstate.tree" :json-tree="tstate.tree" :options="{maxDepth: 2, rootObjectKey: 'root'}" v-on:nodeClicked='nodeClicked'></tree-view>
+        <div v-else>No Data</div>
+      </div>
+      <div slot="2">
+        <div v-if="tstate.tree" ><json-table :table-data='tstate' v-on:nodeClicked='nodeClicked'/></div>
+        <div v-else>No Data</div>
+      </div>
+    </m-split-panel>
+
+    <!-- <split-panel ref="splitPanel" orientation="vertical" :show-border="true" :init-position="400">
       <div slot="panel1" style='overflow:auto;display:flex;flex-grow:1'>
         <split-panel ref="splitPanelLeft" orientation="vertical" :show-border="true" :init-position="100">
           <textarea slot="panel1" style="width: 100%; height: auto; flex-grow:1; overflow:auto;" v-model="jsonStr"></textarea>
@@ -21,7 +33,7 @@
         <div v-if="tstate.tree" ><json-table :table-data='tstate' v-on:nodeClicked='nodeClicked'/></div>
         <div v-else>No Data</div>
       </div>
-    </split-panel>
+    </split-panel> -->
   </div>
 </template>
 
@@ -33,6 +45,7 @@ import TreeState from '../models/TreeState';
 import TreeView from './TreeView.vue';
 import JsonTable from './JsonTable.vue';
 import SplitPanel from './SplitPanel.vue';
+import MSplitPanel from './MSplitPanel.vue';
 
 /* eslint-disable no-unused-vars */
 let o;  // Used by eval
@@ -42,6 +55,7 @@ export default {
     TreeView,
     JsonTable,
     SplitPanel,
+    MSplitPanel,
   },
   props: {
     data: [Object, Array, String],

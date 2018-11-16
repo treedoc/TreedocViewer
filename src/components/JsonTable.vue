@@ -141,7 +141,7 @@ export default {
     queryData() {
       const opt = this.tableOpt;
       opt.data = DataFilter.filter(opt.columns, opt.rawData, opt.query);
-      opt.total = opt.data.length;
+      opt.total = opt.rawData.length;
     },
   },
   watch: {

@@ -4,10 +4,15 @@
     <div class="inputline">Select JSON data:
       <b-form-select v-model="selected" :options="jsonTypeNames" class="mb-3" style="width:auto"/>
     </div>
-    <!-- <json-tree-table v-if="selected" :data='jsonData' :inital-path="'activityHistory'" /> -->
+    <json-tree-table v-if="selected" :data='jsonData' :inital-path="'activityHistory'" />
     <hr />
     <div>Json Table</div>
     <json-table :table-data="tstateTable" :options="jsonTableOptions"/>
+    <hr /> 
+    <div>MSplitPanel</div>
+    <m-split-panel-test/>
+
+
   </div>
 </template>
 
@@ -17,12 +22,14 @@ import JsonTable from './components/JsonTable.vue';
 import sampleData from './sampleData';
 import TreeState from './models/TreeState';
 import TDSample from './tdSample.vue';
+import MSplitPanelTest from './samples/MSplitPanelTest';
 
 export default {
   name: 'app',
   components: {
     JsonTreeTable,
     JsonTable,
+    MSplitPanelTest
   },
   data() {
     return {

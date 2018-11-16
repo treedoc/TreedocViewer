@@ -14,13 +14,6 @@
   </div>
 </template>
 <script>
-class Pane {
-  constructor(size, min, max) {
-    this.size = size;
-    this.min = min;
-    this.max = max;
-  }
-}
 export default {
   props: {
     initPositions: Array,
@@ -29,7 +22,6 @@ export default {
     return {
       resizeIndex: -1,
       startPos: -1,
-      panes: [],
       splitPositions: [],
       handlePositions: [],
     }
@@ -95,7 +87,6 @@ export default {
     },
   },
   created() {
-    console.log(this.$slots);
     this.splitPositions = this.initPositions;
     this.handlePositions = [...this.splitPositions];
   },
@@ -119,7 +110,7 @@ export default {
   height: 100%;
 }
 .sp-handle {
-  position: absolute;
+  position: absolute; 
 }
 </style>
 
