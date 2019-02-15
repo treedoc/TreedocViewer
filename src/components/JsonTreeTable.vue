@@ -73,10 +73,10 @@ export default {
     };
   },
 
-  mounted() {
-    this.$refs.splitPanel.sizeChanged(this);
-    this.$refs.splitPanelLeft.sizeChanged(this);
-  },
+  // mounted() {
+  //   this.$refs.splitPanel.sizeChanged(this);
+  //   this.$refs.splitPanelLeft.sizeChanged(this);
+  // },
   watch: {
     data: {
       immediate: true,
