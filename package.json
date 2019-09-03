@@ -6,6 +6,7 @@
     "build-app": "vue-cli-service build --dest dist/app",
     "build-lib": "vue-cli-service build --dest dist/lib --target lib --name lib src/lib.js",
     "build": "yarn build-app && yarn build-lib",
+    "deploy": "yarn build-app && gh-pages -d dist/app",
     "test:unit": "vue-cli-service test:unit",
     "lint": "vue-cli-service lint"
   },
@@ -35,6 +36,7 @@
     "babel-core": "7.0.0-bridge.0",
     "babel-jest": "^23.4.2",
     "babel-preset-env": "^1.7.0",
+    "gh-pages": "^2.1.1",
     "vue-template-compiler": "^2.5.17"
   },
   "browserslist": [
