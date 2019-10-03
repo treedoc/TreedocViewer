@@ -18,6 +18,7 @@ module.exports = {
     'no-multi-spaces': ['off'],
     'no-param-reassign': ['off'],
     'no-underscore-dangle': ['off'],
+    'no-console': ['off'],
     'no-restricted-syntax': [
       'error',
       'ForInStatement',

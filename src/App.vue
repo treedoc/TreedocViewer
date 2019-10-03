@@ -6,6 +6,7 @@
     </div>
     <json-tree-table v-if="selected" :data='jsonData' :inital-path="'activityHistory'" />
 
+    <div v-if=false>
     <hr />
     <div>Json Table</div>
     <json-table :table-data="tstateTable" :options="jsonTableOptions"/>
@@ -13,6 +14,7 @@
     <hr />
     <div>MSplitPanel</div>
     <m-split-panel-test/>
+    </div>
   </div>
 </template>
 
