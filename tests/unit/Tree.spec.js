@@ -1,5 +1,5 @@
 import * as util from 'util'; // has no default export
-import { Tree } from '../../src/models/Tree';
+import Tree from '../../src/models/Tree';
 
 // import HelloWorld from '@/components/HelloWorld.vue';
 
@@ -28,7 +28,7 @@ describe('Tree', () => {
   // console.log(`children=${util.inspect(tree.root.children, true, 10, true)}`);
 
   it('', () => {
-    expect(tree.root.label).toMatch('root');
-    expect(tree.root.children.child1.label).toMatch('child1');
+    expect(tree.root.key).toMatch('root');
+    expect(tree.root.children.child1.key).toMatch('child1');
   });
 });

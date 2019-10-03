@@ -5,14 +5,14 @@
       <b-form-select v-model="selected" :options="jsonTypeNames" class="mb-3" style="width:auto"/>
     </div>
     <json-tree-table v-if="selected" :data='jsonData' :inital-path="'activityHistory'" />
+
     <hr />
     <div>Json Table</div>
     <json-table :table-data="tstateTable" :options="jsonTableOptions"/>
-    <hr /> 
+
+    <hr />
     <div>MSplitPanel</div>
     <m-split-panel-test/>
-
-
   </div>
 </template>
 
@@ -22,14 +22,14 @@ import JsonTable from './components/JsonTable.vue';
 import sampleData from './sampleData';
 import TreeState from './models/TreeState';
 import TDSample from './tdSample.vue';
-import MSplitPanelTest from './samples/MSplitPanelTest';
+import MSplitPanelTest from './samples/MSplitPanelTest.vue';
 
 export default {
   name: 'app',
   components: {
     JsonTreeTable,
     JsonTable,
-    MSplitPanelTest
+    MSplitPanelTest,
   },
   data() {
     return {
@@ -39,7 +39,7 @@ export default {
         Pagination: false,
         columns: [
           { field: 'activityType' },
-          { 
+          {
             field: 'partitionKey',
             tdComp: TDSample,
           },

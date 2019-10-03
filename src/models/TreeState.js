@@ -1,6 +1,8 @@
 import _ from 'lodash';
+import { TDJSONParser, TDJSONParserOption, TDNodeType } from 'jsonex-treedoc';
 import History from './History';
 import Tree from './Tree';
+
 
 let o;
 export default class TreeState {
@@ -9,18 +11,21 @@ export default class TreeState {
    * @param {String} root
    */
   constructor(treeData, root) {
-    this.tree = TreeState.buildTree(treeData, root);
+    this.tree = this.buildTree(treeData, root);
     this.history = new History();
     this.selected = null;
     this.initialNode = null;
+    this.sourceType = 'OBJECT';
     if (this.tree)
       this.select(this.tree.root, true);
   }
 
-  static buildTree(treeData, root) {
-    if (!treeData || treeData.constructor.name === 'Tree')
+  buildTree(treeData, root) {
+    if (!treeData || treeData.constructor.name === 'Tree') {
+      this.sourceType = 'TREE';
       return treeData;
-    const jsonObj = _.isString(treeData) ? TreeState.parseJson(treeData) : treeData;
+    }
+    const jsonObj = _.isString(treeData) ? this.parseJson(treeData) : treeData;
     return jsonObj ? new Tree(jsonObj, root) : null;
   }
 
@@ -53,18 +58,25 @@ export default class TreeState {
   back() { this.selected = this.history.back(); }
   forward() { this.selected = this.history.forward(); }
 
-  static parseJson(jsonStr) {
+  parseJson(jsonStr) {
     try {
-      return JSON.parse(jsonStr);
+      const json = JSON.parse(jsonStr);
+      this.sourceType = 'JSON_PARSE';
+      return json;
     } catch (e) {
       try {
         /* eslint-disable no-eval */
         eval(`o=${jsonStr}`);
+        this.sourceType = 'EVAL';
         return o;
       } catch (e1) {
-        console.error(e1);
-        return null;
+        try {
+          return TDJSONParser.get().parse(new TDJSONParserOption(jsonStr).setDefaultRootType(TDNodeType.MAP)).toObject();
+        } catch (e2) {
+          console.error(e2);
+        }
       }
     }
+    return null;
   }
 }
