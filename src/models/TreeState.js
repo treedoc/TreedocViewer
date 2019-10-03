@@ -11,18 +11,18 @@ export default class TreeState {
    * @param {String} root
    */
   constructor(treeData, root) {
+    this.parseResult = 'OBJECT';
     this.tree = this.buildTree(treeData, root);
     this.history = new History();
     this.selected = null;
     this.initialNode = null;
-    this.sourceType = 'OBJECT';
     if (this.tree)
       this.select(this.tree.root, true);
   }
 
   buildTree(treeData, root) {
     if (!treeData || treeData.constructor.name === 'Tree') {
-      this.sourceType = 'TREE';
+      this.parseResult = 'TREE';
       return treeData;
     }
     const jsonObj = _.isString(treeData) ? this.parseJson(treeData) : treeData;
@@ -61,18 +61,21 @@ export default class TreeState {
   parseJson(jsonStr) {
     try {
       const json = JSON.parse(jsonStr);
-      this.sourceType = 'JSON_PARSE';
+      this.parseResult = 'JSON_PARSE';
       return json;
     } catch (e) {
       try {
         /* eslint-disable no-eval */
         eval(`o=${jsonStr}`);
-        this.sourceType = 'EVAL';
+        this.parseResult = 'EVAL';
         return o;
       } catch (e1) {
         try {
-          return TDJSONParser.get().parse(new TDJSONParserOption(jsonStr).setDefaultRootType(TDNodeType.MAP)).toObject();
+          const o1 = TDJSONParser.get().parse(new TDJSONParserOption(jsonStr).setDefaultRootType(TDNodeType.MAP)).toObject();
+          this.parseResult = 'TDJSON_PARSE';
+          return o1;
         } catch (e2) {
+          this.parseResult = `Error:${e2.message}`;
           console.error(e2);
         }
       }

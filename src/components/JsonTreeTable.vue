@@ -6,9 +6,15 @@
         <b-btn size='sm' variant='outline-secondary' :pressed.sync='showTree'>Tree</b-btn>
         <b-btn size='sm' variant='outline-secondary' :pressed.sync='showTable'>Table</b-btn>
       </b-button-group>
+      <b-button-group class="mx-1" style="">
+        <b-btn size='sm' variant='outline-secondary' @click='format'>format</b-btn>
+      </b-button-group>
     </div>
     <m-split-panel style="width:99%;height:100%">
-      <textarea slot="source" :grow="20" style="width: 100%; height: auto; flex-grow:1; overflow:auto;" v-model="jsonStr"></textarea>
+      <div slot="source" :grow="20" style="width: 100%">
+        <div class="status-msg" :class="{error: hasError}" >{{parseResult}}</div>
+        <textarea style="width: 100%; min-height:400px; height: 100%; flex-grow:1; overflow:auto;" v-model="jsonStr"></textarea>
+      </div>
       <div slot="tree" :grow="30">
         <tree-view v-if="tstate.tree" :json-tree="tstate.tree" :options="{maxDepth: 2, rootObjectKey: 'root'}" v-on:nodeClicked='nodeClicked'></tree-view>
         <div v-else>No Data</div>
@@ -71,6 +77,10 @@ export default {
       selectedNode: null,
       jsonStr: null,
       tstate: null,
+      parseResult: null,
+      error: {
+        color: 'red',
+      },
     };
   },
 
@@ -87,6 +97,8 @@ export default {
       immediate: true,
       handler(data) {
         this.tstate = new TreeState(data, this.rootObjectKey);
+        this.parseResult = this.tstate.parseResult;
+        console.log(`ParseResult=${this.parseResult}`);
         if (this.initalPath)
           this.tstate.select(this.initalPath, true);
       },
@@ -96,6 +108,14 @@ export default {
     nodeClicked(data) {
       // console.log(data.toString());
       this.tstate.select(data);
+    },
+    format() {
+      this.jsonStr = JSON.stringify(this.tstate.tree.obj, null, 2);
+    },
+  },
+  computed: {
+    hasError() {
+      return this.parseResult.startsWith('Error');
     },
   },
 };
@@ -127,5 +147,14 @@ export default {
   /* border-width: 2px; */
   color: black;
   background-color: lightgray;
+}
+
+.status-msg {
+  font-size: smaller;
+  color: green;
+}
+
+.error {
+  color: red;
 }
 </style>
