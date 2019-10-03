@@ -1,11 +1,12 @@
 {
   "name": "jsontreetable",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "scripts": {
     "serve": "vue-cli-service serve",
     "build-app": "vue-cli-service build --dest dist/app",
     "build-lib": "vue-cli-service build --dest dist/lib --target lib --name lib src/lib.js",
     "build": "yarn build-app && yarn build-lib",
+    "deploy": "yarn build-app && gh-pages -d dist/app",
     "test:unit": "vue-cli-service test:unit",
     "lint": "vue-cli-service lint"
   },
@@ -41,6 +42,8 @@
     "babel-preset-env": "^1.7.0",
     "eslint": "^4.19.1",
     "vue-template-compiler": "^2.6.10"
+    "gh-pages": "^2.1.1"
+
   },
   "browserslist": [
     "> 1%",
