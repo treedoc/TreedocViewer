@@ -1,5 +1,6 @@
 <template>
   <div>
+    query: {{query}}
     <datatable v-bind="tableOpt">
       <div style="display: flex">
         <b-btn size='sm' variant='outline-secondary' :pressed.sync='isExpanded' v-b-tooltip.hover title="expand">
@@ -39,17 +40,17 @@ export default {
     tableData: { TreeState, Tree, Object, String },
     options: Object,  // columns:Object: similar as the one defined in Vue2DataTable, exception field is the key
   },
-  components: { thFilter, JsonPath },
+  components: { JsonPath },
   data() {
     return {
       tableOpt: {
         tblClass: 'table-bordered',
-        pageSizeOptions: [20, 50, 100, 200],
+        pageSizeOptions: [5, 20, 50, 100, 200],
         columns: [],
         data: [],
         rawData: [],
         total: 0,
-        query: { limit: 100 },
+        query: { limit: 100, offset: 0 },
         xprops: { tstate: this.tstate },
       },
       defTableOpt: null,
@@ -160,6 +161,7 @@ export default {
       immediate: true,
       handler(val) {
         this.isExpanded = this.defaultExpand(val);
+        this.tableOpt.query.offset = 0;
         this.rebuildTable(val);
       },
     },

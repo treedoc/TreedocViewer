@@ -11,11 +11,15 @@
     "lint": "vue-cli-service lint"
   },
   "dependencies": {
-    "bootstrap-vue": "^2.0.0-rc.11",
-    "jest": "^23.4.1",
-    "jquery": "^3.3.1",
-    "lodash": "^4.17.10",
-    "vue": "^2.5.17",
+    "babel-eslint": "^10.0.3",
+    "bootstrap-vue": "^2.0.1",
+    "eslint-plugin-vue": "^5.2.3",
+    "jest": "^24.9.0",
+    "jquery": "^3.4.1",
+    "jsonex-treedoc": "../jsonextreedocjs",
+    "lodash": "^4.17.15",
+    "vue": "^2.6.10",
+    "vue-resize": "^0.4.5",
     "vue2-datatable-component": "github:TrueCarry/vue2-datatable"
   },
   "main": "./dist/lib/lib.common.js",
@@ -27,17 +31,19 @@
     "*.js"
   ],
   "devDependencies": {
-    "@vue/cli-plugin-babel": "^3.0.0-rc.5",
-    "@vue/cli-plugin-eslint": "^3.0.0-beta.15",
-    "@vue/cli-plugin-unit-jest": "^3.0.0-rc.5",
-    "@vue/cli-service": "^3.0.0-rc.5",
-    "@vue/eslint-config-airbnb": "^3.0.0-beta.15",
-    "@vue/test-utils": "^1.0.0-beta.24",
+    "@vue/cli-plugin-babel": "^4.0.0-rc.3",
+    "@vue/cli-plugin-eslint": "^4.0.0-rc.3",
+    "@vue/cli-plugin-unit-jest": "^4.0.0-rc.3",
+    "@vue/cli-service": "^4.0.0-rc.3",
+    "@vue/eslint-config-airbnb": "^3.0.5",
+    "@vue/test-utils": "^1.0.0-beta.29",
     "babel-core": "7.0.0-bridge.0",
-    "babel-jest": "^23.4.2",
+    "babel-jest": "^24.9.0",
     "babel-preset-env": "^1.7.0",
-    "gh-pages": "^2.1.1",
-    "vue-template-compiler": "^2.5.17"
+    "eslint": "^4.19.1",
+    "vue-template-compiler": "^2.6.10"
+    "gh-pages": "^2.1.1"
+
   },
   "browserslist": [
     "> 1%",

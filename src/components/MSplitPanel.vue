@@ -1,115 +1,149 @@
 <template>
-  <div class="sp-container" @mousemove="resizing" @mouseup="stopResize" >
-    <template v-for="(p, i) in splitPositions">
-      <div :key="i">
-        <div class="sp-panel" :style="panelStyle(i)">
-          <slot :name="i" />
+  <div class="parent">
+    <!-- params: {{params}} -->
+    <resize-observer style="width:100%;  z-index: -1;" @notify="onWindowResize" />
+    <div class="sp-container" @mousemove="resizing" @mouseup="stopResize">
+      <template v-for="(p, i) in paneSet.panes">
+        <div :key="'sp_' + i">
+          <div class="sp-panel" :style="panelStyle(i)" >
+            <!-- show:{{vnodes[i].data.attrs}} -->
+            <slot :name="p.name" />
+          </div>
+          <div v-if="i<paneSet.panes.length-1" class="sp-handle" :style="handleStyle(i)" @mousedown.prevent="startResize(i, $event)"/>
         </div>
-        <div class="sp-handle" :style="handleStyle(i)" @mousedown.prevent="startResize(i, $event)"/>
-      </div>
-    </template>
-    <div class="sp-panel" :style="panelStyle(splitPositions.length)">
-      <slot :name="splitPositions.length" />
-    </div>    
+      </template>
+    </div>
   </div>
 </template>
 <script>
-class Pane {
-  constructor(size, min, max) {
-    this.size = size;
-    this.min = min;
-    this.max = max;
+// @ts-check
+import 'vue-resize/dist/vue-resize.css';
+import { ResizeObserver } from 'vue-resize';
+import _ from 'lodash';
+/* eslint-disable no-unused-vars */
+import PaneSet, { Pane, PaneStatus } from './PaneSet';
+
+const emit = (vnode, name, data) => {
+  const handlers = vnode.data.on;
+
+  if (handlers && handlers[name]) {
+    const handler = handlers[name];
+    const fn = handler.fns || handler.fn;
+    if (typeof fn === 'function') {
+      fn(data);
+    }
   }
-}
+};
+
 export default {
+  components: {
+    ResizeObserver,
+  },
   props: {
-    initPositions: Array,
+    params: Boolean,
   },
   data() {
     return {
       resizeIndex: -1,
       startPos: -1,
-      panes: [],
-      splitPositions: [],
-      handlePositions: [],
-    }
+      startHandlePos: -1,
+      paneSet: new PaneSet(),
+      vnodes: [],
+    };
   },
   methods: {
+    /**
+     * @param {String} name
+     * @param {PaneStatus} status 0 - Normal, 1 - Minimized, 2 - Maximized
+     */
+    setPaneStatus(name, status) {
+      this.paneSet.setPaneStatus(name, status);
+    },
     startResize(i, e) {
-      console.log(`startResize`);
       this.resizeIndex = i;
+      // this.vnodes[i].context.$emit("update:test", 2)
+      emit(this.vnodes[i], 'update:test', 2);
       this.startPos = e.clientX;
+      this.startHandlePos = this.paneSet.getHandlePos(i);
+      console.log(`startResize: resizingIndex=${this.resizeIndex}, startPos=${this.startPos}, startHandlePos=${this.startHandlePos}`);
     },
     resizing(e) {
       if (this.resizeIndex < 0)
         return;
-      
-      const newPos = this.splitPositions[this.resizeIndex] + e.clientX - this.startPos;
-
-      const min = this.resizeIndex === 0 ? 0 : this.splitPositions[this.resizeIndex - 1];
-      const max = this.resizeIndex === this.splitPositions.length - 1 ? this.$el.clientWidth : this.splitPositions[this.resizeIndex + 1];
-      console.log(`resizing: e.clientX = ${e.clientX}; min=${min}; max=${max}; newPos=${newPos}`)
-
-      if (newPos < min + 5 || newPos > max - 5)
-        return;
-
-      this.handlePositions[this.resizeIndex] = newPos;
+      // _.debounce(() => {
+      /* eslint-disable no-mixed-operators */
+      console.log(`Moving: clientX=${e.clientX}`);
+      this.paneSet.moveHandle(this.resizeIndex, this.startHandlePos + e.clientX - this.startPos);
+      // }, 100)();
       this.$forceUpdate();
     },
-    stopResize () {
-      console.log(`stopResize`);
-      if (this.resizeIndex < 0)
-        return;
-      this.splitPositions[this.resizeIndex] = this.handlePositions[this.resizeIndex];
+    stopResize() {
       this.resizeIndex = -1;
-      this.$forceUpdate();
-    }
+    },
+    onWindowResize() {
+      console.log(`resized:width=${this.$el.clientWidth}`);
+      this.$emit('resize');
+      // TODO: fix debounce, this is not the righ way
+      _.debounce(() => {
+        this.paneSet.totalSize = this.$el.clientWidth;
+        this.paneSet.calculateSize();
+        console.log(`paneSet:${this.paneSet}`);
+      }, 100)();
+    },
   },
   computed: {
-    panelCount() { return this.initPositions.length + 1; },
     panelStyle() {
-      return i => {
-        const style = {};
-        if (i == this.panelCount)
-          style.width = '100%';
-        else if (i == 0)
-          style.width = `${this.splitPositions[0]}px`;
-        else
-          style.width = `${this.splitPositions[i] - this.splitPositions[i-1]}px`;
-        return style;
-      }
+      return i => ({ width: `${this.paneSet.panes[i].getDisplaySize()}px` });
     },
+
     handleStyle() {
-      return i => {
-        const pos =  this.handlePositions[i];
-        return {
-          width: '5px',
-          height: '100%',
-          top: '0',
-          left: pos + 'px',
-          'border-left': '1px solid grey',
-          cursor: 'col-resize'
-        };
-        
-      }
+      return i => ({
+        width: '5px',
+        height: '100%',
+        top: '0',
+        left: `${this.paneSet.getHandlePos(i)}px`,
+        'border-left': '1px solid grey',
+        cursor: 'col-resize',
+      });
     },
   },
-  created() {
-    console.log(this.$slots);
-    this.splitPositions = this.initPositions;
-    this.handlePositions = [...this.splitPositions];
+  mounted() {
+    let i = 0;
+    for (const skey in this.$slots) {  //eslint-disable-line
+      const vnode = this.$slots[skey][0];
+      const { attrs, slot } = vnode.data;
+      console.log(`test:${attrs.test}`);
+      attrs.test = 2;
+      vnode.context.$emit('update:test', 2);
+      this.vnodes[i++] = vnode;
+      this.paneSet.addPane(new Pane(slot, parseInt(attrs.size), parseInt(attrs.min), parseInt(attrs.max), parseInt(attrs.grow))); //eslint-disable-line
+    }
+    this.paneSet.totalSize = this.$el.clientWidth;
+    this.paneSet.calculateSize();
   },
-}
+};
 </script>
 <style scoped>
+.parent {
+  width:100%;
+  border: 1px solid red;
+  background-color: rgba(255, 0, 0, 0.315);
+  height: 200px;
+  display: block;
+  z-index: -1;
+  /* position: fixed; */
+}
 .sp-container {
   position: relative;
-  box-sizing: border-box;
-  border-collapse: collapse;
-  width: 100%;
+  /* box-sizing: border-box; */
+  /* border-collapse: collapse; */
+  /* width: 100%; */
   height: 100%;
   display: flex;
   border: 1px solid grey;
+  float: left;
+  overflow: hidden;
+  z-index: 10;
 }
 .sp-panel {
   box-sizing: border-box;
@@ -122,5 +156,4 @@ export default {
   position: absolute;
 }
 </style>
-
 

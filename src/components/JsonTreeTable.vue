@@ -7,13 +7,13 @@
         <b-btn size='sm' variant='outline-secondary' :pressed.sync='showTable'>Table</b-btn>
       </b-button-group>
     </div>
-    <m-split-panel :initPositions='[100, 300]'>
-      <textarea slot="0" style="width: 100%; height: auto; flex-grow:1; overflow:auto;" v-model="jsonStr"></textarea>
-      <div slot="1">
+    <m-split-panel style="width:99%;height:100%">
+      <textarea slot="source" :grow="20" style="width: 100%; height: auto; flex-grow:1; overflow:auto;" v-model="jsonStr"></textarea>
+      <div slot="tree" :grow="30">
         <tree-view v-if="tstate.tree" :json-tree="tstate.tree" :options="{maxDepth: 2, rootObjectKey: 'root'}" v-on:nodeClicked='nodeClicked'></tree-view>
         <div v-else>No Data</div>
       </div>
-      <div slot="2">
+      <div slot="table" :grow="50">
         <div v-if="tstate.tree" ><json-table :table-data='tstate' v-on:nodeClicked='nodeClicked'/></div>
         <div v-else>No Data</div>
       </div>
@@ -44,7 +44,7 @@ import _ from 'lodash';
 import TreeState from '../models/TreeState';
 import TreeView from './TreeView.vue';
 import JsonTable from './JsonTable.vue';
-import SplitPanel from './SplitPanel.vue';
+// import SplitPanel from './SplitPanel.vue';
 import MSplitPanel from './MSplitPanel.vue';
 
 /* eslint-disable no-unused-vars */
@@ -54,13 +54,14 @@ export default {
   components: {
     TreeView,
     JsonTable,
-    SplitPanel,
+    // SplitPanel,
     MSplitPanel,
   },
   props: {
     data: [Object, Array, String],
     options: Object,
     initalPath: String,
+    rootObjectKey: String,
   },
   data() {
     return {
@@ -73,10 +74,10 @@ export default {
     };
   },
 
-  mounted() {
-    this.$refs.splitPanel.sizeChanged(this);
-    this.$refs.splitPanelLeft.sizeChanged(this);
-  },
+  // mounted() {
+  //   this.$refs.splitPanel.sizeChanged(this);
+  //   this.$refs.splitPanelLeft.sizeChanged(this);
+  // },
   watch: {
     data: {
       immediate: true,

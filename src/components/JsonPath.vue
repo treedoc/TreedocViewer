@@ -1,9 +1,11 @@
 <template>
   <ol class="breadcrumb">
-    <li v-if="items" v-for="item in items" v-bind:key='item.text' :class="['breadcrumb-item', item.active ? 'active' : null]">
-      <span v-if="item.active" v-html="item.text"></span>
-      <b-link v-else :to="item.to||item.href||item.link" v-html="item.text" @click="onclick(item)"></b-link>
-    </li>
+    <template v-if="items">
+      <li v-for="item in items" v-bind:key='item.text' :class="['breadcrumb-item', item.active ? 'active' : null]">
+        <span v-if="item.active" v-html="item.text"></span>
+        <b-link v-else :to="item.to||item.href||item.link" v-html="item.text" @click="onclick(item)"></b-link>
+      </li>
+    </template>
     <slot></slot>
   </ol>
   <!-- <b-breadcrumb :items="items" @click="onClick" /> -->
