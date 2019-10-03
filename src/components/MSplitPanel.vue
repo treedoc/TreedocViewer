@@ -1,12 +1,12 @@
 <template>
   <div class="parent">
-    params: {{params}}
+    <!-- params: {{params}} -->
     <resize-observer style="width:100%;  z-index: -1;" @notify="onWindowResize" />
     <div class="sp-container" @mousemove="resizing" @mouseup="stopResize">
       <template v-for="(p, i) in paneSet.panes">
         <div :key="'sp_' + i">
           <div class="sp-panel" :style="panelStyle(i)" >
-            show:{{vnodes[i].data.attrs}}
+            <!-- show:{{vnodes[i].data.attrs}} -->
             <slot :name="p.name" />
           </div>
           <div v-if="i<paneSet.panes.length-1" class="sp-handle" :style="handleStyle(i)" @mousedown.prevent="startResize(i, $event)"/>
@@ -26,7 +26,7 @@ import PaneSet, { Pane, PaneStatus } from './PaneSet';
 const emit = (vnode, name, data) => {
   const handlers = vnode.data.on;
 
-  if (handlers && handlers.hasOwnProperty(name)) {
+  if (handlers && handlers[name]) {
     const handler = handlers[name];
     const fn = handler.fns || handler.fn;
     if (typeof fn === 'function') {
@@ -88,7 +88,7 @@ export default {
         this.paneSet.totalSize = this.$el.clientWidth;
         this.paneSet.calculateSize();
         console.log(`paneSet:${this.paneSet}`);
-      }, 1000)();
+      }, 100)();
     },
   },
   computed: {

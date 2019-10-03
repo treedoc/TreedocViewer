@@ -40,7 +40,7 @@ export default {
     tableData: { TreeState, Tree, Object, String },
     options: Object,  // columns:Object: similar as the one defined in Vue2DataTable, exception field is the key
   },
-  components: { thFilter, JsonPath },
+  components: { JsonPath },
   data() {
     return {
       tableOpt: {

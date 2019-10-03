@@ -44,7 +44,7 @@ import _ from 'lodash';
 import TreeState from '../models/TreeState';
 import TreeView from './TreeView.vue';
 import JsonTable from './JsonTable.vue';
-import SplitPanel from './SplitPanel.vue';
+// import SplitPanel from './SplitPanel.vue';
 import MSplitPanel from './MSplitPanel.vue';
 
 /* eslint-disable no-unused-vars */
@@ -54,7 +54,7 @@ export default {
   components: {
     TreeView,
     JsonTable,
-    SplitPanel,
+    // SplitPanel,
     MSplitPanel,
   },
   props: {

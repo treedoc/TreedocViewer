@@ -1,14 +1,14 @@
 <template>
 
   <div id='app' class='components-container'>
-    <!-- <div class="inputline">Select JSON data:
+    <div class="inputline">Select JSON data:
       <b-form-select v-model="selected" :options="jsonTypeNames" class="mb-3" style="width:auto"/>
     </div>
     <json-tree-table v-if="selected" :data='jsonData' :inital-path="'activityHistory'" />
 
     <hr />
     <div>Json Table</div>
-    <json-table :table-data="tstateTable" :options="jsonTableOptions"/> -->
+    <json-table :table-data="tstateTable" :options="jsonTableOptions"/>
 
     <hr />
     <div>MSplitPanel</div>
