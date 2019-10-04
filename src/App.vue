@@ -6,7 +6,7 @@
     </div>
     <json-tree-table v-if="true" :data='jsonData' :inital-path="'activityHistory'" />
 
-    <div v-if=true>
+    <div v-if=false>
     <hr />
     <div>Json Table</div>
     <json-table :table-data="tstateTable" :options="jsonTableOptions"/>
