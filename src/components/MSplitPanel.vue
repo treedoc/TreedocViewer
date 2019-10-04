@@ -1,6 +1,6 @@
 <template>
   <div class="parent">
-    <!-- params: {{params}} -->
+    <!-- <input type="checkbox" v-model="params[0]"> {{params}} -->
     <resize-observer style="width:100%;  z-index: -1;" @notify="onWindowResize" />
     <div class="sp-container" @mousemove="resizing" @mouseup="stopResize">
       <template v-for="(p, i) in paneSet.panes">

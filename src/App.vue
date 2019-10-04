@@ -1,12 +1,12 @@
 <template>
 
   <div id='app' class='components-container'>
-    <div class="inputline">Select JSON data:
-      <b-form-select v-model="selected" :options="jsonTypeNames" class="mb-3" style="width:auto"/>
+    <div class="inputline"><h4>Tree Table Viewer for JSON, Prototext, jsonex, json5, hjson</h4> |
+      Sample Data: <b-form-select v-model="selected" :options="jsonTypeNames" class="mb-3" style="width:auto"/>
     </div>
-    <json-tree-table v-if="selected" :data='jsonData' :inital-path="'activityHistory'" />
+    <json-tree-table v-if="true" :data='jsonData' :inital-path="'activityHistory'" />
 
-    <div v-if=false>
+    <div v-if=true>
     <hr />
     <div>Json Table</div>
     <json-table :table-data="tstateTable" :options="jsonTableOptions"/>
@@ -81,5 +81,6 @@ body {
 .inputline {
   display: flex;
   align-items: center;
+  float:right;
 }
 </style>

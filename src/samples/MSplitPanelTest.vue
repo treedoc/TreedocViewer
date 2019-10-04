@@ -7,10 +7,11 @@
         <b-btn size='sm' variant='outline-secondary' :pressed.sync='p3' @click="togglePane">p2</b-btn>
         <b-btn size='sm' variant='outline-secondary' :pressed.sync='p4' @click="togglePane">p4</b-btn>
       </b-button-group>
+      <input type="checkbox" v-model="param[0]"> {{param}}
       test: {{test}}
     </div>
-    <MSplitPanel ref="mpanel" :params='p1'>
-      <div slot="p1" :size=300  :min=250  :max=350 :show='p1' style="background-color:red;width:100%"> Panel1 </div>
+    <MSplitPanel ref="mpanel" :params='param'>
+      <div slot="p1" :size=300  :min=250  :max=350 :show='p1' :param='param' style="background-color:red;width:100%"> Panel1 </div>
       <div slot="p2" :grow='10' :show='p2' :test.sync='test'> Panel2</div>
       <div slot="p3" :grow='20' :show='p3' :test.sync='test'> Panel3 </div>
       <div slot="p4" :size='200' :show='p4' :test.sync='test'> Panel4 </div>
@@ -32,6 +33,7 @@ export default {
   },
   data() {
     return {
+      param: [true],
       p1: true,
       p2: true,
       p3: true,
