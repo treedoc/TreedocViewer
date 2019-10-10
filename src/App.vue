@@ -1,7 +1,7 @@
 <template>
 
   <div id='app' class='components-container'>
-    <div class="inputline"><h4>Tree Table Viewer for JSON, Prototext, jsonex, json5, hjson</h4> |
+    <div class="inputline"><h5>Tree Table Viewer for JSON, Prototext, jsonex, json5, hjson</h5> |
       Sample Data: <b-form-select v-model="selected" :options="jsonTypeNames" class="mb-3" style="width:auto"/>
     </div>
     <json-tree-table v-if="true" :data='jsonData' :inital-path="'activityHistory'" />
