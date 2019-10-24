@@ -1,7 +1,7 @@
 import _ from 'lodash';
 
 class Util {
-  static getSimpleTypeName(typeName) {
+  static getSimpleTypeName(typeName: string): string {
     const p = typeName.indexOf('<'); // remove generic types
     if (p > 0)
       typeName = typeName.substr(0, p);
@@ -11,16 +11,18 @@ class Util {
 }
 
 export default class Tree {
-  static TAG_TYPE = '$type';
-  static TAG_HASH = '$hash';
-  static TAG_HASH_PREFIX = '$hash:';
+  static readonly TAG_TYPE = '$type';
+  static readonly TAG_HASH = '$hash';
+  static readonly TAG_HASH_PREFIX = '$hash:';
+  hashMap = new Map<string, TreeNode>();
+  tagType = Tree.TAG_TYPE;
+  tagHash = Tree.TAG_HASH;
+  tagHashPrefix = Tree.TAG_HASH_PREFIX;
+  root: TreeNode;
+  sorted = false;
 
-  constructor(obj, rootLabel = 'root') {
+  constructor(public obj: any, rootLabel = 'root') {
     this.obj = obj;
-    this.hashMap = {};
-    this.tagType = Tree.TAG_TYPE;
-    this.tagHash = Tree.TAG_HASH;
-    this.tagHashPrefix = Tree.TAG_HASH_PREFIX;
     /* eslint-disable no-use-before-define */
     this.root = new TreeNode(this, null, rootLabel, obj);
   }
@@ -31,22 +33,17 @@ export default class Tree {
 }
 
 export class TreeNode {
-  constructor(tree, parent, key, obj) {
-    this.tree = tree;
-    this.parent = parent;
-    this.key = key;
-    this.obj = obj;
-    this._children = null;
-
+  private mChildren?: {[key: string]: TreeNode};
+  constructor(public tree: Tree, public parent: TreeNode | null, public key: string, public obj: any) {
     if (this.hash)
-      this.tree.hashMap[this.hash] = this;
+      this.tree.hashMap.set(this.hash as string,  this);
   }
 
   get hash() {
     return this.getChildValue(this.tree.tagHash);
   }
 
-  getChildValue(key) {
+  getChildValue(key: string) {
     return this.obj && this.obj[key];
   }
 
@@ -90,12 +87,12 @@ export class TreeNode {
 
   get size() { return _.size(this.children); }
   get children() {
-    if (this._children == null) {
-      this._children = {};
+    if (this.mChildren === undefined) {
+      this.mChildren = {};
       const ia = _.isArray(this.obj);
       const io = _.isObject(this.obj);
       if (!io)
-        return this._children;
+        return this.mChildren;
       const cks = this.obj ? Object.keys(this.obj) : [];
       if (!ia && this.tree.sorted)
         cks.sort();
@@ -104,17 +101,13 @@ export class TreeNode {
         const cv = this.obj[ck];
         if (cv === null || ck === this.tree.tagType || ck === this.tree.tagHash)
           continue;
-        this.children[ck] = new TreeNode(this.tree, this, ck, cv, this);
+        this.children[ck] = new TreeNode(this.tree, this, ck, cv);
       }
     }
-    return this._children;
+    return this.mChildren;
   }
 
-  /**
-   * @param {Array | String} path
-   * @returns TreeNode
-   */
-  getByPath(path) {
+  getByPath(path: string | string[]): TreeNode | null {
     if (_.isString(path))
       path = path.split('/');
 

@@ -9,9 +9,11 @@
     </div>
   </div>
 </template>
-<script>
+<script lang='js'>
+// For some reason, DataTable doesn't support typescript class based dynamic component or Vue.extend({}) component
 import _ from 'lodash';
 import TreeViewItem from './TreeViewItem.vue';
+import { TreeNode } from '../models/Tree';
 
 export default {
   components: {

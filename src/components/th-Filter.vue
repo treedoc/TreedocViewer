@@ -18,6 +18,7 @@
 <script>
 import Vue from 'vue';
 
+// For some reason, DataTable doesn't support typescript class based dynamic component or Vue.extend({}) component
 export default {
   props: ['field', 'title', 'query'],
   data: () => ({

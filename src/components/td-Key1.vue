@@ -6,7 +6,11 @@
     <div v-else>{{this.value}}</div>
   </div>
 </template>
-<script>
+<script lang='js'>
+import { TreeNode } from '../models/Tree';
+import Vue from 'vue';
+
+// For some reason, DataTable doesn't support typescript class based dynamic component or Vue.extend({}) component
 export default {
   props: ['value', 'row', 'xprops'],
   methods: {

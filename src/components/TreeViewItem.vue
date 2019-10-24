@@ -2,12 +2,12 @@
   <div class='item'>
     <div v-if='!data.isSimpleType()' class='leaf'>
       <div class='node' @click.stop='toggleOpen()' >
-        <span :class='{opened: isOpen()}' class='key key-with-chevron'> <a href="#/" @click.stop="$emit('nodeClicked', data)">{{data.key}}</a></span>
+        <span :class='{opened: open}' class='key key-with-chevron'> <a href="#/" @click.stop="$emit('nodeClicked', data)">{{data.key}}</a></span>
         <span class='hint'>{{data.typeSizeLabel}}</span>
       </div>
       <template v-for="(v, k) in data.children" >
         <keep-alive :key='k'>
-            <tree-view-item :key='k' :max-depth='maxDepth' :current-depth='currentDepth+1' v-if='isOpen()' :data='v' @nodeClicked='nodeClicked' />
+          <tree-view-item :key='k' :max-depth='maxDepth' :current-depth='currentDepth+1' v-if='open' :data='v' @nodeClicked='nodeClicked' />
         </keep-alive>
       </template>
     </div>
@@ -18,30 +18,23 @@
   </div>
 </template>
 
-<script>
+<script lang="ts">
+import { Component, Prop, Vue } from 'vue-property-decorator';
 import { TreeNode } from '../models/Tree';
 
-export default {
-  name: 'tree-view-item',
-  props: {
-    data: TreeNode,
-    maxDepth: Number,
-    currentDepth: Number,
-    modifiable: Boolean,
-  },
-  data() {
-    return { open: this.currentDepth < this.maxDepth };
-  },
-  methods: {
-    isOpen() { return this.open; },
-    toggleOpen() { this.open = !this.open; },
-    nodeClicked(data) { this.$emit('nodeClicked', data); },
-  },
-};
+@Component
+export default class TreeViewItem extends Vue {
+  @Prop() data!: TreeNode;
+  @Prop() maxDepth!: number;
+  @Prop() currentDepth!: number;
+  @Prop() modifiable!: boolean;
+  open = this.currentDepth < this.maxDepth;
+
+  toggleOpen() { this.open = !this.open; }
+  nodeClicked(data: TreeNode) { this.$emit('nodeClicked', data); }
+}
 </script>
-
 <style scoped>
-
 .item {
   font-family: monaco, monospace;
   font-size: 14px;

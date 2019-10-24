@@ -11,28 +11,37 @@
   <!-- <b-breadcrumb :items="items" @click="onClick" /> -->
 </template>
 
-<script>
-export default {
-  props: ['treeNode'],
-  methods: {
-    onclick(item) {
-      this.$emit('nodeClicked', item.node);
-    },
-  },
-  computed: {
-    items() {
-      const paths = [];
-      if (!this.treeNode)
-        return null;
+<script lang="ts">
+import { Component, Prop, Vue } from 'vue-property-decorator';
+import { TreeNode } from '../models/Tree';
 
-      paths.unshift({ text: this.treeNode.key, active: true });
-      for (let pNode = this.treeNode.parent; pNode !== null; pNode = pNode.parent) {
-        paths.unshift({ text: pNode.key, href: '', node: pNode });
-      }
-      return paths;
-    },
-  },
-};
+interface Item {
+  text: string;
+  active?: boolean;
+  href?: string;
+  node?: TreeNode;
+}
+
+@Component
+export default class JsonPath extends Vue {
+  @Prop() private treeNode!: TreeNode;
+
+  onclick(item: Item) {
+    this.$emit('nodeClicked', item.node);
+  }
+
+  get items() {
+    const paths = new Array<Item>();
+    if (!this.treeNode)
+      return null;
+
+    paths.unshift({ text: this.treeNode.key, active: true });
+    for (let pNode = this.treeNode.parent; pNode !== null; pNode = pNode.parent) {
+      paths.unshift({ text: pNode.key, href: '', node: pNode });
+    }
+    return paths;
+  }
+}
 </script>
 <style>
   .breadcrumb {

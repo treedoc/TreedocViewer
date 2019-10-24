@@ -1,54 +1,51 @@
-import _ from 'lodash';
 import { TDJSONParser, TDJSONParserOption, TDNodeType } from 'jsonex-treedoc';
 import History from './History';
-import Tree from './Tree';
+import Tree, { TreeNode } from './Tree';
 
 
-let o;
+// tslint:disable-next-line: prefer-const
+let o: any | null;
 export default class TreeState {
-  /**
-   * @param {Tree | String | Object} treeData
-   * @param {String} root
-   */
-  constructor(treeData, root) {
-    this.parseResult = 'OBJECT';
-    this.tree = this.buildTree(treeData, root);
-    this.history = new History();
-    this.selected = null;
-    this.initialNode = null;
+  parseResult = 'OBJECT';
+  history = new History<TreeNode>();
+  selected: TreeNode | null = null;
+  initialNode?: TreeNode | null;
+  tree: Tree;
+
+  constructor(treeData: Tree | string | any, rootLabel = 'root') {
+    this.tree = this.buildTree(treeData, rootLabel);
     if (this.tree)
       this.select(this.tree.root, true);
   }
 
-  buildTree(treeData, root) {
+  buildTree(treeData: Tree | string | any, rootLabel: string) {
     if (!treeData || treeData.constructor.name === 'Tree') {
       this.parseResult = 'TREE';
       return treeData;
     }
-    const jsonObj = _.isString(treeData) ? this.parseJson(treeData) : treeData;
-    return jsonObj ? new Tree(jsonObj, root) : null;
+    const jsonObj = typeof(treeData) === 'string' ? this.parseJson(treeData) : treeData;
+    return jsonObj ? new Tree(jsonObj, rootLabel) : null;
   }
 
-  /**
-   * @param {TreeNode | String} node
-   * @param {Boolean} initialNode
-   */
-  select(node, initialNode) {
+  select(node: TreeNode | string | null, resetInitialNode = false): void {
     if (this.tree == null)
       return;
 
-    if (_.isString(node)) {
-      node = this.tree.root.getByPath(node);
-      if (!node)
+    let selectedNode: TreeNode | null = null;
+    if (typeof(node) === 'string') {
+      selectedNode = this.tree.root.getByPath(node);
+      if (!selectedNode)
         return;
-    }
+    } else
+      selectedNode = node;
 
-    if (initialNode)
-      this.initialNode = node;
-    if (this.selected === node)
+    if (resetInitialNode)
+      this.initialNode = selectedNode;
+    if (this.selected === selectedNode)
       return;
-    this.selected = node;
-    this.history.append(node);
+    this.selected = selectedNode;
+    if (selectedNode)
+      this.history.append(selectedNode);
   }
 
   isRootSelected() { return this.tree != null && this.selected === this.tree.root; }
@@ -58,7 +55,7 @@ export default class TreeState {
   back() { this.selected = this.history.back(); }
   forward() { this.selected = this.history.forward(); }
 
-  parseJson(jsonStr) {
+  parseJson(jsonStr: string) {
     try {
       const json = JSON.parse(jsonStr);
       this.parseResult = 'JSON_PARSE';
@@ -66,6 +63,7 @@ export default class TreeState {
     } catch (e) {
       try {
         /* eslint-disable no-eval */
+        // tslint:disable-next-line: no-eval
         eval(`o=${jsonStr}`);
         this.parseResult = 'EVAL';
         return o;

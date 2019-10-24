@@ -26,10 +26,12 @@ module.exports = {
       'LabeledStatement',
       'WithStatement',
     ],
+    "vue/no-unused-components": ["warn", {
+      "ignoreWhenBindingPresent": true
+    }],
   },
   parserOptions: {
     parser: 'babel-eslint',
     ecmaVersion: 7,
   },
-
 };

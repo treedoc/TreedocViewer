@@ -1,28 +1,6 @@
 {
   "name": "jsontreetable",
-  "version": "0.0.6",
-  "scripts": {
-    "serve": "vue-cli-service serve",
-    "build-app": "vue-cli-service build --dest dist/app",
-    "build-lib": "vue-cli-service build --dest dist/lib --target lib --name lib src/lib.js",
-    "build": "yarn build-app && yarn build-lib",
-    "deploy": "yarn build-app && gh-pages -d dist/app",
-    "test:unit": "vue-cli-service test:unit",
-    "lint": "vue-cli-service lint"
-  },
-  "dependencies": {
-    "babel-eslint": "^10.0.3",
-    "bootstrap-vue": "^2.0.1",
-    "eslint-plugin-vue": "^5.2.3",
-    "jest": "^24.9.0",
-    "jquery": "^3.4.1",
-    "jsonex-treedoc": "../jsonextreedocjs",
-    "lodash": "^4.17.15",
-    "msplit": "^0.1.0",
-    "vue": "^2.6.10",
-    "vue-resize": "^0.4.5",
-    "vue2-datatable-component": "github:TrueCarry/vue2-datatable"
-  },
+  "version": "0.1.0",
   "main": "./dist/lib/lib.common.js",
   "files": [
     "dist/lib/*",
@@ -31,23 +9,37 @@
     "*.json",
     "*.js"
   ],
-  "devDependencies": {
-    "@vue/cli-plugin-babel": "^4.0.0-rc.3",
-    "@vue/cli-plugin-eslint": "^4.0.0-rc.3",
-    "@vue/cli-plugin-unit-jest": "^4.0.0-rc.3",
-    "@vue/cli-service": "^4.0.0-rc.3",
-    "@vue/eslint-config-airbnb": "^3.0.5",
-    "@vue/test-utils": "^1.0.0-beta.29",
-    "babel-core": "7.0.0-bridge.0",
-    "babel-jest": "^24.9.0",
-    "babel-preset-env": "^1.7.0",
-    "eslint": "^4.19.1",
-    "gh-pages": "^2.1.1",
-    "vue-template-compiler": "^2.6.10"
+  "scripts": {
+    "serve": "vue-cli-service serve",
+    "build-app": "vue-cli-service build --dest dist/app",
+    "build-lib": "vue-cli-service build --dest dist/lib --target lib --name lib src/lib.ts",
+    "build": "yarn build-app && yarn build-lib",
+    "deploy": "yarn build-app && gh-pages -d dist/app",
+    "deploy-jsontable": "yarn build-app && yarn gh-pages -d dist/app -r git@github.com:jsontable/jsontable.github.io.git -b master",
+    "lint": "vue-cli-service lint",
+    "test:unit": "vue-cli-service test:unit"
   },
-  "browserslist": [
-    "> 1%",
-    "last 2 versions",
-    "not ie <= 8"
-  ]
+  "dependencies": {
+    "@types/lodash": "^4.14.144",
+    "bootstrap-vue": "^2.0.1",
+    "jquery": "^3.4.1",
+    "jsonex-treedoc": "^0.1.0",
+    "lodash": "^4.17.15",
+    "msplit": "^0.1.8",
+    "vue": "^2.6.10",
+    "vue-class-component": "^7.0.2",
+    "vue-property-decorator": "^8.1.0",
+    "vue2-datatable-component": "github:TrueCarry/vue2-datatable"
+  },
+  "devDependencies": {
+    "@types/jest": "^23.1.4",
+    "@vue/cli-plugin-typescript": "^3.12.0",
+    "@vue/cli-plugin-unit-jest": "^3.12.0",
+    "@vue/cli-service": "^3.12.0",
+    "@vue/test-utils": "1.0.0-beta.29",
+    "gh-pages": "^2.1.1",
+    "ts-jest": "^23.0.0",
+    "typescript": "^3.4.3",
+    "vue-template-compiler": "^2.6.10"
+  }
 }

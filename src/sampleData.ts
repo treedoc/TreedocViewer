@@ -109,7 +109,6 @@ export default {
       "total": 100000000000000000000,
       "longNum": 10000000000,
       "limit": 10,
-    
       /* block comments */
       "data": [
         {
@@ -131,7 +130,7 @@ export default {
         \`Multiple line literal
         Line2\`
       ],
-    }    
+    }
     `,
     hjson: `
     {
@@ -159,5 +158,5 @@ export default {
         '''
     }
     `,
-  },
+  } as {[key: string]: any},
 };

@@ -1,3 +1,4 @@
+import Vue from 'vue';
 import BootstrapVue from 'bootstrap-vue';
 import Datatable from 'vue2-datatable-component';
 import 'bootstrap-vue/dist/bootstrap-vue.css';
@@ -8,7 +9,7 @@ import Tree from './models/Tree';
 
 
 export default {
-  install(vue) {
+  install(vue: typeof Vue) {
     vue.use(BootstrapVue);
     vue.use(Datatable);
     vue.component('json-tree-table', JsonTreeTable);

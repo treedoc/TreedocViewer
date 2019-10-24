@@ -1,7 +1,8 @@
 import _ from 'lodash';
+import { Query, Column } from './Vue2DataTable';
 
 export default {
-  filter(columns, data, q) {
+  filter(columns: Column[], data: any[], q: Query) {
     let result = data;
     columns.forEach((c) => {
       const f = c.field;
@@ -9,7 +10,7 @@ export default {
       if (!fq)
         return;
       if (_.isArray(fq))
-        result = result.filter(row => fq.includes(row[f]));
+        result = result.filter((row) => fq.includes(row[f]));
       else if (_.isString(fq))
         result = result.filter(row => row[f] && (`${row[f]}`).toLowerCase().includes(fq.toLowerCase()));
       else {
@@ -20,7 +21,7 @@ export default {
     if (q.sort) {
       result = _.orderBy(result, q.sort, q.order);
     }
-
-    return result.slice(q.offset, q.offset + q.limit);
+    const end = (q.offset === undefined || !q.limit) ? undefined : q.offset + q.limit;
+    return result.slice(q.offset, end);
   },
 };

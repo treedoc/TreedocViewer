@@ -1,76 +1,75 @@
 <template>
 
   <div id='app' class='components-container'>
-    <div class="inputline"><h5>Tree Table Viewer for JSON, Prototext, jsonex, json5, hjson</h5> |
-      Sample Data: <b-form-select v-model="selected" :options="jsonTypeNames" class="mb-3" style="width:auto"/>
-    </div>
-    <json-tree-table v-if="true" :data='jsonData' :inital-path="'activityHistory'" />
-
+    <h6 class="title">Tree Table Viewer for JSON, Prototext, jsonex, json5, hjson</h6>
+    <json-tree-table v-if="true" :data='jsonData' :inital-path="'activityHistory'">
+      Sample Data: <b-form-select v-model="selected" :options="jsonTypeNames" size='sm' style="width:auto" />
+    </json-tree-table>
     <div v-if=false>
-    <hr />
-    <div>Json Table</div>
-    <json-table :table-data="tstateTable" :options="jsonTableOptions"/>
-
-    <hr />
-    <div>MSplitPanel</div>
-    <m-split-panel-test/>
+      <hr />
+      <div>Json Table</div>
+      <json-table :table-data="tstateTable" :options="jsonTableOptions"/>
     </div>
   </div>
 </template>
 
-<script>
+
+<script lang='ts'>
+import { Component, Prop, Vue, Watch } from 'vue-property-decorator';
+
 import JsonTreeTable from './components/JsonTreeTable.vue';
 import JsonTable from './components/JsonTable.vue';
 import sampleData from './sampleData';
 import TreeState from './models/TreeState';
 import TDSample from './tdSample.vue';
-import MSplitPanelTest from './samples/MSplitPanelTest.vue';
 
-export default {
-  name: 'app',
+@Component({
   components: {
     JsonTreeTable,
     JsonTable,
-    MSplitPanelTest,
   },
-  data() {
-    return {
-      selected: sampleData.jsonTypeNames[0],
-      ...sampleData,
-      jsonTableOptions: {
-        Pagination: false,
-        columns: [
-          { field: 'activityType' },
-          {
-            field: 'partitionKey',
-            tdComp: TDSample,
-          },
-          {
-            field: 'creationDate',
-            html: (value, row) => `<a href="http://abc.com/${row.runtimeContext.obj}">${value.obj}</a>`,
-          },
-        ],
+})
+export default class App extends Vue {
+  selected = sampleData.jsonTypeNames[0];
+  jsonTypeNames = sampleData.jsonTypeNames;
+  jsonTypes = sampleData.jsonTypes;
+  jsonTableOptions = {
+    Pagination: false,
+    columns: [
+      { field: 'activityType' },
+      {
+        field: 'partitionKey',
+        tdComp: TDSample,
       },
-    };
-  },
-  computed: {
-    jsonData() { return this.jsonTypes[this.selected]; },
-    tstateTable() {
-      const state = new TreeState(this.jsonTypes.jsonStr);
-      state.select(state.tree.root.getByPath('/activityHistory'), true);
-      return state;
-    },
-  },
-};
+      {
+        field: 'creationDate',
+        html: (value: any, row: any) => `<a href="http://abc.com/${row.runtimeContext.obj}">${value.obj}</a>`,
+      },
+    ],
+  };
+
+  get jsonData() { return this.jsonTypes[this.selected]; }
+
+  get tstateTable() {
+    const state = new TreeState(this.jsonTypes.jsonStr);
+    state.select(state.tree.root.getByPath('/activityHistory'), true);
+    return state;
+  }
+}
 </script>
 
 <style>
+.title {
+  text-align: center;
+  color: darkblue
+}
 .components-container {
   display: flex;
   position: absolute;
   flex-direction: column;
-  min-height:100%;
-  min-width:100%;
+  width: 100%;
+  /* min-height:100%;
+  min-width:100%; */
 }
 html {
   height: 100%;
