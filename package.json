@@ -14,13 +14,13 @@
     "build-app": "vue-cli-service build --dest dist/app",
     "build-lib": "vue-cli-service build --dest dist/lib --target lib --name lib src/lib.ts",
     "build": "yarn build-app && yarn build-lib",
-    "deploy": "yarn build-app && gh-pages -d dist/app",
-    "deploy-jsontable": "yarn build-app && yarn gh-pages -d dist/app -r git@github.com:jsontable/jsontable.github.io.git -b master",
+    "deploy": "yarn build-app && gh-pages -d dist/app && yarn gh-pages -d dist/app -r git@github.com:jsontable/jsontable.github.io.git -b master",
     "lint": "vue-cli-service lint",
     "test:unit": "vue-cli-service test:unit"
   },
   "dependencies": {
     "@types/lodash": "^4.14.144",
+    "@types/yaml": "^1.2.0",
     "bootstrap-vue": "^2.0.1",
     "jquery": "^3.4.1",
     "jsonex-treedoc": "^0.1.0",
@@ -29,7 +29,8 @@
     "vue": "^2.6.10",
     "vue-class-component": "^7.0.2",
     "vue-property-decorator": "^8.1.0",
-    "vue2-datatable-component": "github:TrueCarry/vue2-datatable"
+    "vue2-datatable-component": "github:TrueCarry/vue2-datatable",
+    "yaml": "^1.7.2"
   },
   "devDependencies": {
     "@types/jest": "^23.1.4",

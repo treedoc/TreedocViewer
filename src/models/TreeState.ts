@@ -1,18 +1,24 @@
 import { TDJSONParser, TDJSONParserOption, TDNodeType } from 'jsonex-treedoc';
 import History from './History';
 import Tree, { TreeNode } from './Tree';
+import { ParserPlugin, ParseResult, ParseStatus } from './JTTOption';
+import JSONParser from '@/parsers/JSONParser';
 
 
 // tslint:disable-next-line: prefer-const
 let o: any | null;
 export default class TreeState {
   parseResult = 'OBJECT';
+  parseStatus = ParseStatus.SUCCESS;
+  parserPlugin: ParserPlugin<any>;
+
   history = new History<TreeNode>();
   selected: TreeNode | null = null;
   initialNode?: TreeNode | null;
   tree: Tree;
 
-  constructor(treeData: Tree | string | any, rootLabel = 'root') {
+  constructor(treeData: Tree | string | any, parserPlugin = new JSONParser(), rootLabel = 'root') {
+    this.parserPlugin = parserPlugin;
     this.tree = this.buildTree(treeData, rootLabel);
     if (this.tree)
       this.select(this.tree.root, true);
@@ -23,7 +29,7 @@ export default class TreeState {
       this.parseResult = 'TREE';
       return treeData;
     }
-    const jsonObj = typeof(treeData) === 'string' ? this.parseJson(treeData) : treeData;
+    const jsonObj = typeof(treeData) === 'string' ? this.parse(treeData) : treeData;
     return jsonObj ? new Tree(jsonObj, rootLabel) : null;
   }
 
@@ -55,29 +61,10 @@ export default class TreeState {
   back() { this.selected = this.history.back(); }
   forward() { this.selected = this.history.forward(); }
 
-  parseJson(jsonStr: string) {
-    try {
-      const json = JSON.parse(jsonStr);
-      this.parseResult = 'JSON_PARSE';
-      return json;
-    } catch (e) {
-      try {
-        /* eslint-disable no-eval */
-        // tslint:disable-next-line: no-eval
-        eval(`o=${jsonStr}`);
-        this.parseResult = 'EVAL';
-        return o;
-      } catch (e1) {
-        try {
-          const o1 = TDJSONParser.get().parse(new TDJSONParserOption(jsonStr).setDefaultRootType(TDNodeType.MAP)).toObject();
-          this.parseResult = 'TDJSON_PARSE';
-          return o1;
-        } catch (e2) {
-          this.parseResult = `Error:${e2.message}`;
-          console.error(e2);
-        }
-      }
-    }
-    return null;
+  parse(jsonStr: string) {
+    const result = this.parserPlugin.parse(jsonStr);
+    this.parseResult = result.message;
+    this.parseStatus = result.status;
+    return result.result;
   }
 }

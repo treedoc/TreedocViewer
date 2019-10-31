@@ -1,35 +1,53 @@
 <template>
   <div class='wrapper'>
-    <tree-view-item class='item-root' :data='tree.root' :max-depth='allOptions.maxDepth' :current-depth='0' @nodeClicked='nodeClicked'></tree-view-item>
+    <expand-control :state='expandState' />
+    <tree-view-item class='item-root' 
+        :data='tree.root' 
+        :currentLevel='0'
+        :expandState='expandState'
+        @nodeClicked='nodeClicked' />
   </div>
 </template>
 
 <script lang="ts">
-import { Component, Prop, Vue } from 'vue-property-decorator';
+import { Component, Prop, Vue, Watch } from 'vue-property-decorator';
 import _ from 'lodash';
 import TreeViewItem from './TreeViewItem.vue';
 import Tree, { TreeNode } from '../models/Tree';
+import ExpandControl, { ExpandState } from './ExpandControl.vue';
 
 @Component({
-  components: { TreeViewItem },
+  components: {
+    TreeViewItem,
+    ExpandControl,
+  },
 })
-export default class JsonPath extends Vue {
+export default class TreeView extends Vue {
   @Prop() data!: string | object;
   @Prop() jsonTree!: Tree;
-  @Prop() options!: object;
 
-  nodeClicked(data: TreeNode) { this.$emit('nodeClicked', data); }
+  @Prop({default: 'root'})
+  rootObjectKey!: string;
 
-  get allOptions() {
-    return _.extend({}, {
-      rootObjectKey: 'root',
-      maxDepth: 4,
-      modifiable: false,
-    }, (this.options || {}));
+  @Prop({default: '4'})
+  expandLevel!: number;
+
+  expandState = new ExpandState(this.expandLevel);
+
+  nodeClicked(data: TreeNode) {
+    this.$emit('nodeClicked', data);
   }
 
   get tree() {
-    return this.jsonTree != null ? this.jsonTree : new Tree(this.data, this.allOptions.rootObjectKey);
+    return this.jsonTree != null ? this.jsonTree : new Tree(this.data, this.rootObjectKey);
+  }
+
+  // For some reason, <keep-alive> will keep the legacy node in memory.
+  // That will cause the shared expandState data get corrupted. 
+  // So we have to create a new instance whenever tree changes.
+  @Watch('tree')
+  watchTree() {
+    this.expandState = new ExpandState(this.expandLevel);
   }
 }
 </script>

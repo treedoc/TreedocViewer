@@ -85,8 +85,19 @@ export class TreeNode {
   isObject() { return _.isObject(this.obj); }
   isSimpleType() { return !this.isArray() && !this.isObject(); }
 
+  hasGrandChildren(): boolean {
+    for (const k of Object.keys(this.children)) {
+      // if (!this.children[k]) {
+      //   console.log(`key=${this.key}, k=${k}`);
+      // }
+      if (!this.children[k].isLeaf())
+        return true;
+    }
+    return false;
+  }
+
   get size() { return _.size(this.children); }
-  get children() {
+  get children(): {[key: string]: TreeNode} {
     if (this.mChildren === undefined) {
       this.mChildren = {};
       const ia = _.isArray(this.obj);

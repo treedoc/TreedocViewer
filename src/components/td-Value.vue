@@ -2,7 +2,12 @@
   <div>
     <div v-if="html" v-html="html"/>
     <div v-else-if="strVal === null">
-      <tree-view-item class='tree-view-item-root' :data='value' :max-depth='0' :current-depth='0' style="margin-left: 0!important;" v-on:nodeClicked='nodeClicked'></tree-view-item>
+      <tree-view-item class='tree-view-item-root'
+          :data='value'
+          :expandState='xprops.expandState'
+          :currentLevel='0'
+          style="margin-left: 0!important;" 
+          v-on:nodeClicked='nodeClicked' />
     </div>
     <div v-else>
       {{strVal}}

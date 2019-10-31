@@ -1,9 +1,9 @@
 <template>
 
   <div id='app' class='components-container'>
-    <h6 class="title">Tree Table Viewer for JSON, Prototext, jsonex, json5, hjson</h6>
-    <json-tree-table v-if="true" :data='jsonData' :inital-path="'activityHistory'">
-      Sample Data: <b-form-select v-model="selected" :options="jsonTypeNames" size='sm' style="width:auto" />
+    <h6 class="title">TreeDoc Table Viewer for JSON, Prototext, jsonex, json5, hjson, yaml</h6>
+    <json-tree-table v-if="true" :data='selectedSample' :inital-path="'activityHistory'" :options='jttOption' rootObjectKey='root'>
+      Sample Data: <b-form-select v-model="selectedSample" :options="sampleData" size='sm' style="width:auto" />
     </json-tree-table>
     <div v-if=false>
       <hr />
@@ -22,6 +22,9 @@ import JsonTable from './components/JsonTable.vue';
 import sampleData from './sampleData';
 import TreeState from './models/TreeState';
 import TDSample from './tdSample.vue';
+import JTTOptions from './models/JTTOption';
+import YAMLParser from './parsers/YAMLParser';
+import XMLParser from './parsers/XMLParser';
 
 @Component({
   components: {
@@ -30,9 +33,8 @@ import TDSample from './tdSample.vue';
   },
 })
 export default class App extends Vue {
-  selected = sampleData.jsonTypeNames[0];
-  jsonTypeNames = sampleData.jsonTypeNames;
-  jsonTypes = sampleData.jsonTypes;
+  sampleData = sampleData.data;
+  selectedSample  = sampleData.data[0].value;
   jsonTableOptions = {
     Pagination: false,
     columns: [
@@ -47,11 +49,17 @@ export default class App extends Vue {
       },
     ],
   };
-
-  get jsonData() { return this.jsonTypes[this.selected]; }
+  jttOption: JTTOptions = {
+    parsers: [
+      new YAMLParser(),
+      new XMLParser(),
+      new XMLParser('XML compact', 'text/xml', true),
+      new XMLParser('html', 'text/html'),
+      ],
+  };
 
   get tstateTable() {
-    const state = new TreeState(this.jsonTypes.jsonStr);
+    const state = new TreeState(sampleData.jsonStr);
     state.select(state.tree.root.getByPath('/activityHistory'), true);
     return state;
   }

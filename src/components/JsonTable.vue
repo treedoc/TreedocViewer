@@ -6,7 +6,7 @@
         <b-btn size='sm' variant='outline-secondary' :pressed.sync='isExpanded' v-b-tooltip.hover title="expand">
           <i class="fa fa-arrows-h"></i>
         </b-btn> &nbsp;
-        <b-button-group class="mx-1" style="">
+        <b-button-group class="ml-1">
           <b-btn :size="'sm'" @click='tstate.back()' :disabled='!tstate.canBack()' title="back">
             <i class="fa fa-arrow-left"></i>
           </b-btn>
@@ -14,6 +14,8 @@
             <i class="fa fa-arrow-right"></i>
           </b-btn>
         </b-button-group>
+        <expand-control :state='expandState' />
+
         <json-path :tree-node="this.tstate ? this.tstate.selected : null" v-on:nodeClicked='nodeClicked'/>
         <!-- query: <b-form-input size='sm' :v-bind="tableOpt.query" /> -->
       </div>
@@ -32,13 +34,18 @@ import tdKey from './td-Key1.vue';
 import JsonPath from './JsonPath.vue';
 import TreeState from '../models/TreeState';
 import Tree, { TreeNode } from '../models/Tree';
+import JSONParser from '../parsers/JSONParser';
+import ExpandControl, { ExpandState } from './ExpandControl.vue';
 
 const COL_VALUE = '@value';
 const COL_NO = '#';
 const COL_KEY = '@key';
 
 @Component({
-  components: { JsonPath },
+  components: {
+    JsonPath,
+    ExpandControl,
+  },
 })
 export default class JsonTable extends Vue {
   tableOpt: DatatableOptions = {
@@ -56,6 +63,7 @@ export default class JsonTable extends Vue {
   // https://github.com/vuejs/vue-class-component#undefined-will-not-be-reactive
   tstate: TreeState = new TreeState({});
   isExpanded = false;
+  expandState = new ExpandState(0, 0);
 
   @Prop() private tableData!: TreeState | Tree | object | string;
   @Prop() private options?: DatatableOptions;
@@ -69,6 +77,7 @@ export default class JsonTable extends Vue {
     this.buildTable(val);
     this.queryData();
     this.tableOpt.xprops.tstate = this.tstate;
+    this.tableOpt.xprops.expandState = this.expandState;
   }
 
   buildTable(val: TreeNode) {
@@ -138,7 +147,7 @@ export default class JsonTable extends Vue {
       }
     }
     const totalCell = cols.size * Object.keys(val.children).length;
-    return cellCnt * 4 > totalCell;  // Fill ratio > 1/4
+    return cellCnt * 3 > totalCell;  // Fill ratio > 1/3
   }
 
   nodeClicked(data: TreeNode) { this.tstate.select(data); }
@@ -157,7 +166,7 @@ export default class JsonTable extends Vue {
 
   @Watch('tableData', {immediate: true})
   watchTableData() {
-    this.tstate = this.tableData && this.tableData instanceof TreeState ? this.tableData : new TreeState(this.tableData);
+    this.tstate = this.tableData && this.tableData instanceof TreeState ? this.tableData : new TreeState(this.tableData, new JSONParser());
   }
 
   @Watch('tstate.selected', {immediate: true})
