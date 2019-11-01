@@ -1,16 +1,17 @@
 <template>
   <b-button-group class="ml-1">
     <b-btn :size="'sm'" @click='collapseAll()' :disabled='!canCollapse()' title="back">
-      <i class="fa fa-angle-double-up"></i>
+      &laquo;
     </b-btn>
     <b-btn :size="'sm'" @click='collapse()' :disabled='!canCollapse()' title="back">
-      <i class="fa fa-angle-up"></i>
+      &lsaquo;
     </b-btn>
+    <b-btn :size="'sm'" :disabled="true" class="expand_level">{{state.expandLevel}}</b-btn>
     <b-btn :size="'sm'" @click='expend()' :disabled='!canExpand()' title="forward">
-      <i class="fa fa-angle-down"></i>
+      &rsaquo;
     </b-btn>
     <b-btn :size="'sm'" @click='expendAll()' :disabled='!canExpand()' title="forward">
-      <i class="fa fa-angle-double-down"></i>
+      &raquo;
     </b-btn>
   </b-button-group>
 </template>
@@ -24,7 +25,7 @@ export class ExpandState {
 
   constructor(
     public expandLevel = 1,
-    public minLevel = 1
+    public minLevel = 1,
     ) {
 
   }
@@ -64,3 +65,11 @@ export default class ExpandControl extends Vue {
   }
 }
 </script>
+<style scoped>
+.expand_level {
+  width: 12px;
+  padding-left: 0px;
+  padding-right: 0px;
+  text-align: center;
+}
+</style>

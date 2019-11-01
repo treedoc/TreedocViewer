@@ -45,19 +45,23 @@ export default class TreeViewItem extends Vue {
 
   @Watch('expandState', {immediate: true, deep: true})
   private watchExpandState() {
+    if (this.data.isLeaf())
+      return;
+
     const state = this.expandState;
     this.open = state.fullyExpand || this.currentLevel < state.expandLevel;
 
     if (state.fullyExpand) {
-      if (this.currentLevel > state.expandLevel)
-        state.expandLevel = this.currentLevel;
+      if (this.currentLevel + 1 > state.expandLevel)
+        state.expandLevel = this.currentLevel + 1;
     } else if (!state.moreLevel) {
       // Have to check two levels, otherwise, as "v-if" and "keep-alive" cause the watchExpendLevel won't be triggered
-      if (this.currentLevel > state.expandLevel - 2 && this.data.hasGrandChildren() ||
-          this.currentLevel > state.expandLevel - 1 && !this.data.isLeaf())
+      if (/*this.currentLevel > state.expandLevel - 2 && this.data.hasGrandChildren() ||*/
+          this.currentLevel > state.expandLevel - 1)
         state.moreLevel = true;
     }
-    // console.log(`expandLevelChange: key=${this.data.key}, currentLevel=${this.currentLevel}, state=${JSON.stringify(state)}, hasGrandChildren=${this.data.hasGrandChildren()}`);
+    // console.log(`expandLevelChange: key=${this.data.key}, currentLevel=${this.currentLevel},
+    //     state=${JSON.stringify(state)}, hasGrandChildren=${this.data.hasGrandChildren()}`);
   }
 
 }

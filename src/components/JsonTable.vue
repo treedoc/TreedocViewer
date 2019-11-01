@@ -147,7 +147,8 @@ export default class JsonTable extends Vue {
       }
     }
     const totalCell = cols.size * Object.keys(val.children).length;
-    return cellCnt * 3 > totalCell;  // Fill ratio > 1/3
+    // Limited number of cells due to performance reason
+    return cellCnt < 1000 && cellCnt * 2 > totalCell;  // Fill ratio > 1/3
   }
 
   nodeClicked(data: TreeNode) { this.tstate.select(data); }

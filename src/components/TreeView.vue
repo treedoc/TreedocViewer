@@ -43,7 +43,7 @@ export default class TreeView extends Vue {
   }
 
   // For some reason, <keep-alive> will keep the legacy node in memory.
-  // That will cause the shared expandState data get corrupted. 
+  // That will cause the shared expandState data get corrupted.
   // So we have to create a new instance whenever tree changes.
   @Watch('tree')
   watchTree() {

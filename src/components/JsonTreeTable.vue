@@ -13,14 +13,14 @@
     </div>
     <div style="width:99%">
       <msplit>
-        <div slot="source" :grow="20" style="width: 100%" :show="showSource" >
+        <div slot="source" :grow="20" style="width: 100%" :show="showSource"  class="panview">
           <textarea style="width: 100%; min-height:400px; height: 100%; flex-grow:1; overflow:auto;" v-model="jsonStr"></textarea>
         </div>
-        <div slot="tree" :grow="30" :show="showTree">
+        <div slot="tree" :grow="30" :show="showTree" class="panview">
           <tree-view v-if="tstate.tree" :json-tree="tstate.tree" :expand-level=1 :rootObjectKey='rootObjectKey' v-on:nodeClicked='nodeClicked'></tree-view>
           <div v-else>No Data</div>
         </div>
-        <div slot="table" :grow="50" :show="showTable">
+        <div slot="table" :grow="50" :show="showTable" class="panview">
           <div v-if="tstate.tree" ><json-table :table-data='tstate' v-on:nodeClicked='nodeClicked'/></div>
           <div v-else>No Data</div>
         </div>
@@ -127,5 +127,10 @@ export default class JsonTreeTable extends Vue {
 
 .error {
   color: red;
+}
+
+.panview {
+  max-height: 93vh;
+  overflow: auto;
 }
 </style>
