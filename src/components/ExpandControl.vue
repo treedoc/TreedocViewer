@@ -1,16 +1,16 @@
 <template>
   <b-button-group class="ml-1">
-    <b-btn :size="'sm'" @click='collapseAll()' :disabled='!canCollapse()' title="back">
+    <b-btn :size="'sm'" @click='collapseAll()' :disabled='!canCollapse()' title="collapse all">
       &laquo;
     </b-btn>
-    <b-btn :size="'sm'" @click='collapse()' :disabled='!canCollapse()' title="back">
+    <b-btn :size="'sm'" @click='collapse()' :disabled='!canCollapse()' title="collapse one level">
       &lsaquo;
     </b-btn>
-    <b-btn :size="'sm'" :disabled="true" class="expand_level">{{state.expandLevel}}</b-btn>
-    <b-btn :size="'sm'" @click='expend()' :disabled='!canExpand()' title="forward">
+    <b-btn :size="'sm'" :disabled="true" class="expand_level" v-b-tooltip.hover title="Current expand level">{{state.expandLevel}}</b-btn>
+    <b-btn :size="'sm'" @click='expend()' :disabled='!canExpand()' title="expand one level">
       &rsaquo;
     </b-btn>
-    <b-btn :size="'sm'" @click='expendAll()' :disabled='!canExpand()' title="forward">
+    <b-btn :size="'sm'" @click='expendAll()' :disabled='!canExpand()' title="expand all">
       &raquo;
     </b-btn>
   </b-button-group>
@@ -67,7 +67,7 @@ export default class ExpandControl extends Vue {
 </script>
 <style scoped>
 .expand_level {
-  width: 12px;
+  width: 16px;
   padding-left: 0px;
   padding-right: 0px;
   text-align: center;

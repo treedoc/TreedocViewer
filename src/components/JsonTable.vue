@@ -1,16 +1,15 @@
 <template>
   <div>
-    query: {{query}}
     <datatable v-bind="tableOpt">
       <div style="display: flex">
-        <b-btn size='sm' variant='outline-secondary' :pressed.sync='isExpanded' v-b-tooltip.hover title="expand">
+        <b-btn size='sm' variant='outline-secondary' :pressed.sync='isExpanded' v-b-tooltip.hover title="expand as columns">
           <i class="fa fa-arrows-h"></i>
         </b-btn> &nbsp;
         <b-button-group class="ml-1">
-          <b-btn :size="'sm'" @click='tstate.back()' :disabled='!tstate.canBack()' title="back">
+          <b-btn :size="'sm'" @click='tstate.back()' :disabled='!tstate.canBack()' v-b-tooltip.hover title="back">
             <i class="fa fa-arrow-left"></i>
           </b-btn>
-          <b-btn :size="'sm'" @click='tstate.forward()' :disabled='!tstate.canForward()' title="forward">
+          <b-btn :size="'sm'" @click='tstate.forward()' :disabled='!tstate.canForward()' v-b-tooltip.hover title="forward">
             <i class="fa fa-arrow-right"></i>
           </b-btn>
         </b-button-group>
