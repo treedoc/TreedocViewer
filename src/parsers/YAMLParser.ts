@@ -6,6 +6,7 @@ export class YMLParserOption {
 
 export default class YAMLParser implements ParserPlugin<YMLParserOption> {
   name = 'YAML';
+  syntax = 'yaml';
   option: YMLParserOption = {};
 
   parse(str: string): ParseResult {

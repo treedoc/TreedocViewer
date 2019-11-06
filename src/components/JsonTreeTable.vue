@@ -14,19 +14,7 @@
     <div class="split-container">
       <msplit>
         <div slot="source" :grow="20" style="width: 100%" :show="showSource"  class="panview">
-          <b-button-group class="ml-1">
-            <b-btn :size="'sm'" @click='$refs.file1.click()' v-b-tooltip.hover title="Open File">
-              <i class="fa fa-folder-open"></i>
-              <input type="file" ref='file1' style="display: none" @change="readFile($event)">
-            </b-btn>
-            <b-btn :size="'sm'" @click='copy' :disabled='!jsonStr' v-b-tooltip.hover title="Copy">
-              <i class="fa fa-copy"></i>
-            </b-btn>
-            <b-btn :size="'sm'" @click='paste' v-b-tooltip.hover title="Paste">
-              <i class="fa fa-paste"></i>
-            </b-btn>
-          </b-button-group>
-          <textarea ref='sourceText' style="width: 100%; min-height:400px; flex-grow:1; overflow:auto;" v-model="jsonStr"></textarea>
+          <SourceView v-model="jsonStr" :syntax='selectedParser.syntax' />
         </div>
         <div slot="tree" :grow="30" :show="showTree" class="panview">
           <tree-view v-if="tstate.tree" :json-tree="tstate.tree" :expand-level=1 :rootObjectKey='rootObjectKey' v-on:nodeClicked='nodeClicked'></tree-view>
@@ -45,6 +33,7 @@
 import { Component, Prop, Vue, Watch } from 'vue-property-decorator';
 import _ from 'lodash';
 import TreeState from '../models/TreeState';
+import SourceView from './SourceView.vue';
 import JTTOptions, { ParserPlugin } from '../models/JTTOption';
 import TreeView from './TreeView.vue';
 import JsonTable from './JsonTable.vue';
@@ -56,6 +45,7 @@ import XMLParser from '../parsers/XMLParser';
   components: {
     TreeView,
     JsonTable,
+    SourceView,
   },
 })
 export default class JsonTreeTable extends Vue {
@@ -87,37 +77,6 @@ export default class JsonTreeTable extends Vue {
     this.jsonStr = JSON.stringify(this.tstate.tree.obj, null, 2);
   }
 
-  readFile(ef: Event) {
-    const fn = (ef.target as HTMLInputElement).files![0];
-    if (!fn)
-      return;
-    const reader = new FileReader();
-    reader.onload = (e: Event) =>  {
-      if (reader.result)
-        this.jsonStr = reader.result as string;
-    };
-    reader.readAsText(fn);
-  }
-
-  get sourceText() {
-    return this.$refs.sourceText as HTMLInputElement;
-  }
-
-  copy() {
-    this.sourceText.select();
-    const res = document.execCommand('copy');
-    console.log(`copy result: ${res}`);
-  }
-
-  paste() {
-    this.sourceText.select();
-    this.sourceText.focus();
-    // Doesn't work as chrome blocked for security reason
-    // const res = document.execCommand("paste");
-    // console.log(`paste result: ${res}`);
-    navigator.clipboard.readText().then((txt: string) => { this.jsonStr = txt; });
-  }
-
   @Watch('data', { immediate: true })
   watchData(d: string | object | any[]) {
     if (_.isString(d))
@@ -139,7 +98,7 @@ export default class JsonTreeTable extends Vue {
     this.strDataSynced = false;
     this.parseResult = this.tstate.parseResult;
 
-    if (this.initalPath)
+    if (this.initalPath && this.tstate.tree)
       this.tstate.select(this.initalPath, true);
   }
 
@@ -157,12 +116,6 @@ export default class JsonTreeTable extends Vue {
 }
 </script>
 <style>
-.btn-outline-secondary:hover {
-  /* border-width: 2px; */
-  color: black;
-  background-color: lightgray;
-}
-
 .status-msg {
   font-size: smaller;
   color: green;

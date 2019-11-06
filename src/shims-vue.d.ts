@@ -5,3 +5,4 @@ declare module '*.vue' {
 
 declare module 'msplit';
 declare module 'vue2-datatable-component';
+declare module 'vue-codemirror-lite';

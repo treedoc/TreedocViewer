@@ -28,6 +28,7 @@
     "msplit": "^0.1.8",
     "vue": "^2.6.10",
     "vue-class-component": "^7.0.2",
+    "vue-codemirror-lite": "^1.0.4",
     "vue-property-decorator": "^8.1.0",
     "vue2-datatable-component": "github:TrueCarry/vue2-datatable",
     "yaml": "^1.7.2"

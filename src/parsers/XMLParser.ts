@@ -16,6 +16,7 @@ interface XNode {
 
 export default class XMLParser implements  ParserPlugin<XMLParserOption> {
   option: XMLParserOption = {};
+  syntax = 'xml';
 
   constructor(
     public name = 'XML',

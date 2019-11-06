@@ -6,6 +6,7 @@ export class JSONParserOption {
 
 export default class JSONParser implements  ParserPlugin<JSONParserOption> {
   name = 'JSON/JSONEX';
+  syntax = 'json';
   option: JSONParserOption = {};
 
   parse(str: string): ParseResult {

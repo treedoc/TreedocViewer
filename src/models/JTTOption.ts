@@ -14,6 +14,7 @@ export class ParseResult {
 
 export interface ParserPlugin<TOpt> {
   name: string;
+  syntax: string;
   option: TOpt;
 
   parse(str: string): ParseResult;
