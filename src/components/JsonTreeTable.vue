@@ -160,7 +160,6 @@ export default class JsonTreeTable extends Vue {
   background-color: #bdccdc;
 }
 .jtt-toolbar {
-  float: right;
   position: sticky;
   top: 0;
   z-index: 100;

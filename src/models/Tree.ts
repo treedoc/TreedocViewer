@@ -141,6 +141,10 @@ export class TreeNode {
     return node ? node.getByPath(path) : null;
   }
 
+  getPath(): string[] {
+    return this.parent ? [...this.parent.getPath(), this.key] : [];
+  }
+
   isDescendantOf(other: TreeNode | null): boolean {
     if (!this.parent || ! other)
       return false;

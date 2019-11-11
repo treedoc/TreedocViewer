@@ -27,8 +27,7 @@ export class ExpandState {
   constructor(
     public expandLevel = 1,
     public minLevel = 1,
-    public selected: TreeNode | null = null,
-    ) {}
+  ) {}
 }
 
 @Component

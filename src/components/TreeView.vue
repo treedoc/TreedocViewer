@@ -5,7 +5,8 @@
         :data='tree.root'
         :currentLevel='0'
         :expandState='expandState'
-        @nodeClicked='nodeClicked' />
+        @nodeClicked='nodeClicked'
+        ref='item' />
   </div>
 </template>
 
@@ -44,7 +45,16 @@ export default class TreeView extends Vue {
   }
 
   @Watch('selected')
-  watchselected(v: TreeNode | null) { this.expandState.selected = v; }
+  watchselected(v: TreeNode | null, old: TreeNode | null) {
+    if (old != null)
+      this.item.selectNode(old.getPath(), 0, (node) => node.selected = false);
+    if (v)
+      this.item.selectNode(v.getPath(), 0, (node) => node.selected = true);
+  }
+
+  get item() {
+    return this.$refs.item as TreeViewItem;
+  }
 
   // For some reason, <keep-alive> will keep the legacy node in memory.
   // That will cause the shared expandState data get corrupted.

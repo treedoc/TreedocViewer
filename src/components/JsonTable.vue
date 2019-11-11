@@ -14,7 +14,6 @@
           </b-btn>
         </b-button-group>
         <expand-control :state='expandState' />
-
         <json-path :tree-node="this.tstate ? this.tstate.selected : null" v-on:nodeClicked='nodeClicked'/>
         <!-- query: <b-form-input size='sm' :v-bind="tableOpt.query" /> -->
       </div>
@@ -173,6 +172,7 @@ export default class JsonTable extends Vue {
   watchSelected(val: TreeNode) {
     this.isExpanded = this.defaultExpand(val);
     this.tableOpt.query.offset = 0;
+    this.expandState = new ExpandState(0, 0);
     this.rebuildTable(val);
   }
 

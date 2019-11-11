@@ -12,16 +12,17 @@
       <template v-for="(v, k) in data.children" >
         <keep-alive :key='k'>
           <TreeViewItem :key='k' 
-              v-if='open' 
+              v-if='open'
+              ref='children'
               :currentLevel='currentLevel+1'
               :expandState='expandState'
-              :data='v' 
+              :data='v'
               @nodeClicked='nodeClicked' />
         </keep-alive>
       </template>
     </div>
     <div v-else>
-      <span class='key'>{{data.key}}: </span>
+      <span class='key'>{{data.key}}</span>:
       <span class='value'>{{data.obj}}</span>
     </div>
   </div>
@@ -39,11 +40,10 @@ export default class TreeViewItem extends Vue {
   @Prop() modifiable!: boolean;
   @Prop({default: () => new ExpandState()}) expandState!: ExpandState;
   open = false;
+  selected = false;
 
   toggleOpen() { this.open = !this.open; }
   nodeClicked(data: TreeNode) { this.$emit('nodeClicked', data); }
-
-  get selected() { return this.data === this.expandState.selected; }
 
   @Watch('selected')
   private watchSelected(v: boolean) {
@@ -51,27 +51,29 @@ export default class TreeViewItem extends Vue {
       this.$el.scrollIntoView();
   }
 
-  @Watch('expandState.fullyExpand', { immediate: false })
-  private watchFullyExpand() { this.watchExpandState(); }
+  selectNode(path: string[], start: number, action: (node: TreeViewItem) => void) {
+    if (start === path.length)
+      action(this);
 
-  @Watch('expandState.expandLevel', { immediate: true })
-  private watchExpandLevel() { this.watchExpandState(); }
+    this.open = true;
+    this.$nextTick(() => {
+      for (const item of this.$refs.children as TreeViewItem[]) {
+        if (item.data.key === path[start])
+          item.selectNode(path, start + 1, action);
+      }
+    });
+  }
 
-  @Watch('expandState.selected', { immediate: false })
-  private watchSeleted() { this.watchExpandState(); }
-
-  // deep watch will cause stack overflow due to cyclic reference
-  // cause error: vue.runtime.esm.js:620 [Vue warn]: Error in nextTick: "RangeError: Maximum call stack size exceeded"
-  @Watch('expandState', { immediate: true})
+  // // deep watch will cause stack overflow due to cyclic reference if expandState contains TreeNode
+  // // cause error: vue.runtime.esm.js:620 [Vue warn]: Error in nextTick: "RangeError: Maximum call stack size exceeded"
+  @Watch('expandState', { immediate: true, deep: true})
   private watchExpandState() {
-    //console.log(`watchExpandState: key=${this.data.key}`);
+    // console.log(`watchExpandState: key=${this.data.key}`);
     if (this.data.isLeaf())
       return;
 
     const state = this.expandState;
-    this.open = state.fullyExpand
-        || this.currentLevel < state.expandLevel
-        || !!state.selected && state.selected.isDescendantOf(this.data);
+    this.open = state.fullyExpand || this.currentLevel < state.expandLevel;
 
     if (state.fullyExpand) {
       if (this.currentLevel + 1 > state.expandLevel)
@@ -85,12 +87,11 @@ export default class TreeViewItem extends Vue {
     // console.log(`expandLevelChange: key=${this.data.key}, currentLevel=${this.currentLevel},
     //     state=${JSON.stringify(state)}, hasGrandChildren=${this.data.hasGrandChildren()}`);
   }
-
 }
 </script>
 <style scoped>
 .item {
-  font-family: monaco, monospace;
+  /* font-family: monaco, monospace; */
   font-size: 14px;
   margin-left: 18px;
 }
