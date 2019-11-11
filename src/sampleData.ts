@@ -97,6 +97,8 @@ export default {
     n11: "multiline 1\n"
     'line2'
   }
+  escapeStr: "a\\tb\\nc\\vd\\u0020e\\vf",
+  htmlStr: "<a href=test>\nThis is a link\n</a>"
   n2: [1,2,3]
   n2 [3,4,5]  # ':' is emitted before '['
   "n3" [6, 7, 8, 9]

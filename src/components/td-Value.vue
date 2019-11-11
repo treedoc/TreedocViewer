@@ -10,7 +10,7 @@
           v-on:nodeClicked='nodeClicked' />
     </div>
     <div v-else>
-      {{strVal}}
+      <pre>{{strVal}}</pre>
     </div>
   </div>
 </template>

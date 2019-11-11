@@ -2,7 +2,7 @@
   <div class='item'>
     <div v-if='!data.isSimpleType()' class='leaf'>
       <div class='node' @click.stop='toggleOpen()' >
-        <span :class='{opened: open}' class='key key-with-chevron'>
+        <span :class='{opened: open, selected: selected}' class='key key-with-chevron'>
           <a href="#/" @click.stop="$emit('nodeClicked', data)">
             {{data.key}}
           </a>
@@ -11,7 +11,7 @@
       </div>
       <template v-for="(v, k) in data.children" >
         <keep-alive :key='k'>
-          <tree-view-item :key='k' 
+          <TreeViewItem :key='k' 
               v-if='open' 
               :currentLevel='currentLevel+1'
               :expandState='expandState'
@@ -43,13 +43,35 @@ export default class TreeViewItem extends Vue {
   toggleOpen() { this.open = !this.open; }
   nodeClicked(data: TreeNode) { this.$emit('nodeClicked', data); }
 
-  @Watch('expandState', {immediate: true, deep: true})
+  get selected() { return this.data === this.expandState.selected; }
+
+  @Watch('selected')
+  private watchSelected(v: boolean) {
+    if (v)
+      this.$el.scrollIntoView();
+  }
+
+  @Watch('expandState.fullyExpand', { immediate: false })
+  private watchFullyExpand() { this.watchExpandState(); }
+
+  @Watch('expandState.expandLevel', { immediate: true })
+  private watchExpandLevel() { this.watchExpandState(); }
+
+  @Watch('expandState.selected', { immediate: false })
+  private watchSeleted() { this.watchExpandState(); }
+
+  // deep watch will cause stack overflow due to cyclic reference
+  // cause error: vue.runtime.esm.js:620 [Vue warn]: Error in nextTick: "RangeError: Maximum call stack size exceeded"
+  @Watch('expandState', { immediate: true})
   private watchExpandState() {
+    //console.log(`watchExpandState: key=${this.data.key}`);
     if (this.data.isLeaf())
       return;
 
     const state = this.expandState;
-    this.open = state.fullyExpand || this.currentLevel < state.expandLevel;
+    this.open = state.fullyExpand
+        || this.currentLevel < state.expandLevel
+        || !!state.selected && state.selected.isDescendantOf(this.data);
 
     if (state.fullyExpand) {
       if (this.currentLevel + 1 > state.expandLevel)
@@ -110,7 +132,11 @@ export default class TreeViewItem extends Vue {
     -webkit-transition: -webkit-transform .1s ease;
 }
 
+.selected {
+  background-color:#ffc107;
+}
+
 .hint {
-  color: #ccc
+  color: #ccc;
 }
 </style>

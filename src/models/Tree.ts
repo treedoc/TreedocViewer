@@ -14,11 +14,11 @@ export default class Tree {
   static readonly TAG_TYPE = '$type';
   static readonly TAG_HASH = '$hash';
   static readonly TAG_HASH_PREFIX = '$hash:';
-  hashMap = new Map<string, TreeNode>();
+  readonly hashMap = new Map<string, TreeNode>();
   tagType = Tree.TAG_TYPE;
   tagHash = Tree.TAG_HASH;
   tagHashPrefix = Tree.TAG_HASH_PREFIX;
-  root: TreeNode;
+  readonly root: TreeNode;
   sorted = false;
 
   constructor(public obj: any, rootLabel = 'root') {
@@ -34,7 +34,11 @@ export default class Tree {
 
 export class TreeNode {
   private mChildren?: {[key: string]: TreeNode};
-  constructor(public tree: Tree, public parent: TreeNode | null, public key: string, public obj: any) {
+  constructor(
+      public readonly tree: Tree,
+      public readonly parent: TreeNode | null,
+      public readonly key: string,
+      public readonly obj: any) {
     if (this.hash)
       this.tree.hashMap.set(this.hash as string,  this);
   }
@@ -85,16 +89,16 @@ export class TreeNode {
   isObject() { return _.isObject(this.obj); }
   isSimpleType() { return !this.isArray() && !this.isObject(); }
 
-  hasGrandChildren(): boolean {
-    for (const k of Object.keys(this.children)) {
-      // if (!this.children[k]) {
-      //   console.log(`key=${this.key}, k=${k}`);
-      // }
-      if (!this.children[k].isLeaf())
-        return true;
-    }
-    return false;
-  }
+  // hasGrandChildren(): boolean {
+  //   for (const k of Object.keys(this.children)) {
+  //     // if (!this.children[k]) {
+  //     //   console.log(`key=${this.key}, k=${k}`);
+  //     // }
+  //     if (!this.children[k].isLeaf())
+  //       return true;
+  //   }
+  //   return false;
+  // }
 
   get size() { return _.size(this.children); }
   get children(): {[key: string]: TreeNode} {
@@ -135,6 +139,12 @@ export class TreeNode {
       node = this.children[path[0]];
     path.shift();
     return node ? node.getByPath(path) : null;
+  }
+
+  isDescendantOf(other: TreeNode | null): boolean {
+    if (!this.parent || ! other)
+      return false;
+    return this.parent === other || this.parent.isDescendantOf(other);
   }
 }
 

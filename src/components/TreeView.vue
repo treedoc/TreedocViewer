@@ -1,8 +1,8 @@
 <template>
   <div class='wrapper'>
-    <expand-control :state='expandState' />
+    <expand-control :state='expandState' class="jtt-toolbar"/>
     <tree-view-item class='item-root' 
-        :data='tree.root' 
+        :data='tree.root'
         :currentLevel='0'
         :expandState='expandState'
         @nodeClicked='nodeClicked' />
@@ -25,6 +25,7 @@ import ExpandControl, { ExpandState } from './ExpandControl.vue';
 export default class TreeView extends Vue {
   @Prop() data!: string | object;
   @Prop() jsonTree!: Tree;
+  @Prop({required: false}) selected?: TreeNode;
 
   @Prop({default: 'root'})
   rootObjectKey!: string;
@@ -41,6 +42,9 @@ export default class TreeView extends Vue {
   get tree() {
     return this.jsonTree != null ? this.jsonTree : new Tree(this.data, this.rootObjectKey);
   }
+
+  @Watch('selected')
+  watchselected(v: TreeNode | null) { this.expandState.selected = v; }
 
   // For some reason, <keep-alive> will keep the legacy node in memory.
   // That will cause the shared expandState data get corrupted.

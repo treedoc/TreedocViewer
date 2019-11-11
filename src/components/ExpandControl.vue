@@ -18,6 +18,7 @@
 
 <script lang="ts">
 import { Component, Prop, Vue, Watch } from 'vue-property-decorator';
+import { TreeNode } from '../models/Tree';
 
 export class ExpandState {
   fullyExpand = false;
@@ -26,9 +27,8 @@ export class ExpandState {
   constructor(
     public expandLevel = 1,
     public minLevel = 1,
-    ) {
-
-  }
+    public selected: TreeNode | null = null,
+    ) {}
 }
 
 @Component

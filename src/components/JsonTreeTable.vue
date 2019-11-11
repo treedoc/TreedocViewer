@@ -17,7 +17,13 @@
           <SourceView v-model="jsonStr" :syntax='selectedParser.syntax' />
         </div>
         <div slot="tree" :grow="30" :show="showTree" class="panview">
-          <tree-view v-if="tstate.tree" :json-tree="tstate.tree" :expand-level=1 :rootObjectKey='rootObjectKey' v-on:nodeClicked='nodeClicked'></tree-view>
+          <!-- tstate.selected={{tstate.selected}} -->
+          <tree-view v-if="tstate.tree" 
+              :json-tree="tstate.tree"
+              :expand-level=1
+              :selected="tstate.selected"
+              :rootObjectKey='rootObjectKey'
+              v-on:nodeClicked='nodeClicked' />
           <div v-else>No Data</div>
         </div>
         <div slot="table" :grow="50" :show="showTable" class="panview">
@@ -148,5 +154,15 @@ export default class JsonTreeTable extends Vue {
   flex-grow: 1;
   /* background-color: rgba(0, 255, 255, 0.308); */
   overflow: auto;
+}
+
+.btn-outline-secondary:hover {
+  background-color: #bdccdc;
+}
+.jtt-toolbar {
+  float: right;
+  position: sticky;
+  top: 0;
+  z-index: 100;
 }
 </style>
