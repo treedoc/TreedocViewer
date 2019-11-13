@@ -1,7 +1,7 @@
 <template>
   <div class='wrapper'>
-    <expand-control :state='expandState' class="jtt-toolbar"/>
-    <tree-view-item class='item-root' 
+    <expand-control ref='expandControl' :state='expandState' class="jtt-toolbar" style=" float: right;"/>
+    <tree-view-item class='item-root' :key='index'
         :data='tree.root'
         :currentLevel='0'
         :expandState='expandState'
@@ -46,10 +46,10 @@ export default class TreeView extends Vue {
 
   @Watch('selected')
   watchselected(v: TreeNode | null, old: TreeNode | null) {
-    if (old != null)
-      this.item.selectNode(old.getPath(), 0, (node) => node.selected = false);
-    if (v)
-      this.item.selectNode(v.getPath(), 0, (node) => node.selected = true);
+    // if (old != null)
+    //   this.item.selectNode(old.getPath(), 0, (node) => node.selected = false);
+    // if (v)
+    //   this.item.selectNode(v.getPath(), 0, (node) => node.selected = true);
   }
 
   get item() {

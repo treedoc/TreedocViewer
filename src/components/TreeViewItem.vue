@@ -13,7 +13,7 @@
         <keep-alive :key='k'>
           <TreeViewItem :key='k' 
               v-if='open'
-              ref='children'
+              :ref="'children'"
               :currentLevel='currentLevel+1'
               :expandState='expandState'
               :data='v'
@@ -33,6 +33,13 @@ import { Component, Prop, Vue, Watch } from 'vue-property-decorator';
 import { TreeNode } from '../models/Tree';
 import { ExpandState } from './ExpandControl.vue';
 
+// @Component({
+//   components: {
+//     // VUEBUG: if don't specify components explicitly here, the $refs.children will be DOM objects
+//     // instead of Vue component when compiled in production mode. Dev mode has no problem.
+//     TreeViewItem,
+//   },
+// })
 @Component
 export default class TreeViewItem extends Vue {
   @Prop() data!: TreeNode;
@@ -57,15 +64,20 @@ export default class TreeViewItem extends Vue {
 
     this.open = true;
     this.$nextTick(() => {
-      for (const item of this.$refs.children as TreeViewItem[]) {
-        if (item.data.key === path[start])
-          item.selectNode(path, start + 1, action);
-      }
+      if (this.$refs.children)
+        for (const item of this.$refs.children as TreeViewItem[]) {
+          // VUEBUG: in production mode, item.data is not avaible. instead the data will be stored in item.$attrs.data
+          const node = item.data ? item.data : (item.$attrs.data as unknown as TreeNode);
+          if (node.key === path[start])
+            item.selectNode(path, start + 1, action);
+        }
+      else
+        console.log(`selectNode: path=${path}`);
     });
   }
 
-  // // deep watch will cause stack overflow due to cyclic reference if expandState contains TreeNode
-  // // cause error: vue.runtime.esm.js:620 [Vue warn]: Error in nextTick: "RangeError: Maximum call stack size exceeded"
+  // VUEBUG: deep watch will cause stack overflow due to cyclic reference if expandState contains TreeNode
+  // cause error: vue.runtime.esm.js:620 [Vue warn]: Error in nextTick: "RangeError: Maximum call stack size exceeded"
   @Watch('expandState', { immediate: true, deep: true})
   private watchExpandState() {
     // console.log(`watchExpandState: key=${this.data.key}`);
@@ -79,7 +91,7 @@ export default class TreeViewItem extends Vue {
       if (this.currentLevel + 1 > state.expandLevel)
         state.expandLevel = this.currentLevel + 1;
     } else if (!state.moreLevel) {
-      // Have to check two levels, otherwise, as "v-if" and "keep-alive" cause the watchExpendLevel won't be triggered
+      // VUEBUG: Have to check two levels, otherwise, as "v-if" and "keep-alive" cause the watchExpendLevel won't be triggered
       if (/*this.currentLevel > state.expandLevel - 2 && this.data.hasGrandChildren() ||*/
           this.currentLevel > state.expandLevel - 1)
         state.moreLevel = true;
