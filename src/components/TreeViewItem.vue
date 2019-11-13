@@ -11,7 +11,11 @@
       </div>
       <template v-for="(v, k) in data.children" >
         <keep-alive :key='k'>
-          <TreeViewItem :key='k' 
+          <!-- 
+            VUEBUG: If use TreeViewItem which is cause brokage only happen in prod mode, this inconsistency cause me
+            many days to troubleshoot.
+          -->
+          <tree-view-item :key='k' 
               v-if='open'
               :ref="'children'"
               :currentLevel='currentLevel+1'
@@ -37,6 +41,7 @@ import { ExpandState } from './ExpandControl.vue';
 //   components: {
 //     // VUEBUG: if don't specify components explicitly here, the $refs.children will be DOM objects
 //     // instead of Vue component when compiled in production mode. Dev mode has no problem.
+//     // This only happens is I use <TreeViewItem> instead of <tree-view-item>
 //     TreeViewItem,
 //   },
 // })
@@ -64,15 +69,13 @@ export default class TreeViewItem extends Vue {
 
     this.open = true;
     this.$nextTick(() => {
-      if (this.$refs.children)
-        for (const item of this.$refs.children as TreeViewItem[]) {
-          // VUEBUG: in production mode, item.data is not avaible. instead the data will be stored in item.$attrs.data
-          const node = item.data ? item.data : (item.$attrs.data as unknown as TreeNode);
-          if (node.key === path[start])
-            item.selectNode(path, start + 1, action);
-        }
-      else
-        console.log(`selectNode: path=${path}`);
+      for (const item of this.$refs.children as TreeViewItem[]) {
+        // VUEBUG: in production mode, item.data is not avaible. instead the data will be stored in item.$attrs.data
+        // const node = item.data ? item.data : (item.$attrs.data as unknown as TreeNode);
+        // This only happen if I use <TreeViewItem> instead of <tree-view-item>
+        if (item.data.key === path[start])
+          item.selectNode(path, start + 1, action);
+      }
     });
   }
 

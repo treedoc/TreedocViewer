@@ -46,10 +46,10 @@ export default class TreeView extends Vue {
 
   @Watch('selected')
   watchselected(v: TreeNode | null, old: TreeNode | null) {
-    // if (old != null)
-    //   this.item.selectNode(old.getPath(), 0, (node) => node.selected = false);
-    // if (v)
-    //   this.item.selectNode(v.getPath(), 0, (node) => node.selected = true);
+    if (old != null)
+      this.item.selectNode(old.getPath(), 0, (node) => node.selected = false);
+    if (v)
+      this.item.selectNode(v.getPath(), 0, (node) => node.selected = true);
   }
 
   get item() {
