@@ -14,7 +14,7 @@
     <div class="split-container">
       <msplit>
         <div slot="source" :grow="20" style="width: 100%" :show="showSource"  class="panview">
-          <SourceView v-model="jsonStr" :syntax='selectedParser.syntax' />
+          <SourceView v-model="jsonStr" :syntax='selectedParser.syntax' :selection='tstate.selection' :show='showSource[0]' />
         </div>
         <div slot="tree" :grow="30" :show="showTree" class="panview">
           <!-- tstate.selected={{tstate.selected}} -->
@@ -100,13 +100,20 @@ export default class JsonTreeTable extends Vue {
 
   @Watch('jsonStr', { immediate: true })
   watchJsonStr(str: string) {
-    this.tstate = new TreeState(this.strDataSynced ? this.data : str, this.selectedParser, this.rootObjectKey);
-    this.strDataSynced = false;
-    this.parseResult = this.tstate.parseResult;
-
-    if (this.initalPath && this.tstate.tree)
-      this.tstate.select(this.initalPath, true);
+    this.jsonStrChanged(str, this);
   }
+
+  // Have to parse THIS as Vue framework will generate a different instance
+  // of this during runtime.
+  jsonStrChanged = _.debounce((str: string, THIS: JsonTreeTable) => {
+    const selectedPath = THIS.tstate.selected ? THIS.tstate.selected.path : [];
+    THIS.tstate = new TreeState(this.strDataSynced ? THIS.data : str, THIS.selectedParser, THIS.rootObjectKey, selectedPath);
+    THIS.strDataSynced = false;
+    THIS.parseResult = THIS.tstate.parseResult;
+
+    if (selectedPath.length === 0 && THIS.initalPath && THIS.tstate.tree)
+      THIS.tstate.select(THIS.initalPath, true);
+  }, 500);
 
   get hasError() {
     return this.parseResult.startsWith('Error');

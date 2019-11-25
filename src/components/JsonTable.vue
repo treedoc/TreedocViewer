@@ -195,4 +195,16 @@ export default class JsonTable extends Vue {
 .jsontable-min {
   width:1%;
 }
+.table td, .table th {
+  padding: .25rem;
+}
+pre {
+  /* white-space: pre-wrap; */
+  white-space: pre;
+  word-wrap: break-word;
+  margin-bottom: 0px;
+}
+.clearfix {
+  margin-bottom: 0px !important;
+}
 </style>

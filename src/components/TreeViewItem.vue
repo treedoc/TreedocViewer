@@ -55,6 +55,8 @@ export default class TreeViewItem extends Vue {
   selected = false;
 
   toggleOpen() { this.open = !this.open; }
+  // VUELIMIT: Vue $emit won't buble up the event to grand parent, so we have explicitly
+  // propagate it.
   nodeClicked(data: TreeNode) { this.$emit('nodeClicked', data); }
 
   @Watch('selected')
@@ -64,8 +66,10 @@ export default class TreeViewItem extends Vue {
   }
 
   selectNode(path: string[], start: number, action: (node: TreeViewItem) => void) {
-    if (start === path.length)
+    if (start === path.length) {
       action(this);
+      return;
+    }
 
     this.open = true;
     this.$nextTick(() => {

@@ -114,7 +114,7 @@ export class TreeNode {
 
       for (const ck of cks) {
         const cv = this.obj[ck];
-        if (cv === null || ck === this.tree.tagType || ck === this.tree.tagHash)
+        if (cv === null || ck === this.tree.tagType || ck === this.tree.tagHash || ck === '$')
           continue;
         this.children[ck] = new TreeNode(this.tree, this, ck, cv);
       }
@@ -122,27 +122,30 @@ export class TreeNode {
     return this.mChildren;
   }
 
-  getByPath(path: string | string[]): TreeNode | null {
+  getByPath(path: string | string[], thisIfNotFound = false, idx = 0): TreeNode | null {
     if (_.isString(path))
       path = path.split('/');
 
-    if (path.length === 0)
+    if (idx >= path.length)
       return this;
+
+    const k = path[idx];
     let node = null;
-    if (path[0] === '..')
+    if (k === '..')
       node = this.parent;
-    else if (path[0] === '')
+    else if (k === '')
       node = this.tree.root;
-    else if (path[0] === '.')
+    else if (k === '.')
       node = this;
     else
-      node = this.children[path[0]];
-    path.shift();
-    return node ? node.getByPath(path) : null;
+      node = this.children[k];
+    return node ?
+      node.getByPath(path, thisIfNotFound, idx + 1) :
+      (thisIfNotFound ? this : null);
   }
 
-  getPath(): string[] {
-    return this.parent ? [...this.parent.getPath(), this.key] : [];
+  get path(): string[] {
+    return this.parent ? [...this.parent.path, this.key] : [];
   }
 
   isDescendantOf(other: TreeNode | null): boolean {

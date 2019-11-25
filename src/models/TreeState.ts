@@ -3,10 +3,14 @@ import History from './History';
 import Tree, { TreeNode } from './Tree';
 import { ParserPlugin, ParseResult, ParseStatus } from './JTTOption';
 import JSONParser from '@/parsers/JSONParser';
+import Bookmark from 'jsonex-treedoc/lib/Bookmark';
 
 
-// tslint:disable-next-line: prefer-const
-let o: any | null;
+export interface Selection {
+  start?: Bookmark;
+  end?: Bookmark;
+}
+
 export default class TreeState {
   parseResult = 'OBJECT';
   parseStatus = ParseStatus.SUCCESS;
@@ -14,14 +18,15 @@ export default class TreeState {
 
   history = new History<TreeNode>();
   selected: TreeNode | null = null;
+  selection: Selection = {};
   initialNode?: TreeNode | null;
   tree: Tree;
 
-  constructor(treeData: Tree | string | any, parserPlugin = new JSONParser(), rootLabel = 'root') {
+  constructor(treeData: Tree | string | any, parserPlugin = new JSONParser(), rootLabel = 'root', selectedPath: string[] = []) {
     this.parserPlugin = parserPlugin;
     this.tree = this.buildTree(treeData, rootLabel);
     if (this.tree)
-      this.select(this.tree.root, true);
+      this.select(selectedPath, true);
   }
 
   buildTree(treeData: Tree | string | any, rootLabel: string) {
@@ -33,25 +38,28 @@ export default class TreeState {
     return jsonObj ? new Tree(jsonObj, rootLabel) : null;
   }
 
-  select(node: TreeNode | string | null, resetInitialNode = false): void {
+  select(node: TreeNode | string | string[] | null, initial = false): void {
     if (this.tree == null)
       return;
 
     let selectedNode: TreeNode | null = null;
-    if (typeof(node) === 'string') {
-      selectedNode = this.tree.root.getByPath(node);
-      if (!selectedNode)
-        return;
+    if (typeof(node) === 'string' || node instanceof Array) {
+      selectedNode = this.tree.root.getByPath(node, true);
+      // if (!selectedNode)
+      //   return;
     } else
       selectedNode = node;
 
-    if (resetInitialNode)
+    if (initial)
       this.initialNode = selectedNode;
     if (this.selected === selectedNode)
       return;
     this.selected = selectedNode;
     if (selectedNode)
       this.history.append(selectedNode);
+
+    if (!initial)
+      this.selection = this.selected!.obj.$;
   }
 
   isRootSelected() { return this.tree != null && this.selected === this.tree.root; }

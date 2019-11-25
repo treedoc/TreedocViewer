@@ -1,7 +1,7 @@
 <template>
   <div class='wrapper'>
     <expand-control ref='expandControl' :state='expandState' class="jtt-toolbar" style=" float: right;"/>
-    <tree-view-item class='item-root' :key='index'
+    <tree-view-item class='item-root'
         :data='tree.root'
         :currentLevel='0'
         :expandState='expandState'
@@ -47,9 +47,9 @@ export default class TreeView extends Vue {
   @Watch('selected')
   watchselected(v: TreeNode | null, old: TreeNode | null) {
     if (old != null)
-      this.item.selectNode(old.getPath(), 0, (node) => node.selected = false);
+      this.item.selectNode(old.path, 0, (node) => node.selected = false);
     if (v)
-      this.item.selectNode(v.getPath(), 0, (node) => node.selected = true);
+      this.item.selectNode(v.path, 0, (node) => node.selected = true);
   }
 
   get item() {
@@ -61,7 +61,7 @@ export default class TreeView extends Vue {
   // So we have to create a new instance whenever tree changes.
   @Watch('tree')
   watchTree() {
-    this.expandState = new ExpandState(this.expandLevel);
+    // this.expandState = new ExpandState(this.expandState.expandLevel);
   }
 }
 </script>
