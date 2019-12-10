@@ -25,7 +25,7 @@
     "jquery": "^3.4.1",
     "jsonex-treedoc": "^0.1.0",
     "lodash": "^4.17.15",
-    "msplit": "^0.1.15",
+    "msplit": "^0.1.20",
     "vue": "^2.6.10",
     "vue-class-component": "^7.0.2",
     "vue-codemirror-lite": "^1.0.4",

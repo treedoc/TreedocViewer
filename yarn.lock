@@ -2736,9 +2736,9 @@ execa@^1.0.0:
     strip-eof "^1.0.0"
 
 execa@^3.3.0:
-  version "3.3.0"
-  resolved "https://registry.yarnpkg.com/execa/-/execa-3.3.0.tgz#7e348eef129a1937f21ecbbd53390942653522c1"
-  integrity sha512-j5Vit5WZR/cbHlqU97+qcnw9WHRCIL4V1SVe75VcHcD1JRBdt8fv0zw89b7CQHQdUHTt2VjuhcF5ibAgVOxqpg==
+  version "3.4.0"
+  resolved "https://registry.yarnpkg.com/execa/-/execa-3.4.0.tgz#c08ed4550ef65d858fac269ffc8572446f37eb89"
+  integrity sha512-r9vdGQk4bmCuK1yKQu1KTwcT2zwfWdbdaXfCtAh+5nU/4fSX+JAb7vZGvI5naJrQlvONrEB20jeruESI69530g==
   dependencies:
     cross-spawn "^7.0.0"
     get-stream "^5.0.0"
@@ -5356,10 +5356,10 @@ ms@^2.1.1:
   resolved "https://registry.yarnpkg.com/ms/-/ms-2.1.2.tgz#d09d1f357b443f493382a8eb3ccd183872ae6009"
   integrity sha512-sGkPx+VjMtmA6MX27oA4FBFELFCZZ4S4XqeGOXCv68tT+jb3vk/RyaKWP0PTKyWtmLSM0b+adUTEvbs1PEaH2w==
 
-msplit@^0.1.14:
-  version "0.1.15"
-  resolved "https://registry.yarnpkg.com/msplit/-/msplit-0.1.15.tgz#39a52bd42dac1e843a6aa9aac2746f29980bcc41"
-  integrity sha512-ymfSaMiAlxxbFZfKu39aucyBgAY72eI2se6R/UeNWZ2A/3mhSk83Ol37C+kPRHdJcdSFStgsob5wRUg4ghvFiA==
+msplit@^0.1.20:
+  version "0.1.20"
+  resolved "https://registry.yarnpkg.com/msplit/-/msplit-0.1.20.tgz#ae40a1c0b809e05e5828593ca98932f09cf2c4f7"
+  integrity sha512-rNXBCcmm2y0YD7GI2fS23YNm/yekN/7/qkZq/+0l1UfICRobVcIvlc+tSsutLW2RFbdm5ZC2e9cARnljTlvccg==
   dependencies:
     vue "^2.6.10"
     vue-class-component "^7.0.2"

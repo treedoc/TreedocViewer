@@ -1,15 +1,15 @@
 <template>
   <div class='item'>
-    <div v-if='!data.isSimpleType()' class='leaf'>
+    <div v-if='!tnode.isSimpleType()' class='leaf'>
       <div class='node' @click.stop='toggleOpen()' >
         <span :class='{opened: open, selected: selected}' class='key key-with-chevron'>
-          <a href="#/" @click.stop="$emit('nodeClicked', data)">
-            {{data.key}}
+          <a href="#/" @click.stop="tstate.select(tnode)">
+            {{tnode.key}}
           </a>
         </span>
-        <span class='hint'>{{data.typeSizeLabel}}</span>
+        <span class='hint'>{{tnode.typeSizeLabel}}</span>
       </div>
-      <template v-for="(v, k) in data.children" >
+      <template v-for="(v, k) in tnode.children" >
         <keep-alive :key='k'>
           <!-- 
             VUEBUG: If use TreeViewItem which is cause brokage only happen in prod mode, this inconsistency cause me
@@ -20,14 +20,14 @@
               :ref="'children'"
               :currentLevel='currentLevel+1'
               :expandState='expandState'
-              :data='v'
-              @nodeClicked='nodeClicked' />
+              :tnode='v'
+              :tstate='tstate' />
         </keep-alive>
       </template>
     </div>
     <div v-else>
-      <span class='key'>{{data.key}}</span>:
-      <span class='value'>{{data.obj}}</span>
+      <span class='key'>{{tnode.key}}</span>:
+      <span class='value'>{{tnode.obj}}</span>
     </div>
   </div>
 </template>
@@ -36,6 +36,7 @@
 import { Component, Prop, Vue, Watch } from 'vue-property-decorator';
 import { TreeNode } from '../models/Tree';
 import { ExpandState } from './ExpandControl.vue';
+import TreeState from '../models/TreeState';
 
 // @Component({
 //   components: {
@@ -47,7 +48,8 @@ import { ExpandState } from './ExpandControl.vue';
 // })
 @Component
 export default class TreeViewItem extends Vue {
-  @Prop() data!: TreeNode;
+  @Prop() tstate!: TreeState;
+  @Prop() tnode!: TreeNode;
   @Prop() currentLevel!: number;
   @Prop() modifiable!: boolean;
   @Prop({default: () => new ExpandState()}) expandState!: ExpandState;
@@ -57,12 +59,12 @@ export default class TreeViewItem extends Vue {
   toggleOpen() { this.open = !this.open; }
   // VUELIMIT: Vue $emit won't buble up the event to grand parent, so we have explicitly
   // propagate it.
-  nodeClicked(data: TreeNode) { this.$emit('nodeClicked', data); }
+  // nodeClicked(tnode: TreeNode) { this.$emit('nodeClicked', tnode); }
 
   @Watch('selected')
   private watchSelected(v: boolean) {
     if (v)
-      this.$el.scrollIntoView();
+      this.$el.scrollIntoView({block: 'nearest'});
   }
 
   selectNode(path: string[], start: number, action: (node: TreeViewItem) => void) {
@@ -74,10 +76,10 @@ export default class TreeViewItem extends Vue {
     this.open = true;
     this.$nextTick(() => {
       for (const item of this.$refs.children as TreeViewItem[]) {
-        // VUEBUG: in production mode, item.data is not avaible. instead the data will be stored in item.$attrs.data
-        // const node = item.data ? item.data : (item.$attrs.data as unknown as TreeNode);
+        // VUEBUG: in production mode, item.tnode is not avaible. instead the tnode will be stored in item.$attrs.tnode
+        // const node = item.tnode ? item.tnode : (item.$attrs.tnode as unknown as TreeNode);
         // This only happen if I use <TreeViewItem> instead of <tree-view-item>
-        if (item.data.key === path[start])
+        if (item.tnode.key === path[start])
           item.selectNode(path, start + 1, action);
       }
     });
@@ -87,8 +89,8 @@ export default class TreeViewItem extends Vue {
   // cause error: vue.runtime.esm.js:620 [Vue warn]: Error in nextTick: "RangeError: Maximum call stack size exceeded"
   @Watch('expandState', { immediate: true, deep: true})
   private watchExpandState() {
-    // console.log(`watchExpandState: key=${this.data.key}`);
-    if (this.data.isLeaf())
+    // console.log(`watchExpandState: key=${this.tnode.key}`);
+    if (this.tnode.isLeaf())
       return;
 
     const state = this.expandState;
@@ -99,12 +101,12 @@ export default class TreeViewItem extends Vue {
         state.expandLevel = this.currentLevel + 1;
     } else if (!state.moreLevel) {
       // VUEBUG: Have to check two levels, otherwise, as "v-if" and "keep-alive" cause the watchExpendLevel won't be triggered
-      if (/*this.currentLevel > state.expandLevel - 2 && this.data.hasGrandChildren() ||*/
+      if (/*this.currentLevel > state.expandLevel - 2 && this.tnode.hasGrandChildren() ||*/
           this.currentLevel > state.expandLevel - 1)
         state.moreLevel = true;
     }
-    // console.log(`expandLevelChange: key=${this.data.key}, currentLevel=${this.currentLevel},
-    //     state=${JSON.stringify(state)}, hasGrandChildren=${this.data.hasGrandChildren()}`);
+    // console.log(`expandLevelChange: key=${this.tnode.key}, currentLevel=${this.currentLevel},
+    //     state=${JSON.stringify(state)}, hasGrandChildren=${this.tnode.hasGrandChildren()}`);
   }
 }
 </script>

@@ -2,10 +2,10 @@
   <div class='wrapper'>
     <expand-control ref='expandControl' :state='expandState' class="jtt-toolbar" style=" float: right;"/>
     <tree-view-item class='item-root'
-        :data='tree.root'
+        :tnode='tstate.tree.root'
         :currentLevel='0'
         :expandState='expandState'
-        @nodeClicked='nodeClicked'
+        :tstate='tstate'
         ref='item' />
   </div>
 </template>
@@ -16,6 +16,7 @@ import _ from 'lodash';
 import TreeViewItem from './TreeViewItem.vue';
 import Tree, { TreeNode } from '../models/Tree';
 import ExpandControl, { ExpandState } from './ExpandControl.vue';
+import TreeState from '../models/TreeState';
 
 @Component({
   components: {
@@ -24,27 +25,12 @@ import ExpandControl, { ExpandState } from './ExpandControl.vue';
   },
 })
 export default class TreeView extends Vue {
-  @Prop() data!: string | object;
-  @Prop() jsonTree!: Tree;
-  @Prop({required: false}) selected?: TreeNode;
-
-  @Prop({default: 'root'})
-  rootObjectKey!: string;
-
-  @Prop({default: '4'})
-  expandLevel!: number;
-
+  @Prop() tstate!: TreeState;
+  @Prop({default: 'root'}) rootObjectKey!: string;
+  @Prop({default: '4'}) expandLevel!: number;
   expandState = new ExpandState(this.expandLevel);
 
-  nodeClicked(data: TreeNode) {
-    this.$emit('nodeClicked', data);
-  }
-
-  get tree() {
-    return this.jsonTree != null ? this.jsonTree : new Tree(this.data, this.rootObjectKey);
-  }
-
-  @Watch('selected')
+  @Watch('tstate.selected')
   watchselected(v: TreeNode | null, old: TreeNode | null) {
     if (old != null)
       this.item.selectNode(old.path, 0, (node) => node.selected = false);
@@ -56,12 +42,12 @@ export default class TreeView extends Vue {
     return this.$refs.item as TreeViewItem;
   }
 
-  // For some reason, <keep-alive> will keep the legacy node in memory.
+  // VUELMIT: For some reason, <keep-alive> will keep the legacy node in memory.
   // That will cause the shared expandState data get corrupted.
   // So we have to create a new instance whenever tree changes.
-  @Watch('tree')
+  @Watch('tstate')
   watchTree() {
-    // this.expandState = new ExpandState(this.expandState.expandLevel);
+    this.expandState = new ExpandState(this.expandState.expandLevel);
   }
 }
 </script>

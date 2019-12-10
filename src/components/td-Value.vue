@@ -3,11 +3,11 @@
     <div v-if="html" v-html="html"/>
     <div v-else-if="strVal === null">
       <tree-view-item class='tree-view-item-root'
-          :data='value'
+          :tstate='xprops.tstate'
+          :tnode='value'
           :expandState='xprops.expandState'
           :currentLevel='0'
-          style="margin-left: 0!important;" 
-          v-on:nodeClicked='nodeClicked' />
+          style="margin-left: 0!important;" />
     </div>
     <div v-else>
       <pre>{{strVal}}</pre>
@@ -25,9 +25,6 @@ export default {
     TreeViewItem,
   },
   props: ['field', 'value', 'row', 'xprops', 'columns'],
-  methods: {
-    nodeClicked(data) { this.xprops.tstate.select(data); },
-  },
   computed: {
     strVal() {
       if (!this.value)

@@ -19,11 +19,9 @@
         <div slot="tree" :grow="30" :show="showTree" class="panview">
           <!-- tstate.selected={{tstate.selected}} -->
           <tree-view v-if="tstate.tree" 
-              :json-tree="tstate.tree"
+              :tstate="tstate"
               :expand-level=1
-              :selected="tstate.selected"
-              :rootObjectKey='rootObjectKey'
-              v-on:nodeClicked='nodeClicked' />
+              :rootObjectKey='rootObjectKey' />
           <div v-else>No Data</div>
         </div>
         <div slot="table" :grow="50" :show="showTable" class="panview">
@@ -142,7 +140,7 @@ export default class JsonTreeTable extends Vue {
   /* max-height: 93vh; */
   max-height: 100%;
   width: 100%;
-  overflow: auto;
+  /* overflow: auto; */
   background-color: white;
   display: flex;
   flex-direction: column;
