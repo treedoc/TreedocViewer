@@ -10,7 +10,7 @@
     <json-tree-table v-if="true" :data='selectedSample' :inital-path="'activityHistory'" :options='jttOption' rootObjectKey='root' class="json-tree-table">
       Sample Data: <b-form-select v-model="selectedSample" :options="sampleData" size='sm' style="width:auto" />
     </json-tree-table>
-    <div v-if=false>
+    <div v-if=true>
       <hr />
       <div>Json Table</div>
       <json-table :table-data="tstateTable" :options="jsonTableOptions"/>
@@ -50,7 +50,7 @@ export default class App extends Vue {
       },
       {
         field: 'creationDate',
-        html: (value: any, row: any) => `<a href="http://abc.com/${row.runtimeContext.obj}">${value.obj}</a>`,
+        html: (value: any, row: any) => `<a href="http://abc.com/${row.runtimeContext.obj}">${value.value}</a>`,
       },
     ],
   };
@@ -65,7 +65,9 @@ export default class App extends Vue {
 
   get tstateTable() {
     const state = new TreeState(sampleData.jsonStr);
-    state.select(state.tree.root.getByPath('/activityHistory'), true);
+    const n = state.tree.root.getByPath('/activityHistory');
+    if (n)
+      state.select(n, true);
     return state;
   }
 }

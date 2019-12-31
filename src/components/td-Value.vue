@@ -18,7 +18,7 @@
 // For some reason, DataTable doesn't support typescript class based dynamic component or Vue.extend({}) component
 import _ from 'lodash';
 import TreeViewItem from './TreeViewItem.vue';
-import { TreeNode } from '../models/Tree';
+import { TDNodeType } from 'jsonex-treedoc';
 
 export default {
   components: {
@@ -29,8 +29,8 @@ export default {
     strVal() {
       if (!this.value)
         return '';
-      if (!this.value.isObject())
-        return this.value.obj;
+      if (this.value.type === TDNodeType.SIMPLE)
+        return this.value.value;
       return null;
     },
     html() {

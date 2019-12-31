@@ -14,9 +14,9 @@
 import { Component, Prop, Vue, Watch } from 'vue-property-decorator';
 import _ from 'lodash';
 import TreeViewItem from './TreeViewItem.vue';
-import Tree, { TreeNode } from '../models/Tree';
 import ExpandControl, { ExpandState } from './ExpandControl.vue';
 import TreeState from '../models/TreeState';
+import { TDNode } from 'jsonex-treedoc';
 
 @Component({
   components: {
@@ -31,7 +31,7 @@ export default class TreeView extends Vue {
   expandState = new ExpandState(this.expandLevel);
 
   @Watch('tstate.selected')
-  watchselected(v: TreeNode | null, old: TreeNode | null) {
+  watchselected(v: TDNode | null, old: TDNode | null) {
     if (old != null)
       this.item.selectNode(old.path, 0, (node) => node.selected = false);
     if (v)

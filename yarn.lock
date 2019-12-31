@@ -4775,10 +4775,10 @@ json5@^1.0.1:
   dependencies:
     minimist "^1.2.0"
 
-jsonex-treedoc@^0.1.0:
-  version "0.1.8"
-  resolved "https://registry.yarnpkg.com/jsonex-treedoc/-/jsonex-treedoc-0.1.8.tgz#bfe82382b70de9eb200d747528e27a9f63f98cf9"
-  integrity sha512-2NHBMwDFkAx7DqQAsum/feW0dEN1dZmFjT+Zvuqt1ImqT5Mq+98drOul7F096Xpc9Vc9NoYO5Zokoh9kE18kNQ==
+jsonex-treedoc@^0.1.10:
+  version "0.1.10"
+  resolved "https://registry.yarnpkg.com/jsonex-treedoc/-/jsonex-treedoc-0.1.10.tgz#ae0f41f081fbfcd868d292e7b9b1f3193141d1a7"
+  integrity sha512-LIh5X1lKlmaG8IPHbAvcqNbopv5zWVT3QSl64gwzBvMWWf0qq74vb3RdQQP8oLdJSJyzHGwnRY3dnRZw3rBCWA==
 
 jsonfile@^4.0.0:
   version "4.0.0"

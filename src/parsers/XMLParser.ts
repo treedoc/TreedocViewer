@@ -1,5 +1,6 @@
-import { ParserPlugin, ParseResult } from '../models/JTTOption';
 import _ from 'lodash';
+import { ParserPlugin, ParseResult } from '../models/JTTOption';
+import { TDObjectCoder } from 'jsonex-treedoc';
 
 export class XMLParserOption  {
 }
@@ -28,9 +29,11 @@ export default class XMLParser implements  ParserPlugin<XMLParserOption> {
     try {
       const doc = new DOMParser().parseFromString(str, this.mineType);
       const root = doc.childNodes.length < 2 ? doc.childNodes[0] : doc;
-      result.result = this.docToObj(root);
+      let xmlObj: XNode = this.docToObj(root);
       if (this.compact)
-        result.result = { [result.result.tag || result.result.name] : this.compactToObject(result.result)};
+        xmlObj = { [xmlObj.tag || xmlObj.name!] : this.compactToObject(xmlObj)};
+
+      result.result = TDObjectCoder.get().encode(xmlObj);
       result.message = 'DOMParser().parseFromString()';
       return result;
     } catch (e) {

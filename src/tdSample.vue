@@ -1,5 +1,5 @@
 <template functional>
-  <b>{{props.value.obj}}</b>
+  <b>{{props.value.value}}</b>
 </template>
 <script lang='ts'>
 export default {};

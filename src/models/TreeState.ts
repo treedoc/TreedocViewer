@@ -1,10 +1,7 @@
-import { TDJSONParser, TDJSONParserOption, TDNodeType } from 'jsonex-treedoc';
+import { TDNode, TreeDoc, Bookmark, TDObjectCoder, TDNodeType } from 'jsonex-treedoc';
 import History from './History';
-import Tree, { TreeNode } from './Tree';
-import { ParserPlugin, ParseResult, ParseStatus } from './JTTOption';
+import { ParserPlugin, ParseStatus } from './JTTOption';
 import JSONParser from '@/parsers/JSONParser';
-import Bookmark from 'jsonex-treedoc/lib/Bookmark';
-
 
 export interface Selection {
   start?: Bookmark;
@@ -16,34 +13,36 @@ export default class TreeState {
   parseStatus = ParseStatus.SUCCESS;
   parserPlugin: ParserPlugin<any>;
 
-  history = new History<TreeNode>();
-  selected: TreeNode | null = null;
+  history = new History<TDNode>();
+  selected: TDNode | null = null;
   selection: Selection = {};
-  initialNode?: TreeNode | null;
-  tree: Tree;
+  initialNode?: TDNode | null;
+  tree: TreeDoc;
 
-  constructor(treeData: Tree | string | any, parserPlugin = new JSONParser(), rootLabel = 'root', selectedPath: string[] = []) {
+  constructor(treeData: TDNode | string | any, parserPlugin = new JSONParser(), rootLabel = 'root', selectedPath: string[] = []) {
     this.parserPlugin = parserPlugin;
     this.tree = this.buildTree(treeData, rootLabel);
-    if (this.tree)
+    if (this.tree) {
+      this.tree.root.key = rootLabel;
       this.select(selectedPath, true);
-  }
-
-  buildTree(treeData: Tree | string | any, rootLabel: string) {
-    if (!treeData || treeData.constructor.name === 'Tree') {
-      this.parseResult = 'TREE';
-      return treeData;
     }
-    const jsonObj = typeof(treeData) === 'string' ? this.parse(treeData) : treeData;
-    return jsonObj ? new Tree(jsonObj, rootLabel) : null;
   }
 
-  select(node: TreeNode | string | string[] | null, initial = false): void {
+  buildTree(treeData: TDNode | string | any, rootLabel: string) {
+    if (!treeData || treeData.constructor.name === 'TreeDoc') {
+      this.parseResult = 'TreeDoc';
+      return treeData as TreeDoc;
+    }
+    const tdNode = typeof(treeData) === 'string' ? this.parse(treeData) : TDObjectCoder.get().encode(treeData);
+    return tdNode && tdNode.doc;
+  }
+
+  select(node: TDNode | string | string[], initial = false): void {
     if (this.tree == null)
       return;
 
-    let selectedNode: TreeNode | null = null;
-    if (typeof(node) === 'string' || node instanceof Array) {
+    let selectedNode: TDNode | null = null;
+    if (!(node instanceof TDNode)) {
       selectedNode = this.tree.root.getByPath(node, true);
       // if (!selectedNode)
       //   return;
@@ -59,7 +58,7 @@ export default class TreeState {
       this.history.append(selectedNode);
 
     if (!initial)
-      this.selection = this.selected!.obj.$;
+      this.selection = this.selected!;
   }
 
   isRootSelected() { return this.tree != null && this.selected === this.tree.root; }

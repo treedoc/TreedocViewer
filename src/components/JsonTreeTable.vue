@@ -41,9 +41,9 @@ import SourceView from './SourceView.vue';
 import JTTOptions, { ParserPlugin } from '../models/JTTOption';
 import TreeView from './TreeView.vue';
 import JsonTable from './JsonTable.vue';
-import Tree, { TreeNode } from '../models/Tree';
 import JSONParser from '../parsers/JSONParser';
 import XMLParser from '../parsers/XMLParser';
+import { TDNode, TDJSONWriter, TDJSONWriterOption } from 'jsonex-treedoc';
 
 @Component({
   components: {
@@ -73,12 +73,12 @@ export default class JsonTreeTable extends Vue {
     color: 'red',
   };
 
-  nodeClicked(node: TreeNode) {
+  nodeClicked(node: TDNode) {
     this.tstate.select(node);
   }
 
   format() {
-    this.jsonStr = JSON.stringify(this.tstate.tree.obj, null, 2);
+    this.jsonStr = TDJSONWriter.get().writeAsString(this.tstate.tree.root, new TDJSONWriterOption().setIndentFactor(2));
   }
 
   @Watch('data', { immediate: true })

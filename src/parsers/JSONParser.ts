@@ -1,10 +1,10 @@
 import { ParserPlugin, ParseResult } from '../models/JTTOption';
-import { TDJSONParser, TDJSONParserOption, TDNodeType } from 'jsonex-treedoc';
+import { TDJSONParser, TDJSONParserOption, TDNodeType, TDNode, TDJSONWriter, TDJSONWriterOption } from 'jsonex-treedoc';
 
 export class JSONParserOption {
 }
 
-export default class JSONParser implements  ParserPlugin<JSONParserOption> {
+export default class JSONParser implements ParserPlugin<JSONParserOption> {
   name = 'JSON/JSONEX';
   syntax = 'json';
   option: JSONParserOption = {};
@@ -23,7 +23,7 @@ export default class JSONParser implements  ParserPlugin<JSONParserOption> {
     //     return result;
     //   } catch (e1) {
     try {
-      result.result = TDJSONParser.get().parse(new TDJSONParserOption(str).setDefaultRootType(TDNodeType.MAP)).toObject();
+      result.result = TDJSONParser.get().parse(new TDJSONParserOption(str).setDefaultRootType(TDNodeType.MAP));
       result.message = 'TDJSONParser.parser()';
       return result;
     } catch (e2) {
@@ -35,7 +35,7 @@ export default class JSONParser implements  ParserPlugin<JSONParserOption> {
     // }
   }
 
-  stringify(obj: any): string {
-    return JSON.stringify(obj, null, 2);
+  stringify(obj: TDNode): string {
+    return TDJSONWriter.get().writeAsString(obj, new TDJSONWriterOption().setIndentFactor(2));
   }
 }

@@ -1,5 +1,6 @@
 <template>
   <div>
+    {{query}}
     <datatable v-bind="tableOpt">
       <div style="display: flex">
         <b-btn size='sm' variant='outline-secondary' :pressed.sync='isExpanded' v-b-tooltip.hover title="expand as columns">
@@ -31,9 +32,9 @@ import tdValue from './td-Value.vue';
 import tdKey from './td-Key1.vue';
 import JsonPath from './JsonPath.vue';
 import TreeState from '../models/TreeState';
-import Tree, { TreeNode } from '../models/Tree';
 import JSONParser from '../parsers/JSONParser';
 import ExpandControl, { ExpandState } from './ExpandControl.vue';
+import { TDNode, TDNodeType } from 'jsonex-treedoc';
 
 const COL_VALUE = '@value';
 const COL_NO = '#';
@@ -63,10 +64,10 @@ export default class JsonTable extends Vue {
   isExpanded = false;
   expandState = new ExpandState(0, 0);
 
-  @Prop() private tableData!: TreeState | Tree | object | string;
+  @Prop() private tableData!: TreeState | TDNode | object | string;
   @Prop() private options?: DatatableOptions;
 
-  rebuildTable(val: TreeNode) {
+  rebuildTable(val: TDNode) {
     if (!this.defTableOpt)  // backup for the first time, we have to intialize tableOpt attributes to make them reactive
       this.defTableOpt = this.tableOpt;
 
@@ -78,28 +79,30 @@ export default class JsonTable extends Vue {
     this.tableOpt.xprops.expandState = this.expandState;
   }
 
-  buildTable(val: TreeNode) {
+  buildTable(val: TDNode) {
     this.tableOpt.rawData = [];
 
     if (!val)
       return;
-    const ia = val.isArray();
+    const ia = val.type === TDNodeType.ARRAY;
     const keyCol = ia ? COL_NO : COL_KEY;
     this.addColumn(keyCol, 0);
-    for (const k of Object.keys(val.children)) {
-      const v = val.children[k];
-      const row = {
-        [keyCol]: ia ? Number(k) : k,
-        [COL_VALUE]: v,
-      };
-      this.tableOpt.rawData.push(row);
-      if (this.isExpanded && v && !v.isLeaf()) {
-        for (const ck of Object.keys(v.children)) {
-          this.addColumn(ck);
-          row[ck] = v.children[ck];
+
+    if (val.children) {
+      for (const v of val.children) {
+        const row = {
+          [keyCol]: ia ? Number(v.key) : v.key,
+          [COL_VALUE]: v,
+        };
+        this.tableOpt.rawData.push(row);
+        if (this.isExpanded && v && v.children) {
+          for (const cv of v.children) {
+            this.addColumn(cv.key);
+            row[cv.key] = cv;
+          }
+        } else {
+          this.addColumn(COL_VALUE, 1);
         }
-      } else {
-        this.addColumn(COL_VALUE, 1);
       }
     }
   }
@@ -130,26 +133,27 @@ export default class JsonTable extends Vue {
     }
   }
 
-  defaultExpand(val: TreeNode) {
+  defaultExpand(val: TDNode) {
     if (!val)
       return false;
     const cols = new Set<string>();
     let cellCnt = 0;
-    for (const k of Object.keys(val.children)) {
-      const v = val.children[k];
-      if (v && !v.isLeaf()) {
-        for (const ck of Object.keys(v.children)) {
-          cols.add(ck);
-          cellCnt++;
+    if (val.children) {
+      for (const v of val.children) {
+        if (v && v.children) {
+          for (const ck of Object.keys(v.children)) {
+            cols.add(ck);
+            cellCnt++;
+          }
         }
       }
     }
-    const totalCell = cols.size * Object.keys(val.children).length;
+    const totalCell = cols.size * val.getChildrenSize();
     // Limited number of cols due to performance reason
     return cols.size < 100 && cellCnt * 2 > totalCell;  // Fill ratio > 1/3
   }
 
-  nodeClicked(data: TreeNode) { this.tstate.select(data); }
+  nodeClicked(data: TDNode) { this.tstate.select(data); }
 
   queryData() {
     const opt = this.tableOpt;
@@ -169,7 +173,7 @@ export default class JsonTable extends Vue {
   }
 
   @Watch('tstate.selected', {immediate: true})
-  watchSelected(val: TreeNode) {
+  watchSelected(val: TDNode) {
     this.isExpanded = this.defaultExpand(val);
     this.tableOpt.query.offset = 0;
     this.expandState = new ExpandState(0, 0);
@@ -179,7 +183,7 @@ export default class JsonTable extends Vue {
   @Watch('options', {immediate: true})
   optionsUpdated() { this.rebuildTable(this.selected!); }
 
-  get selected(): TreeNode | null {
+  get selected(): TDNode | null {
     return this.tstate ? this.tstate.selected : null;
   }
 

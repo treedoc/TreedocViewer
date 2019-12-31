@@ -13,18 +13,18 @@
 
 <script lang="ts">
 import { Component, Prop, Vue } from 'vue-property-decorator';
-import { TreeNode } from '../models/Tree';
+import { TDNode } from 'jsonex-treedoc';
 
 interface Item {
   text: string;
   active?: boolean;
   href?: string;
-  node?: TreeNode;
+  node?: TDNode;
 }
 
 @Component
 export default class JsonPath extends Vue {
-  @Prop() private treeNode!: TreeNode;
+  @Prop() private treeNode!: TDNode;
 
   onclick(item: Item) {
     this.$emit('nodeClicked', item.node);
@@ -36,8 +36,8 @@ export default class JsonPath extends Vue {
       return null;
 
     paths.unshift({ text: this.treeNode.key, active: true });
-    for (let pNode = this.treeNode.parent; pNode !== null; pNode = pNode.parent) {
-      paths.unshift({ text: pNode.key, href: '', node: pNode });
+    for (let pNode = this.treeNode.parent; pNode; pNode = pNode!.parent) {
+      paths.unshift({ text: pNode!.key, href: '', node: pNode });
     }
     return paths;
   }

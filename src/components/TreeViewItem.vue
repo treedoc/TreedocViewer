@@ -1,42 +1,43 @@
 <template>
   <div class='item'>
-    <div v-if='!tnode.isSimpleType()' class='leaf'>
+    <div v-if='!isSimpleType' class='leaf'>
       <div class='node' @click.stop='toggleOpen()' >
         <span :class='{opened: open, selected: selected}' class='key key-with-chevron'>
           <a href="#/" @click.stop="tstate.select(tnode)">
             {{tnode.key}}
           </a>
         </span>
-        <span class='hint'>{{tnode.typeSizeLabel}}</span>
+        <span class='hint'>{{label}}</span>
       </div>
-      <template v-for="(v, k) in tnode.children" >
-        <keep-alive :key='k'>
+      <template v-for="cn in tnode.children" >
+        <keep-alive :key='cn.key'>
           <!-- 
             VUEBUG: If use TreeViewItem which is cause brokage only happen in prod mode, this inconsistency cause me
             many days to troubleshoot.
           -->
-          <tree-view-item :key='k' 
+          <tree-view-item :key='cn.key' 
               v-if='open'
               :ref="'children'"
               :currentLevel='currentLevel+1'
               :expandState='expandState'
-              :tnode='v'
+              :tnode='cn'
               :tstate='tstate' />
         </keep-alive>
       </template>
     </div>
     <div v-else>
       <span class='key'>{{tnode.key}}</span>:
-      <span class='value'>{{tnode.obj}}</span>
+      <span class='value'>{{tnode.value}}</span>
     </div>
   </div>
 </template>
 
 <script lang="ts">
 import { Component, Prop, Vue, Watch } from 'vue-property-decorator';
-import { TreeNode } from '../models/Tree';
+import { TDNode, TDNodeType } from 'jsonex-treedoc';
 import { ExpandState } from './ExpandControl.vue';
 import TreeState from '../models/TreeState';
+import TreeUtil from '../models/TreeUtil';
 
 // @Component({
 //   components: {
@@ -49,7 +50,7 @@ import TreeState from '../models/TreeState';
 @Component
 export default class TreeViewItem extends Vue {
   @Prop() tstate!: TreeState;
-  @Prop() tnode!: TreeNode;
+  @Prop() tnode!: TDNode;
   @Prop() currentLevel!: number;
   @Prop() modifiable!: boolean;
   @Prop({default: () => new ExpandState()}) expandState!: ExpandState;
@@ -60,6 +61,10 @@ export default class TreeViewItem extends Vue {
   // VUELIMIT: Vue $emit won't buble up the event to grand parent, so we have explicitly
   // propagate it.
   // nodeClicked(tnode: TreeNode) { this.$emit('nodeClicked', tnode); }
+
+  get isSimpleType() { return this.tnode.type === TDNodeType.SIMPLE; }
+
+  get label() { return TreeUtil.getTypeSizeLabel(this.tnode); }
 
   @Watch('selected')
   private watchSelected(v: boolean) {

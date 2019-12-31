@@ -1,5 +1,6 @@
 import YAML from 'yaml';
 import { ParserPlugin, ParseResult } from '../models/JTTOption';
+import { TDObjectCoder } from 'jsonex-treedoc';
 
 export class YMLParserOption {
 }
@@ -12,7 +13,7 @@ export default class YAMLParser implements ParserPlugin<YMLParserOption> {
   parse(str: string): ParseResult {
     const result = new ParseResult();
     try {
-      result.result = YAML.parse(str);
+      result.result = TDObjectCoder.get().encode(YAML.parse(str));
       result.message = 'YAML.parse()';
       return result;
     } catch (e) {

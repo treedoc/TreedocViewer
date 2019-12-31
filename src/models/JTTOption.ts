@@ -1,4 +1,5 @@
 import { Component } from 'vue';
+import { TDNode } from 'jsonex-treedoc';
 
 export enum ParseStatus {
   SUCCESS,
@@ -18,7 +19,7 @@ export interface ParserPlugin<TOpt> {
   option: TOpt;
 
   parse(str: string): ParseResult;
-  stringify(obj: any): string;
+  stringify(obj: TDNode): string;
   configComp?: Component;
 }
 
