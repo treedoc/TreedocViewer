@@ -5,6 +5,7 @@ import { TDNode, TDNodeType } from 'jsonex-treedoc';
 export default class TreeUtil {
   static readonly KEY_TYPE = '$type';
   static readonly KEY_ID = '$id';
+  static readonly KEY_REF = '$ref';
 
   static getSimpleTypeName(typeName: string): string {
     const p = typeName.indexOf('<'); // remove generic types

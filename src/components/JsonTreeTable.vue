@@ -43,6 +43,7 @@ import TreeView from './TreeView.vue';
 import JsonTable from './JsonTable.vue';
 import JSONParser from '../parsers/JSONParser';
 import XMLParser from '../parsers/XMLParser';
+
 import { TDNode, TDJSONWriter, TDJSONWriterOption } from 'jsonex-treedoc';
 
 @Component({
@@ -93,17 +94,24 @@ export default class JsonTreeTable extends Vue {
 
   @Watch('selectedParser')
   watch(v: ParserPlugin<any>) {
-    this.watchJsonStr(this.jsonStr);
+    this.parse(this.jsonStr, this);
   }
 
   @Watch('jsonStr', { immediate: true })
   watchJsonStr(str: string) {
-    this.jsonStrChanged(str, this);
+    // Auto detect parser
+    for (const parser of this.parserSelectOptions) {
+      if (parser.value.looksLike(str)) {
+        this.selectedParser = parser.value;
+        break;
+      }
+    }
+    this.parse(str, this);
   }
 
   // Have to parse THIS as Vue framework will generate a different instance
   // of this during runtime.
-  jsonStrChanged = _.debounce((str: string, THIS: JsonTreeTable) => {
+  parse = _.debounce((str: string, THIS: JsonTreeTable) => {
     const selectedPath = THIS.tstate.selected ? THIS.tstate.selected.path : [];
     THIS.tstate = new TreeState(this.strDataSynced ? THIS.data : str, THIS.selectedParser, THIS.rootObjectKey, selectedPath);
     THIS.strDataSynced = false;

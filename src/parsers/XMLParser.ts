@@ -24,6 +24,18 @@ export default class XMLParser implements  ParserPlugin<XMLParserOption> {
     private mineType: SupportedType = 'text/xml',
     private compact: boolean = false) {}
 
+  looksLike(str: string): boolean {
+    for (let i = 0; i < 1000 && i < str.length; i++) {
+      const c = str[i];
+      if (' \t\n\r'.indexOf(c) >= 0)
+        continue;
+      if (c === '<')
+        return true;
+      return false;
+    }
+    return false;
+  }
+
   parse(str: string): ParseResult {
     const result = new ParseResult();
     try {

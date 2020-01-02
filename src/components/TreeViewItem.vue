@@ -27,7 +27,7 @@
     </div>
     <div v-else>
       <span class='key'>{{tnode.key}}</span>:
-      <span class='value'>{{tnode.value}}</span>
+      <simple-value :tstate='tstate' :tnode='tnode' />
     </div>
   </div>
 </template>
@@ -36,6 +36,7 @@
 import { Component, Prop, Vue, Watch } from 'vue-property-decorator';
 import { TDNode, TDNodeType } from 'jsonex-treedoc';
 import { ExpandState } from './ExpandControl.vue';
+import SimpleValue from './SimpleValue.vue';
 import TreeState from '../models/TreeState';
 import TreeUtil from '../models/TreeUtil';
 
@@ -47,7 +48,11 @@ import TreeUtil from '../models/TreeUtil';
 //     TreeViewItem,
 //   },
 // })
-@Component
+@Component({
+  components: {
+    SimpleValue,
+  },
+})
 export default class TreeViewItem extends Vue {
   @Prop() tstate!: TreeState;
   @Prop() tnode!: TDNode;

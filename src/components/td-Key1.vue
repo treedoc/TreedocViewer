@@ -26,5 +26,6 @@ export default {
 <style scoped>
 .jtt_key  {
   white-space: nowrap;
+  font-weight: bolder;
 }
 </style>

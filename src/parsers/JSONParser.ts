@@ -1,5 +1,6 @@
 import { ParserPlugin, ParseResult } from '../models/JTTOption';
 import { TDJSONParser, TDJSONParserOption, TDNodeType, TDNode, TDJSONWriter, TDJSONWriterOption } from 'jsonex-treedoc';
+import YAMLParser from './YAMLParser';
 
 export class JSONParserOption {
 }
@@ -9,19 +10,19 @@ export default class JSONParser implements ParserPlugin<JSONParserOption> {
   syntax = 'json';
   option: JSONParserOption = {};
 
+  looksLike(str: string): boolean {
+    if (new YAMLParser().looksLike(str))
+      return false;
+
+    for (let i = 0; i < 1000 && i < str.length; i++) {
+      if (str[i] === '[' || str[i] === '{')
+        return true;
+    }
+    return false;
+  }
+
   parse(str: string): ParseResult {
     const result = new ParseResult();
-    // try {
-    //   result.result = JSON.parse(str);
-    //   result.message = 'JSON.parse()';
-    //   return result;
-    // } catch (e) {
-    //   try {
-    //     // tslint:disable-next-line: no-eval
-    //     result.result = eval(`(${str})`);
-    //     result.message = 'eval()';
-    //     return result;
-    //   } catch (e1) {
     try {
       result.result = TDJSONParser.get().parse(new TDJSONParserOption(str).setDefaultRootType(TDNodeType.MAP));
       result.message = 'TDJSONParser.parser()';
@@ -31,8 +32,6 @@ export default class JSONParser implements ParserPlugin<JSONParserOption> {
       console.error(e2);
       return result;
     }
-    // }
-    // }
   }
 
   stringify(obj: TDNode): string {

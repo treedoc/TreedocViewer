@@ -4,23 +4,29 @@ const jsonStr = `
   activityHistory:[
   {
     $type:"ActivityHist",
+    $id:1234,
     creationDate:"2014/10/02 10:20:37",
     lastModifiedDate:"2014/10/02 10:20:37",
     runtimeContext:"t=118",
     partitionKey:0,
     activityType:"1-buyerCreateCancel",
+    log:"http://www.google.com",
   },
   {
     $type:"ActivityHistBoImpl",
     creationDate:"2014/10/02 11:15:13",
     lastModifiedDate:"2014/10/02 11:15:13",
-    runtimeContext:"m=t=148",
+    runtimeContext:"m=t=148\nline2",
     partitionKey:0,
     activityType:"6-sellerApprove",
-  }]
+  }],
+  current: {
+    $ref: '#/activityHistory/1',
+  },
+  first: {
+    $ref: '#1234',
+  },
 }`;
-
-
 
 export default {
   jsonStr,

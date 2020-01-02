@@ -1,18 +1,25 @@
 <template>
   <div>
-    {{query}}
     <datatable v-bind="tableOpt">
-      <div style="display: flex">
-        <b-btn size='sm' variant='outline-secondary' :pressed.sync='isExpanded' v-b-tooltip.hover title="expand as columns">
-          <i class="fa fa-arrows-h"></i>
-        </b-btn> &nbsp;
+      <div class="jtt-tbl-toolbar">
+        <span v-b-tooltip.hover title="Expand children as columns">
+          <b-btn size='sm' variant='outline-secondary' :pressed.sync='isExpanded'>
+            <i class="fa fa-arrows-h"></i>
+          </b-btn>
+        </span>
         <b-button-group class="ml-1">
-          <b-btn :size="'sm'" @click='tstate.back()' :disabled='!tstate.canBack()' v-b-tooltip.hover title="back">
-            <i class="fa fa-arrow-left"></i>
-          </b-btn>
-          <b-btn :size="'sm'" @click='tstate.forward()' :disabled='!tstate.canForward()' v-b-tooltip.hover title="forward">
-            <i class="fa fa-arrow-right"></i>
-          </b-btn>
+          <!-- We have to wrapper the button so that tooltip will work properly when it's disabled -->
+          <!-- https://bootstrap-vue.js.org/docs/components/tooltip/ -->
+          <span v-b-tooltip.hover title="Go back">
+            <b-btn :size="'sm'" @click='tstate.back()' :disabled='!tstate.canBack()'>
+              <i class="fa fa-arrow-left"></i>
+            </b-btn>
+          </span>
+          <span v-b-tooltip.hover title="Go forward">
+            <b-btn :size="'sm'" @click='tstate.forward()' :disabled='!tstate.canForward()'>
+              <i class="fa fa-arrow-right"></i>
+            </b-btn>
+          </span>
         </b-button-group>
         <expand-control :state='expandState' />
         <json-path :tree-node="this.tstate ? this.tstate.selected : null" v-on:nodeClicked='nodeClicked'/>
@@ -198,6 +205,7 @@ export default class JsonTable extends Vue {
 <style>
 .jsontable-min {
   width:1%;
+  /* white-space: nowrap; */
 }
 .table td, .table th {
   padding: .25rem;
@@ -210,5 +218,9 @@ pre {
 }
 .clearfix {
   margin-bottom: 0px !important;
+}
+.jtt-tbl-toolbar {
+  display: flex;
+  flex-wrap: wrap;
 }
 </style>

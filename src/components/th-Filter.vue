@@ -56,7 +56,6 @@ export default {
   white-space: nowrap;
 }
 
-
 input[type=search]::-webkit-search-cancel-button {
   -webkit-appearance: searchfield-cancel-button;
   cursor: pointer;

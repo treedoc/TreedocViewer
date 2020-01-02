@@ -1,18 +1,20 @@
 <template>
   <b-button-group class="ml-1">
-    <b-btn :size="'sm'" @click='collapseAll()' :disabled='!canCollapse()' title="collapse all">
-      &laquo;
-    </b-btn>
-    <b-btn :size="'sm'" @click='collapse()' :disabled='!canCollapse()' title="collapse one level">
-      &lsaquo;
-    </b-btn>
-    <b-btn :size="'sm'" :disabled="true" class="expand_level" v-b-tooltip.hover title="Current expand level">{{state.expandLevel}}</b-btn>
-    <b-btn :size="'sm'" @click='expend()' :disabled='!canExpand()' title="expand one level">
-      &rsaquo;
-    </b-btn>
-    <b-btn :size="'sm'" @click='expendAll()' :disabled='!canExpand()' title="expand all">
-      &raquo;
-    </b-btn>
+    <span v-b-tooltip.hover title="Collapse all">
+      <b-btn :size="'sm'" @click='collapseAll()' :disabled='!canCollapse()'>&laquo;</b-btn>
+    </span>
+    <span v-b-tooltip.hover title="Collapse one level">
+      <b-btn :size="'sm'" @click='collapse()' :disabled='!canCollapse()'>&lsaquo;</b-btn>
+    </span>
+    <span v-b-tooltip.hover title="Current expand level">
+      <b-btn :size="'sm'" :disabled="true" class="expand_level">{{state.expandLevel}}</b-btn>
+    </span>
+    <span v-b-tooltip.hover title="Expand one level">
+      <b-btn :size="'sm'" @click='expend()' :disabled='!canExpand()'>&rsaquo;</b-btn>
+    </span>
+    <span v-b-tooltip.hover title="Expand all">
+      <b-btn :size="'sm'" @click='expendAll()' :disabled='!canExpand()'>&raquo;</b-btn>
+    </span>
   </b-button-group>
 </template>
 

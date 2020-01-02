@@ -18,6 +18,7 @@ export interface ParserPlugin<TOpt> {
   syntax: string;
   option: TOpt;
 
+  looksLike(str: string): boolean;
   parse(str: string): ParseResult;
   stringify(obj: TDNode): string;
   configComp?: Component;

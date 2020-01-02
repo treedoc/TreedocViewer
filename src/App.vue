@@ -10,14 +10,13 @@
     <json-tree-table v-if="true" :data='selectedSample' :inital-path="'activityHistory'" :options='jttOption' rootObjectKey='root' class="json-tree-table">
       Sample Data: <b-form-select v-model="selectedSample" :options="sampleData" size='sm' style="width:auto" />
     </json-tree-table>
-    <div v-if=true>
+    <div v-if=false>
       <hr />
       <div>Json Table</div>
       <json-table :table-data="tstateTable" :options="jsonTableOptions"/>
     </div>
   </div>
 </template>
-
 
 <script lang='ts'>
 import { Component, Prop, Vue, Watch } from 'vue-property-decorator';
@@ -50,7 +49,7 @@ export default class App extends Vue {
       },
       {
         field: 'creationDate',
-        html: (value: any, row: any) => `<a href="http://abc.com/${row.runtimeContext.obj}">${value.value}</a>`,
+        html: (value: any, row: any) => `<a href="http://abc.com/${row.runtimeContext.value}">${value.value}</a>`,
       },
     ],
   };

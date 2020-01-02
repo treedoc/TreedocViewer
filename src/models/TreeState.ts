@@ -1,4 +1,4 @@
-import { TDNode, TreeDoc, Bookmark, TDObjectCoder, TDNodeType } from 'jsonex-treedoc';
+import { TDNode, TreeDoc, Bookmark, TDObjectCoder, TDNodeType, JSONPointer } from 'jsonex-treedoc';
 import History from './History';
 import { ParserPlugin, ParseStatus } from './JTTOption';
 import JSONParser from '@/parsers/JSONParser';
@@ -37,15 +37,17 @@ export default class TreeState {
     return tdNode && tdNode.doc;
   }
 
-  select(node: TDNode | string | string[], initial = false): void {
+  public select(node: TDNode | string | string[], initial = false): void {
     if (this.tree == null)
       return;
 
     let selectedNode: TDNode | null = null;
     if (!(node instanceof TDNode)) {
-      selectedNode = this.tree.root.getByPath(node, true);
-      // if (!selectedNode)
-      //   return;
+      // when inital, we specify noNull, for the case that current node name is edited, so it can't be selected
+      // we will fullback to its parent.
+      selectedNode = this.findNodeByPath(node, initial);
+      if (!selectedNode)
+        return;
     } else
       selectedNode = node;
 
@@ -57,8 +59,36 @@ export default class TreeState {
     if (selectedNode)
       this.history.append(selectedNode);
 
+    // We don't auto select in case it's intial. If auto selected, when user edit the source
+    // the user won't be able to continous editing.
     if (!initial)
       this.selection = this.selected!;
+  }
+
+  private findNodeByPath(path: string | string[], noNull = false): TDNode {
+    const cNode: TDNode = this.selected || this.tree.root;
+    let node = cNode.getByPath(path);
+    if (node)
+      return node;
+
+    if (typeof(path) !== 'string')
+      return cNode;
+
+    // special handling for google API schema, e.g. https://www.googleapis.com/discovery/v1/apis/vision/v1p1beta1/rest
+    node = cNode.getByPath('/schemas/' + path);
+    if (node)
+      return node;
+
+    // using json pointer standard
+    const jsonPointer = JSONPointer.get().parse(path);
+    if (jsonPointer.docPath) {
+      console.warn(`Cross document reference is not supported: ${path}`);
+      return cNode;
+    }
+    node = cNode.getByPath(jsonPointer);
+    if (node)
+      return node;
+    return cNode;
   }
 
   isRootSelected() { return this.tree != null && this.selected === this.tree.root; }
