@@ -24,7 +24,7 @@ export default {
 };
 </script>
 <style scoped>
-.jtt_key  {
+.jtt_key {
   white-space: nowrap;
   font-weight: bolder;
 }

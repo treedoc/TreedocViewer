@@ -1,26 +1,5 @@
 <template>
-  <div style="height:100%">
-    <b-button-group class="ml-1 jtt-toolbar">
-      <b-btn :size="'sm'" @click='$refs.file1.click()' v-b-tooltip.hover title="Open File">
-        <i class="fa fa-folder-open"></i>
-        <input type="file" ref='file1' style="display: none" @change="readFile($event)">
-      </b-btn>
-      <b-btn :size="'sm'" v-b-modal.modal-1 v-b-tooltip.hover title="Open URL">
-        <i class="fa fa-internet-explorer"></i>
-        <b-modal id="modal-1" title="Open URL" @ok='openUrl' @show='urlInput=url'>
-          URL: <b-input v-model="urlInput" />
-        </b-modal>
-      </b-btn>
-      <b-btn :size="'sm'" @click='copy' :disabled='!value' v-b-tooltip.hover title="Copy">
-        <i class="fa fa-copy"></i>
-      </b-btn>
-      <b-btn :size="'sm'" @click='paste' v-b-tooltip.hover title="Paste">
-        <i class="fa fa-paste"></i>
-      </b-btn>
-      <b-btn size='sm' variant='outline-secondary' :pressed.sync='useCodeview' v-b-tooltip.hover title="Source Code View">
-        <i class="fa fa-code"></i>
-      </b-btn>
-    </b-button-group>
+  <div style="height:100%;overflow: hidden;">
     <template v-if="useCodeview">
       <codemirror ref='codeView' class='codeView' :options="options" v-model="val" style="height:100%"></codemirror>
     </template>
@@ -62,38 +41,6 @@ export default class SourceView extends Vue {
   @Prop() show?: boolean;
   useCodeview = true;
   val = this.value;
-  // url = 'https://jsonplaceholder.typicode.com/posts';
-  url = 'https://www.googleapis.com/discovery/v1/apis/vision/v1p1beta1/rest';
-  // url = "https://www.googleapis.com/discovery/v1/apis"
-  urlInput = '';
-
-  readFile(ef: Event) {
-    const fileName = (ef.target as HTMLInputElement).files![0];
-    if (!fileName)
-      return;
-    const reader = new FileReader();
-    reader.onload = (e: Event) =>  {
-      if (reader.result)
-        this.val = reader.result as string;
-    };
-    reader.readAsText(fileName);
-  }
-
-  openUrl() {
-    this.url = this.urlInput;
-    window.fetch(this.url)
-      .then(res => res.text())
-      .then(data => this.val = data)
-      .catch((err) => this.val = err);
-    this.val = JSON.stringify({
-      action: 'loading...',
-      url: this.url,
-    }, null, 2);
-  }
-
-  // get codeView() {
-  //   return this.$refs.codeView as any;
-  // }
 
   get textView() {
     return this.$refs.textView as HTMLTextAreaElement;
@@ -135,17 +82,6 @@ export default class SourceView extends Vue {
     // this.codeView.editor.getTextArea().select();
     // this.codeView.editor.execCommand('selectAll');
     // this.codeView.editor.execCommand('copy');
-  }
-
-  paste() {
-    // this.codeView.editor.getTextArea().select();
-    // this.codeView.editor.focus();
-    // Doesn't work as chrome blocked for security reason
-    // const res = document.execCommand("paste");
-    // console.log(`paste result: ${res}`);
-    navigator.clipboard.readText().then((txt: string) => {
-       this.val = txt;
-    });
   }
 
   @Watch('val')

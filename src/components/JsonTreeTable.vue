@@ -1,7 +1,30 @@
 <template>
   <div class="jtt-container">
     <div>
-      <b-btn size='sm' variant='outline-secondary' @click='format'>format</b-btn>
+      <b-button-group class="ml-1 jtt-toolbar">
+        <b-btn :size="'sm'" @click='$refs.file1.click()' v-b-tooltip.hover title="Open File">
+          <i class="fa fa-folder-open"></i>
+          <input type="file" ref='file1' style="display: none" @change="readFile($event)">
+        </b-btn>
+        <b-btn :size="'sm'" v-b-modal.modal-1 v-b-tooltip.hover title="Open URL">
+          <i class="fa fa-link"></i>
+          <b-modal id="modal-1" title="Open URL" @ok='openUrl' @show='urlInput=url'>
+            URL: <b-input v-model="urlInput" />
+          </b-modal>
+        </b-btn>
+        <b-btn :size="'sm'" @click='copy' :disabled='!jsonStr' v-b-tooltip.hover title="Copy">
+          <i class="fa fa-copy"></i>
+        </b-btn>
+        <b-btn :size="'sm'" @click='paste' v-b-tooltip.hover title="Paste">
+          <i class="fa fa-paste"></i>
+        </b-btn>
+        <!-- <b-btn size='sm' variant='outline-secondary' :pressed.sync='sourceView.useCodeview' v-b-tooltip.hover title="Toggle source code view">
+          <i class="fa fa-code"></i>
+        </b-btn> -->
+        <b-btn size='sm' @click='format' v-b-tooltip.hover title="Format">
+          <i class="fa fa-indent"></i>
+        </b-btn>
+      </b-button-group>      
       <b-button-group class="mx-1">
         <b-btn size='sm' variant='outline-secondary' :pressed.sync='showSource[0]'>Source</b-btn>
         <b-btn size='sm' variant='outline-secondary' :pressed.sync='showTree[0]'>Tree</b-btn>
@@ -14,7 +37,7 @@
     <div class="split-container">
       <msplit>
         <div slot="source" :grow="20" style="width: 100%" :show="showSource"  class="panview">
-          <SourceView v-model="jsonStr" :syntax='selectedParser.syntax' :selection='tstate.selection' :show='showSource[0]' />
+          <SourceView ref="sourceView" v-model="jsonStr" :syntax='selectedParser.syntax' :selection='tstate.selection' :show='showSource[0]' />
         </div>
         <div slot="tree" :grow="30" :show="showTree" class="panview">
           <!-- tstate.selected={{tstate.selected}} -->
@@ -74,6 +97,11 @@ export default class JsonTreeTable extends Vue {
     color: 'red',
   };
 
+  // url = 'https://jsonplaceholder.typicode.com/posts';
+  url = 'https://www.googleapis.com/discovery/v1/apis/vision/v1p1beta1/rest';
+  // url = "https://www.googleapis.com/discovery/v1/apis"
+  urlInput = '';
+
   nodeClicked(node: TDNode) {
     this.tstate.select(node);
   }
@@ -99,19 +127,21 @@ export default class JsonTreeTable extends Vue {
 
   @Watch('jsonStr', { immediate: true })
   watchJsonStr(str: string) {
-    // Auto detect parser
-    for (const parser of this.parserSelectOptions) {
-      if (parser.value.looksLike(str)) {
-        this.selectedParser = parser.value;
-        break;
-      }
-    }
-    this.parse(str, this);
+    this.parse(str, this, true);
   }
 
   // Have to parse THIS as Vue framework will generate a different instance
   // of this during runtime.
-  parse = _.debounce((str: string, THIS: JsonTreeTable) => {
+  parse = _.debounce((str: string, THIS: JsonTreeTable, detectParser = false) => {
+    // Auto detect parser
+    if (detectParser)
+      for (const parser of this.parserSelectOptions) {
+        if (parser.value.looksLike(str)) {
+          this.selectedParser = parser.value;
+          break;
+        }
+      }
+
     const selectedPath = THIS.tstate.selected ? THIS.tstate.selected.path : [];
     THIS.tstate = new TreeState(this.strDataSynced ? THIS.data : str, THIS.selectedParser, THIS.rootObjectKey, selectedPath);
     THIS.strDataSynced = false;
@@ -131,6 +161,49 @@ export default class JsonTreeTable extends Vue {
     if (this.options && this.options.parsers)
       this.options.parsers.forEach(p => opt.push({text: p.name, value: p}));
     return opt;
+  }
+
+  get sourceView() {
+    return this.$refs.sourceView as SourceView;
+  }
+
+  readFile(ef: Event) {
+    const fileName = (ef.target as HTMLInputElement).files![0];
+    if (!fileName)
+      return;
+    const reader = new FileReader();
+    reader.onload = (e: Event) =>  {
+      if (reader.result)
+        this.jsonStr = reader.result as string;
+    };
+    reader.readAsText(fileName);
+  }
+
+  openUrl() {
+    this.url = this.urlInput;
+    window.fetch(this.url)
+      .then(res => res.text())
+      .then(data => this.jsonStr = data)
+      .catch((err) => this.jsonStr = err);
+    this.jsonStr = JSON.stringify({
+      action: 'loading...',
+      url: this.url,
+    }, null, 2);
+  }
+
+  paste() {
+    // this.codeView.editor.getTextArea().select();
+    // this.codeView.editor.focus();
+    // Doesn't work as chrome blocked for security reason
+    // const res = document.execCommand("paste");
+    // console.log(`paste result: ${res}`);
+    navigator.clipboard.readText().then((txt: string) => {
+       this.jsonStr = txt;
+    });
+  }
+
+  copy() {
+    this.sourceView.copy();
   }
 }
 </script>
