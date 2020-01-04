@@ -55,6 +55,7 @@ export default class TreeView extends Vue {
 <style scoped>
 .wrapper {
   overflow: auto;
+  height: 100%;
 }
 
 .item-root {

@@ -56,8 +56,8 @@ export default class App extends Vue {
   jttOption: JTTOptions = {
     parsers: [
       new YAMLParser(),
-      new XMLParser(),
       new XMLParser('XML compact', 'text/xml', true),
+      new XMLParser(),
       new XMLParser('html', 'text/html'),
       ],
   };

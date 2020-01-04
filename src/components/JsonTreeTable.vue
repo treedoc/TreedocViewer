@@ -137,7 +137,7 @@ export default class JsonTreeTable extends Vue {
     if (detectParser)
       for (const parser of this.parserSelectOptions) {
         if (parser.value.looksLike(str)) {
-          this.selectedParser = parser.value;
+          THIS.selectedParser = parser.value;
           break;
         }
       }
