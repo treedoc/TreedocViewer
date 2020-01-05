@@ -1,5 +1,5 @@
 {
-  "name": "jsontreetable",
+  "name": "treedoc-viewer",
   "version": "0.1.0",
   "main": "./dist/lib/lib.common.js",
   "files": [
@@ -14,7 +14,7 @@
     "build-app": "vue-cli-service build --dest dist/app",
     "build-lib": "vue-cli-service build --dest dist/lib --target lib --name lib src/lib.ts",
     "build": "yarn build-app && yarn build-lib",
-    "deploy": "yarn build-app && gh-pages -d dist/app && yarn gh-pages -d dist/app -r git@github.com:jsontable/jsontable.github.io.git -b master",
+    "deploy": "yarn build-app && gh-pages -d dist/app && yarn gh-pages -d dist/app -r git@github.com:treedoc/treedoc.github.io.git -b master",
     "lint": "vue-cli-service lint",
     "test:unit": "vue-cli-service test:unit"
   },
