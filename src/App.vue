@@ -3,7 +3,7 @@
   <div id='app' class='components-container'>
     <h6 class="title">
       TreeDoc Table Viewer for JSON, Prototext, jsonex, json5, hjson, yaml, xml 
-      <a href='https://github.com/treedoc/TreedocViewer/issues'><img alt="GitHub issues" src="https://img.shields.io/github/issues/treedoc/TreedocViewer"></a>
+      <a href='https://github.com/treedoc/TreedocViewer/issues'><img alt="GitHub issues" src="https://img.shields.io/github/issues/treedoc/treedocviewer"></a>
       <a href='https://www.npmjs.com/package/treedoc-viewer'><img alt="npm" src="https://img.shields.io/npm/v/treedoc-viewer"></a>
     </h6> 
     
