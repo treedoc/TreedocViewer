@@ -6,14 +6,14 @@ A feature-rich viewer for Treedoc implemented with VueJS and typescript. Treedoc
 
 ## Features
 
-* Three views: Source, Tree and Table and they are togglable
+* Three views: Source, Tree and Table and they are toggleable
 * Flexible navigation
   * Back/forward navigation between tree nodes
   * Support breadcrumb view of the node path for easy navigation to parent nodes
   * Navigation through *$ref* node as defined in [OpenAPI](https://openapis.org/) or [Google Discovery Service](https://developers.google.com/discovery)
   * Navigation is synchronized between tree view and table view
 * Treeview
-  * Support expand / clapse one level or all levels.
+  * Support expand / collapse one level or all levels.
   * Tree is also embedded in table views
 * Table view (Based on [vue2-datatable-component](https://www.npmjs.com/package/vue2-datatable-component))
   * Expand attributes for the child nodes as table columns
@@ -28,9 +28,16 @@ A feature-rich viewer for Treedoc implemented with VueJS and typescript. Treedoc
   * Auto-detect format to choose the right parser
   * Support JSONEX format (extension of JSON)
   * Support text protobuf which is support by JSONEX parser
-  * Pluggable parser, so that more format can be easily added.
+  * Plugable parser, so that more format can be easily added.
 * Implemented as VueJS component, so it's easy to be reused in different applications
 
 ## Live Demo
 
 <https://treedoc.github.io/>
+
+## License
+
+Copyright 2019-2020 Jianwu Chen <BR>
+Author/Developer: Jianwu Chen
+
+Use of this source code is governed by an MIT-style license that can be found in the LICENSE file or at <https://opensource.org/licenses/MIT>.
