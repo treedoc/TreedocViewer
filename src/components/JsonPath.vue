@@ -13,7 +13,7 @@
 
 <script lang="ts">
 import { Component, Prop, Vue } from 'vue-property-decorator';
-import { TDNode } from 'jsonex-treedoc';
+import { TDNode } from 'treedoc';
 
 interface Item {
   text: string;

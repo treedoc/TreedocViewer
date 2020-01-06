@@ -1,6 +1,6 @@
 import YAML from 'yaml';
 import { ParserPlugin, ParseResult } from '../models/JTTOption';
-import { TDObjectCoder } from 'jsonex-treedoc';
+import { TDObjectCoder } from 'treedoc';
 import XMLParser from './XMLParser';
 
 export class YMLParserOption {

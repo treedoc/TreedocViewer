@@ -1,5 +1,5 @@
 import { ParserPlugin, ParseResult } from '../models/JTTOption';
-import { TDJSONParser, TDJSONParserOption, TDNodeType, TDNode, TDJSONWriter, TDJSONWriterOption } from 'jsonex-treedoc';
+import { TDJSONParser, TDJSONParserOption, TDNodeType, TDNode, TDJSONWriter, TDJSONWriterOption } from 'treedoc';
 import YAMLParser from './YAMLParser';
 
 export class JSONParserOption {

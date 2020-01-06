@@ -34,7 +34,7 @@
 
 <script lang="ts">
 import { Component, Prop, Vue, Watch } from 'vue-property-decorator';
-import { TDNode, TDNodeType } from 'jsonex-treedoc';
+import { TDNode, TDNodeType } from 'treedoc';
 import { ExpandState } from './ExpandControl.vue';
 import SimpleValue from './SimpleValue.vue';
 import TreeState from '../models/TreeState';

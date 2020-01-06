@@ -16,7 +16,7 @@ import _ from 'lodash';
 import TreeViewItem from './TreeViewItem.vue';
 import ExpandControl, { ExpandState } from './ExpandControl.vue';
 import TreeState from '../models/TreeState';
-import { TDNode } from 'jsonex-treedoc';
+import { TDNode } from 'treedoc';
 
 @Component({
   components: {

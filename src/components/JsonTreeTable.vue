@@ -67,7 +67,7 @@ import JsonTable from './JsonTable.vue';
 import JSONParser from '../parsers/JSONParser';
 import XMLParser from '../parsers/XMLParser';
 
-import { TDNode, TDJSONWriter, TDJSONWriterOption } from 'jsonex-treedoc';
+import { TDNode, TDJSONWriter, TDJSONWriterOption } from 'treedoc';
 
 @Component({
   components: {

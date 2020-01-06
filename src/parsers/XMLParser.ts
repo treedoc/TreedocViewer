@@ -1,6 +1,6 @@
 import _ from 'lodash';
 import { ParserPlugin, ParseResult } from '../models/JTTOption';
-import { TDObjectCoder } from 'jsonex-treedoc';
+import { TDObjectCoder } from 'treedoc';
 
 export class XMLParserOption  {
 }

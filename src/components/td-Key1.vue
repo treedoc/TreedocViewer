@@ -8,7 +8,7 @@
 </template>
 <script lang='js'>
 import Vue from 'vue';
-import { TDNodeType } from 'jsonex-treedoc';
+import { TDNodeType } from 'treedoc';
 
 // For some reason, DataTable doesn't support typescript class based dynamic component or Vue.extend({}) component
 export default {

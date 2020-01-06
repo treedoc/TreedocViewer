@@ -1,4 +1,4 @@
-import { TDNode, TreeDoc, Bookmark, TDObjectCoder, TDNodeType, JSONPointer } from 'jsonex-treedoc';
+import { TDNode, TreeDoc, Bookmark, TDObjectCoder, TDNodeType, JSONPointer } from 'treedoc';
 import History from './History';
 import { ParserPlugin, ParseStatus } from './JTTOption';
 import JSONParser from '@/parsers/JSONParser';

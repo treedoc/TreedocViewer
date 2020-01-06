@@ -41,7 +41,7 @@ import JsonPath from './JsonPath.vue';
 import TreeState from '../models/TreeState';
 import JSONParser from '../parsers/JSONParser';
 import ExpandControl, { ExpandState } from './ExpandControl.vue';
-import { TDNode, TDNodeType } from 'jsonex-treedoc';
+import { TDNode, TDNodeType } from 'treedoc';
 
 const COL_VALUE = '@value';
 const COL_NO = '#';

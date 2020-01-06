@@ -1,6 +1,6 @@
 import _ from 'lodash';
 
-import { TDNode, TDNodeType } from 'jsonex-treedoc';
+import { TDNode, TDNodeType } from 'treedoc';
 
 export default class TreeUtil {
   static readonly KEY_TYPE = '$type';

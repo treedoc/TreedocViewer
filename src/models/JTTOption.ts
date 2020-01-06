@@ -1,5 +1,5 @@
 import { Component } from 'vue';
-import { TDNode } from 'jsonex-treedoc';
+import { TDNode } from 'treedoc';
 
 export enum ParseStatus {
   SUCCESS,

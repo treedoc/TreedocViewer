@@ -15,7 +15,7 @@
 
 <script lang="ts">
 import { Component, Prop, Vue, Watch } from 'vue-property-decorator';
-import { TDNode } from 'jsonex-treedoc';
+import { TDNode } from 'treedoc';
 import TreeState from '../models/TreeState';
 import TreeUtil from '../models/TreeUtil';
 
