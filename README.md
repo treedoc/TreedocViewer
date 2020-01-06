@@ -1,4 +1,4 @@
-<a href="https://github.com/treedoc/TreedocViewer"><img alt="GitHub Actions status" src="https://github.com/treedoc/TreedocViewer/workflows/Node%20CI/badge.svg"></a> 
+<a href="https://github.com/treedoc/TreedocViewer"><img alt="GitHub Actions status" src="https://github.com/treedoc/TreedocViewer/workflows/Node%20CI/badge.svg"></a>
 
 # Treedoc Viewer
 
@@ -23,11 +23,11 @@ A feature-rich viewer for Treedoc implemented with VueJS and typescript. Treedoc
 * Source View (Based on [CodeMirror](https://codemirror.net/))
   * Syntax source highlighting
   * Synchronized highlighting in the source code when navigating through nodes
-* Support multiple file formats 
+* Support multiple file formats
   * different sources of the document: open local file, open URL or copy/paste
   * Auto-detect format to choose the right parser
-  * Support JSONEX format (extension of JSON)
-  * Support text protobuf which is support by JSONEX parser
+  * Support JSONex format (extension of JSON) (Based on [treedoc](https://www.npmjs.com/package/treedoc))
+  * Support text protobuf which is support by JSONex parser
   * Plugable parser, so that more format can be easily added.
 * Implemented as VueJS component, so it's easy to be reused in different applications
 
