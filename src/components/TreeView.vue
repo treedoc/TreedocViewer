@@ -5,7 +5,7 @@
         :tnode='tstate.tree.root'
         :currentLevel='0'
         :expandState='expandState'
-        :tstate='tstate'
+        @nodeClicked='nodeClicked'
         ref='item' />
   </div>
 </template>
@@ -48,6 +48,10 @@ export default class TreeView extends Vue {
   @Watch('tstate')
   watchTree() {
     this.expandState = new ExpandState(this.expandState.expandLevel);
+  }
+
+  nodeClicked(data: string[]) {
+    this.tstate.select(data);
   }
 }
 </script>

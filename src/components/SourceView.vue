@@ -1,9 +1,9 @@
 <template>
   <div style="height:100%;overflow: hidden;">
-    <template v-if="useCodeview">
+    <template v-if="useCodeView[0]">
       <codemirror ref='codeView' class='codeView' :options="options" v-model="val" style="height:100%"></codemirror>
     </template>
-    <textarea ref='textView' v-model="val" :class="[useCodeview ? 'hiddenTextArea' : 'textArea']"></textarea>
+    <textarea ref='textView' v-model="val" :class="[useCodeView[0] ? 'hiddenTextArea' : 'textArea']"></textarea>
   </div>
 </template>
 
@@ -37,9 +37,9 @@ import Bookmark from 'treedoc/lib/Bookmark';
 export default class SourceView extends Vue {
   @Prop() value!: string;
   @Prop() syntax!: string;
+  @Prop() useCodeView!: boolean[];
   @Prop({required: false}) selection?: Selection;
   @Prop() show?: boolean;
-  useCodeview = true;
   val = this.value;
 
   get textView() {
@@ -74,7 +74,7 @@ export default class SourceView extends Vue {
   copy() {
     // code mirror doesn't support copy command, we have to use a hidden textarea to do the copy
     this.textView.select();
-    this.textView.setSelectionRange(0, 999999);
+    this.textView.setSelectionRange(0, 999999999);
     // document.execCommand('selectAll');
     const res = document.execCommand('copy');
 
@@ -94,7 +94,9 @@ export default class SourceView extends Vue {
   watchSelection(v: Selection) {
     if (!this.show || !v || !v.start || !v.end)
       return;
-    if (this.useCodeview) {
+    if (this.val.length > 1_000_000)  // Don't scroll for large file to avoid performence issue
+      return;
+    if (this.useCodeView[0]) {
       this.codeView.editor.doc.setSelection(toPos(v.start), toPos(v.end), {scroll: true});
     } else {
       scrollTo(this.textView, v.start.pos);

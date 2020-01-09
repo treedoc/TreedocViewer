@@ -1,7 +1,7 @@
 <template>
   <span class='value'>
     <template v-if='ref'>
-      <a href="#/" @click.stop="tstate.select(ref)">{{ref}}</a>
+      <a href="#/" @click.stop="$emit('nodeClicked', ref)">{{ref}}</a>
     </template>
     <template v-else-if="url">
       <a :href='url' target="_blank">{{url}}</a>
@@ -21,7 +21,6 @@ import TreeUtil from '../models/TreeUtil';
 
 @Component
 export default class SimpleValue extends Vue {
-  @Prop() tstate!: TreeState;
   @Prop() tnode!: TDNode;
   @Prop({required: false, default: false}) isInTable!: boolean;
 

@@ -7968,10 +7968,10 @@ tr46@^1.0.1:
   dependencies:
     punycode "^2.1.0"
 
-treedoc@^0.1.10:
-  version "0.1.10"
-  resolved "https://registry.yarnpkg.com/treedoc/-/treedoc-0.1.10.tgz#baecee6395089ca02150db6f0ffaf3867ee17714"
-  integrity sha512-sar8eKQWD6lmy85bh7EXpPUYAMHGE4vR9guMT+sXwUz4PRTh9IpFk2teX82ylz3Uvni5iGBsvCT960Y1H3S/rg==
+treedoc@^0.1.12:
+  version "0.1.12"
+  resolved "https://registry.yarnpkg.com/treedoc/-/treedoc-0.1.12.tgz#19794e8c6e96e1ae101f248d418e0f564c769038"
+  integrity sha512-IZtnl17W0DgI10ra2YS4Vvvhd3kedFgHnZFiIexYCKEb0y6Ahoc9UhfuQpJzuXtmo/N+SYvrUtNQVJcTCCp6Nw==
 
 trim-repeated@^1.0.0:
   version "1.0.0"

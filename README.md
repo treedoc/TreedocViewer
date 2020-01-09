@@ -33,7 +33,7 @@ A feature-rich viewer for Treedoc implemented with VueJS and typescript. Treedoc
 
 ## Live Demo
 
-<https://treedoc.github.io/>
+<http://treedoc.org>
 
 ## License
 
