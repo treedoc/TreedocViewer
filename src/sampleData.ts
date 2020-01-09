@@ -31,7 +31,7 @@ const jsonStr = `
 export default {
   jsonStr,
   data: [
-    {text: 'emtpy', value: {}},
+    {text: 'empty', value: {}},
     {
       text: 'jsonStr',
       value: jsonStr,
