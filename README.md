@@ -31,6 +31,11 @@ A feature-rich viewer for Treedoc implemented with VueJS and typescript. Treedoc
   * Plugable parser, so that more format can be easily added.
 * Implemented as VueJS component, so it's easy to be reused in different applications
 
+## Development
+
+    yarn install
+    yarn serve
+
 ## Live Demo
 
 <https://treedoc.github.io/>

@@ -1,22 +1,20 @@
 <template>
-    <div class='filter-header'>
-    {{ title }}
-      <b-button tabindex='0' size='sm' variant='link' :id="filterBtnId" style='padding: 0px;'>
-        <i class="m-2 fa fa-filter" :class="{ 'text-muted': !keyword}" style='margin: 1px !important;'></i>
-      </b-button>
-      <b-popover :target="filterBtnId" triggers="click blur" placement='bottom' @show='onShowPopover'>
-        <div class="input-group input-group-sm" >
-          <input type="search" class="form-control" ref="input"
-            v-model="keyword" @keydown.enter="search" :placeholder="`Search ${field}...`">
-            <span class="input-group-btn">
-              <button class="btn btn-default fa fa-search" @click="search"></button>
-            </span>
-        </div>
-      </b-popover>
-    </div>
+  <div class='filter-header'>
+    <b-button tabindex='0' variant='link' :id="filterBtnId" style='padding: 0px;'>
+      <b class='jsontable-head' :class="{'has-keyword': keyword}">{{ title }}</b>
+      <!-- <i class="m-2 fa fa-filter" :class="{ 'text-muted': !keyword}" style='margin: 1px !important;'></i> -->
+    </b-button>
+    <b-popover :target="filterBtnId" triggers="hover blur" placement='top' @show='onShowPopover'>
+      <div class="input-group input-group-sm" >
+        <input type="search" class="form-control" ref="input" @keydown.esc.prevent='close' 
+          v-model="keyword" @keydown.enter="close" :placeholder="`Search ${field}...`">
+      </div>
+    </b-popover>
+  </div>
 </template>
 <script>
 import Vue from 'vue';
+import _ from 'lodash';
 
 // For some reason, DataTable doesn't support typescript class based dynamic component or Vue.extend({}) component
 export default {
@@ -27,20 +25,23 @@ export default {
   watch: {
     keyword(kw) {
       // reset immediately if empty
-      if (kw === '') this.search();
+      // if (kw === '')
+        this.search(this);
     },
   },
   methods: {
-    search() {
-      const { query } = this;
+    search: _.debounce((THIS) => {
       // `$props.query` would be initialized to `{ limit: 10, offset: 0, sort: '', order: '' }` by default
       // custom query conditions must be set to observable by using `Vue.set / $vm.$set`
-      this.$set(query, this.field, this.keyword);
-      query.offset = 0; // reset pagination
-      this.$root.$emit('bv::hide::popover');
-    },
+      THIS.$set(THIS.query, THIS.field, THIS.keyword);
+      THIS.query.offset = 0; // reset pagination
+      // THIS.$root.$emit('bv::hide::popover');
+    }),
     onShowPopover() {
       Vue.nextTick(() => this.$refs.input.focus({ preventScroll: true }));
+    },
+    close() {
+      this.$root.$emit('bv::hide::popover');
     },
   },
   computed: {
@@ -53,11 +54,17 @@ export default {
 <style>
 .filter-header {
   display: inline;
-  white-space: nowrap;
 }
 
 input[type=search]::-webkit-search-cancel-button {
   -webkit-appearance: searchfield-cancel-button;
   cursor: pointer;
+}
+
+.has-keyword {
+  color: green;
+}
+.jsontable-head {
+  font-size: 1rem;
 }
 </style>

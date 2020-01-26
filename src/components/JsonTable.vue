@@ -24,6 +24,7 @@
         <expand-control :state='expandState' />
         <json-path :tree-node="this.tstate ? this.tstate.selected : null" v-on:nodeClicked='nodeClicked'/>
         <!-- query: <b-form-input size='sm' :v-bind="tableOpt.query" /> -->
+        <!-- query: {{query}} -->
       </div>
     </datatable>
   </div>
@@ -75,6 +76,7 @@ export default class JsonTable extends Vue {
   @Prop() private options?: DatatableOptions;
 
   rebuildTable(val: TDNode) {
+    // use defTableOpt to get rid of this.options for non-initial node
     if (!this.defTableOpt)  // backup for the first time, we have to intialize tableOpt attributes to make them reactive
       this.defTableOpt = this.tableOpt;
 
@@ -133,9 +135,14 @@ export default class JsonTable extends Vue {
     col.thComp = col.thComp || thFilter;
     col.tdComp = col.tdComp || (isKeyCol ? tdKey : tdValue);
     col.processed = true;
+    // VUETIP: we have to use Vue.$set, otherwise, once it's assigned with array syntax. this field will no longer
+    // be reactive
+    // this.tableOpt.query[field] = '';
+    this.$set(this.tableOpt.query, field, undefined);
 
+    col.thClass = 'jsontable-th';
     if (isKeyCol) {
-      col.thClass = 'jsontable-min';
+      col.thClass += ' jsontable-min';
       col.tdClass = 'jsontable-min';
     }
   }
@@ -183,6 +190,8 @@ export default class JsonTable extends Vue {
   watchSelected(val: TDNode) {
     this.isExpanded = this.defaultExpand(val);
     this.tableOpt.query.offset = 0;
+    // if (this.defTableOpt)
+    //   this.defTableOpt.query = { limit: 100, offset: 0 };
     this.expandState = new ExpandState(0, 0);
     this.rebuildTable(val);
   }
@@ -203,6 +212,9 @@ export default class JsonTable extends Vue {
 </script>
 
 <style>
+.jsontable-th {
+  white-space: nowrap;
+}
 .jsontable-min {
   width:1%;
   /* white-space: nowrap; */
