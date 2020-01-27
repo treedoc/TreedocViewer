@@ -4,14 +4,14 @@
     <div v-else-if="html" v-html="html"/>
     <div v-else-if="!isSimpleType">
       <tree-view-item class='tree-view-item-root'
-          :tstate='xprops.tstate'
+          @nodeClicked='nodeClicked'
           :tnode='value'
           :expandState='xprops.expandState'
           :currentLevel='0'
           style="margin-left: 0!important;" />
     </div>
     <div v-else>
-      <simple-value :tstate='xprops.tstate' :tnode='value' :isInTable='true' />
+      <simple-value @nodeClicked='nodeClicked' :tnode='value' :isInTable='true' />
     </div>
   </div>
 </template>
@@ -37,6 +37,11 @@ export default {
     col() { return _.find(this.columns, { field: this.field }); },
     isLastCol() { return this.col === this.columns[this.columns.length - 1]; },
     isSimpleType() { return this.value.type === TDNodeType.SIMPLE; },
+  },
+  methods: {
+    nodeClicked(data) {
+      this.xprops.tstate.select(data);
+    },
   },
 };
 </script>

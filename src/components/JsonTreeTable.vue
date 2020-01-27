@@ -18,13 +18,13 @@
         <b-btn :size="'sm'" @click='paste' v-b-tooltip.hover title="Paste">
           <i class="fa fa-paste"></i>
         </b-btn>
-        <!-- <b-btn size='sm' variant='outline-secondary' :pressed.sync='sourceView.useCodeview' v-b-tooltip.hover title="Toggle source code view">
+        <b-btn size='sm' variant='outline-secondary' :pressed.sync='codeView[0]' v-b-tooltip.hover title="Toggle source code syntax hi-lighting">
           <i class="fa fa-code"></i>
-        </b-btn> -->
+        </b-btn>
         <b-btn size='sm' @click='format' v-b-tooltip.hover title="Format">
           <i class="fa fa-indent"></i>
         </b-btn>
-      </b-button-group>      
+      </b-button-group>
       <b-button-group class="mx-1">
         <b-btn size='sm' variant='outline-secondary' :pressed.sync='showSource[0]'>Source</b-btn>
         <b-btn size='sm' variant='outline-secondary' :pressed.sync='showTree[0]'>Tree</b-btn>
@@ -37,7 +37,7 @@
     <div class="split-container">
       <msplit>
         <div slot="source" :grow="20" style="width: 100%" :show="showSource"  class="panview">
-          <SourceView ref="sourceView" v-model="jsonStr" :syntax='selectedParser.syntax' :selection='tstate.selection' :show='showSource[0]' />
+          <SourceView ref="sourceView" v-model="jsonStr" :syntax='selectedParser.syntax' :selection='tstate.selection' :show='showSource[0]' :useCodeView='codeView' />
         </div>
         <div slot="tree" :grow="30" :show="showTree" class="panview">
           <!-- tstate.selected={{tstate.selected}} -->
@@ -85,6 +85,7 @@ export default class JsonTreeTable extends Vue {
   showSource = [true];
   showTree = [true];
   showTable = [true];
+  codeView = [true];
   defaultParser = new JSONParser();
   selectedParser = this.defaultParser;
   tstate = new TreeState({}, this.selectedParser);
@@ -97,6 +98,7 @@ export default class JsonTreeTable extends Vue {
     color: 'red',
   };
 
+  // url = https://maps.sensor.community/data/v2/data.24h.json
   // url = 'https://jsonplaceholder.typicode.com/posts';
   url = 'https://www.googleapis.com/discovery/v1/apis/vision/v1p1beta1/rest';
   // url = "https://www.googleapis.com/discovery/v1/apis"
@@ -113,7 +115,7 @@ export default class JsonTreeTable extends Vue {
   @Watch('data', { immediate: true })
   watchData(d: string | object | any[]) {
     if (_.isString(d))
-      this.jsonStr =  d;
+      this.jsonStr = d;
     else {
       this.jsonStr = JSON.stringify(d, null, '  ');
       this.strDataSynced = true;
@@ -127,6 +129,10 @@ export default class JsonTreeTable extends Vue {
 
   @Watch('jsonStr', { immediate: true })
   watchJsonStr(str: string) {
+    if (str.length > 200_000)
+      this.codeView[0] = false;
+    if (str.length < 100_000)
+      this.codeView[0] = true;
     this.parse(str, this, true);
   }
 

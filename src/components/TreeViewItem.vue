@@ -3,7 +3,9 @@
     <div v-if='!isSimpleType' class='leaf'>
       <div class='node' @click.stop='toggleOpen()' >
         <span :class='{opened: open, selected: selected}' class='key key-with-chevron'>
-          <a href="#/" @click.stop="tstate.select(tnode)">
+          <!-- VUETIP: in the event, don't emit object, serialization will take long time if object is big -->
+          <a href="#/" @click.stop="$emit('nodeClicked', ['', ...tnode.path])">
+          <!-- <a href="#/" @click.stop="tstate.select(tnode)"> -->
             {{tnode.key}}
           </a>
         </span>
@@ -21,13 +23,13 @@
               :currentLevel='currentLevel+1'
               :expandState='expandState'
               :tnode='cn'
-              :tstate='tstate' />
+              @nodeClicked='nodeClicked' />
         </keep-alive>
       </template>
     </div>
     <div v-else>
       <span class='key'>{{tnode.key}}</span>:
-      <simple-value :tstate='tstate' :tnode='tnode' />
+      <simple-value :tnode='tnode' @nodeClicked='nodeClicked' />
     </div>
   </div>
 </template>
@@ -54,7 +56,7 @@ import TreeUtil from '../models/TreeUtil';
   },
 })
 export default class TreeViewItem extends Vue {
-  @Prop() tstate!: TreeState;
+  // @Prop() tstate!: TreeState;
   @Prop() tnode!: TDNode;
   @Prop() currentLevel!: number;
   @Prop() modifiable!: boolean;
@@ -117,6 +119,10 @@ export default class TreeViewItem extends Vue {
     }
     // console.log(`expandLevelChange: key=${this.tnode.key}, currentLevel=${this.currentLevel},
     //     state=${JSON.stringify(state)}, hasGrandChildren=${this.tnode.hasGrandChildren()}`);
+  }
+
+  nodeClicked(data: TDNode) {
+    this.$emit('nodeClicked', data);
   }
 }
 </script>

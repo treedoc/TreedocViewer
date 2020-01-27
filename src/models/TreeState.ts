@@ -24,6 +24,7 @@ export default class TreeState {
     this.tree = this.buildTree(treeData, rootLabel);
     if (this.tree) {
       this.tree.root.key = rootLabel;
+      this.tree.root.freeze();
       this.select(selectedPath, true);
     }
   }
@@ -43,7 +44,7 @@ export default class TreeState {
 
     let selectedNode: TDNode | null = null;
     if (!(node instanceof TDNode)) {
-      // when inital, we specify noNull, for the case that current node name is edited, so it can't be selected
+      // when initial, we specify noNull, for the case that current node name is edited, so it can't be selected
       // we will fullback to its parent.
       selectedNode = this.findNodeByPath(node, initial);
       if (!selectedNode)
@@ -59,8 +60,8 @@ export default class TreeState {
     if (selectedNode)
       this.history.append(selectedNode);
 
-    // We don't auto select in case it's intial. If auto selected, when user edit the source
-    // the user won't be able to continous editing.
+    // We don't auto select in case it's initial. If auto selected, when user edit the source
+    // the user won't be able to continuous editing.
     if (!initial)
       this.selection = this.selected!;
   }
