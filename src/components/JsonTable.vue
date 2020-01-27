@@ -24,7 +24,7 @@
         <expand-control :state='expandState' />
         <json-path :tree-node="this.tstate ? this.tstate.selected : null" v-on:nodeClicked='nodeClicked'/>
         <!-- query: <b-form-input size='sm' :v-bind="tableOpt.query" /> -->
-        <!-- query: {{query}} -->
+        query: {{query}}
       </div>
     </datatable>
   </div>
@@ -32,7 +32,7 @@
 
 <script lang="ts">
 import { Component, Prop, Vue, Watch } from 'vue-property-decorator';
-
+import _ from 'lodash';
 import { DatatableOptions, Column, Query } from './Vue2DataTable';
 import DataFilter from './DataFilter';
 import thFilter from './th-Filter.vue';
@@ -83,7 +83,7 @@ export default class JsonTable extends Vue {
     this.defTableOpt.columns = [];
     this.tableOpt = { ...this.defTableOpt, ...(this.applyCustomOpts && this.options) };
     this.buildTable(val);
-    this.queryData();
+    this.queryData(this);
     this.tableOpt.xprops.tstate = this.tstate;
     this.tableOpt.xprops.expandState = this.expandState;
   }
@@ -169,14 +169,14 @@ export default class JsonTable extends Vue {
 
   nodeClicked(data: TDNode) { this.tstate.select(data); }
 
-  queryData() {
-    const opt = this.tableOpt;
+  queryData = _.debounce((THIS) => {
+    const opt = THIS.tableOpt;
     opt.data = DataFilter.filter(opt.columns, opt.rawData, opt.query);
     opt.total = opt.rawData.length;
-  }
+  });
 
   @Watch('query', {deep: true})
-  watchQuery() { this.queryData(); }
+  watchQuery() { this.queryData(this); }
 
   @Watch('isExpanded')
   watchIsExpanded() { this.rebuildTable(this.selected!); }
