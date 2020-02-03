@@ -12,13 +12,13 @@
             URL: <b-input v-model="urlInput" />
           </b-modal>
         </b-btn>
-        <b-btn :size="'sm'" @click='copy' :disabled='!jsonStr' v-b-tooltip.hover title="Copy">
+        <b-btn :size="'sm'" @click='copy' class='jtt' :disabled='!jsonStr' v-b-tooltip.hover title="Copy">
           <i class="fa fa-copy"></i>
         </b-btn>
         <b-btn :size="'sm'" @click='paste' v-b-tooltip.hover title="Paste">
           <i class="fa fa-paste"></i>
         </b-btn>
-        <b-btn size='sm' variant='outline-secondary' :pressed.sync='codeView[0]' v-b-tooltip.hover title="Toggle source code syntax hi-lighting">
+        <b-btn size='sm' variant='outline-secondary' class='jtt' :pressed.sync='codeView[0]' v-b-tooltip.hover title="Toggle source code syntax hi-lighting">
           <i class="fa fa-code"></i>
         </b-btn>
         <b-btn size='sm' @click='format' v-b-tooltip.hover title="Format">
@@ -26,9 +26,9 @@
         </b-btn>
       </b-button-group>
       <b-button-group class="mx-1">
-        <b-btn size='sm' variant='outline-secondary' :pressed.sync='showSource[0]'>Source</b-btn>
-        <b-btn size='sm' variant='outline-secondary' :pressed.sync='showTree[0]'>Tree</b-btn>
-        <b-btn size='sm' variant='outline-secondary' :pressed.sync='showTable[0]'>Table</b-btn>
+        <b-btn size='sm' variant='outline-secondary' class='jtt' :pressed.sync='showSource[0]'>Source</b-btn>
+        <b-btn size='sm' variant='outline-secondary' class='jtt' :pressed.sync='showTree[0]'>Tree</b-btn>
+        <b-btn size='sm' variant='outline-secondary' class='jtt' :pressed.sync='showTable[0]'>Table</b-btn>
         Parser <b-form-select :options='parserSelectOptions' v-model='selectedParser' size="sm"></b-form-select>
       </b-button-group>
       <span><slot/></span>
@@ -248,9 +248,10 @@ export default class JsonTreeTable extends Vue {
   overflow: auto;
 }
 
-.btn-outline-secondary:hover {
+.btn-outline-secondary.jtt:hover {
   background-color: #bdccdc;
 }
+
 .jtt-toolbar {
   position: sticky;
   top: 0;

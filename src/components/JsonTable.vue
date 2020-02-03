@@ -24,7 +24,7 @@
         <expand-control :state='expandState' />
         <json-path :tree-node="this.tstate ? this.tstate.selected : null" v-on:nodeClicked='nodeClicked'/>
         <!-- query: <b-form-input size='sm' :v-bind="tableOpt.query" /> -->
-        query: {{query}}
+        <!-- query: {{query}} -->
       </div>
     </datatable>
   </div>

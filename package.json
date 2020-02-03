@@ -22,6 +22,7 @@
     "@types/lodash": "^4.14.144",
     "@types/yaml": "^1.2.0",
     "bootstrap-vue": "^2.0.1",
+    "font-awesome": "^4.7.0",
     "jquery": "^3.4.1",
     "lodash": "^4.17.15",
     "msplit": "^0.1.20",

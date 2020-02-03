@@ -1,5 +1,5 @@
 <template>
-  <ol class="breadcrumb">
+  <ol class="breadcrumb jsonpath">
     <template v-if="items">
       <li v-for="(item, idx) in items" :key='item.text+idx' :class="['breadcrumb-item', item.active ? 'active' : null]">
         <span v-if="item.active" v-html="item.text"></span>
@@ -44,7 +44,7 @@ export default class JsonPath extends Vue {
 }
 </script>
 <style>
-  .breadcrumb {
+  .breadcrumb.jsonpath {
     margin-bottom: auto;
     padding: 0.3em;
   }
