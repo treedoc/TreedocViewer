@@ -13,6 +13,8 @@ export declare interface Query {
 }
 
 export declare interface DatatableOptions {
+  fixHeaderAndSetBodyMaxHeight?: string | number;
+  tblStyle?: string;
   tblClass?: string;
   pageSizeOptions?: number[];
   columns: Array<Column>;

@@ -1,10 +1,11 @@
+import 'bootstrap/dist/css/bootstrap.css';
+import 'bootstrap-vue/dist/bootstrap-vue.css';
+import 'font-awesome/css/font-awesome.css';
+
 import Vue from 'vue';
 import BootstrapVue from 'bootstrap-vue';
 import Datatable from 'vue2-datatable-component';
 import msplit from 'msplit';
-import 'bootstrap/dist/css/bootstrap.css';
-import 'bootstrap-vue/dist/bootstrap-vue.css';
-import 'font-awesome/css/font-awesome.css';
 
 import JsonTreeTable from './components/JsonTreeTable.vue';
 import JsonTable from './components/JsonTable.vue';

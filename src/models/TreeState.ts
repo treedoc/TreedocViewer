@@ -19,6 +19,8 @@ export default class TreeState {
   initialNode?: TDNode | null;
   tree: TreeDoc;
 
+  maxPane = '';
+
   constructor(treeData: TDNode | string | any, parserPlugin = new JSONParser(), rootLabel = 'root', selectedPath: string[] = []) {
     this.parserPlugin = parserPlugin;
     this.tree = this.buildTree(treeData, rootLabel);
@@ -104,5 +106,13 @@ export default class TreeState {
     this.parseResult = result.message;
     this.parseStatus = result.status;
     return result.result;
+  }
+
+  toggleMaxPane(pane: string) {
+    console.log(`pane=${pane}`);
+    if (this.maxPane)
+      this.maxPane = '';
+    else
+      this.maxPane = pane;
   }
 }

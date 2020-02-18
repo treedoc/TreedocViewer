@@ -7,7 +7,7 @@
       <a :href='url' target="_blank">{{url}}</a>
     </template>
     <template v-else-if="isInTable">
-      <pre>{{tnode.value}}</pre>
+      <pre class='jtt-value'>{{tnode.value}}</pre>
     </template>
     <template v-else>{{tnode.value}}</template>
   </span>
@@ -37,3 +37,8 @@ export default class SimpleValue extends Vue {
   }
 }
 </script>
+<style scoped>
+pre.jtt-value {
+  margin-bottom: 1px;
+}
+</style>

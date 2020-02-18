@@ -1,5 +1,6 @@
 import _ from 'lodash';
 import { Query, Column } from './Vue2DataTable';
+import { TDNode } from 'treedoc';
 
 export default {
   filter(columns: Column[], data: any[], q: Query) {
@@ -19,7 +20,12 @@ export default {
     });
 
     if (q.sort) {
-      result = _.orderBy(result, q.sort, q.order);
+      const getFieldValue = (row: any) => {
+        const v = row[q.sort!];
+        return v instanceof TDNode && v.value ? v.value : v;
+      };
+
+      result = _.orderBy(result, getFieldValue, q.order);
     }
     const end = (q.offset === undefined || !q.limit) ? undefined : q.offset + q.limit;
     return result.slice(q.offset, end);

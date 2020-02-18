@@ -35,7 +35,7 @@
       <span class="status-msg" :class="{error: hasError}" >{{parseResult}}</span>
     </div>
     <div class="split-container">
-      <msplit>
+      <msplit :maxPane='tstate.maxPane'>
         <div slot="source" :grow="20" style="width: 100%" :show="showSource"  class="panview">
           <SourceView ref="sourceView" v-model="jsonStr" :syntax='selectedParser.syntax' :selection='tstate.selection' :show='showSource[0]' :useCodeView='codeView' />
         </div>
@@ -247,14 +247,26 @@ export default class JsonTreeTable extends Vue {
   /* background-color: rgba(0, 255, 255, 0.308); */
   overflow: auto;
 }
-
-.btn-outline-secondary.jtt:hover {
-  background-color: #bdccdc;
-}
-
 .jtt-toolbar {
   position: sticky;
   top: 0;
+  left: 0;
   z-index: 100;
 }
+.json-tree-table * .btn-outline-secondary:hover {
+  background-color: #bdccdc;
+}
+.json-tree-table * .btn-secondary {
+  background-color: #6c757da6;
+}
+.json-tree-table * .btn-outline-secondary:not(:disabled):not(.disabled).active {
+  background-color: #6c757da6;
+}
+.json-tree-table * .btn-outline-secondary:not(:disabled):not(.disabled).active:hover {
+  background-color: #6c757d;
+}
+.json-tree-table * .btn-secondary:hover:not(:disabled){
+  background-color: #6c757d;
+}
+
 </style>

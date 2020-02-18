@@ -1,6 +1,8 @@
 <template>
   <div class='wrapper'>
-    <expand-control ref='expandControl' :state='expandState' class="jtt-toolbar" style=" float: right;"/>
+    <div class="jtt-toolbar">
+      <expand-control ref='expandControl' :state='expandState' style="float: right;"/>
+    </div>
     <tree-view-item class='item-root'
         :tnode='tstate.tree.root'
         :currentLevel='0'
