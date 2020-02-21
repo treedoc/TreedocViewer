@@ -109,7 +109,6 @@ export default class TreeState {
   }
 
   toggleMaxPane(pane: string) {
-    console.log(`pane=${pane}`);
     if (this.maxPane)
       this.maxPane = '';
     else

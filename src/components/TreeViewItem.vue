@@ -121,7 +121,7 @@ export default class TreeViewItem extends Vue {
     //     state=${JSON.stringify(state)}, hasGrandChildren=${this.tnode.hasGrandChildren()}`);
   }
 
-  nodeClicked(data: TDNode) {
+  nodeClicked(data: string[]) {
     this.$emit('nodeClicked', data);
   }
 }
