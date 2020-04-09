@@ -179,8 +179,7 @@ export default class JsonTable extends Vue {
 
   queryData = _.debounce((THIS) => {
     const opt = THIS.tableOpt;
-    opt.data = DataFilter.filter(opt.columns, opt.rawData, opt.query);
-    opt.total = opt.rawData.length;
+    DataFilter.filter(opt);
   });
 
   @Watch('query', {deep: true})

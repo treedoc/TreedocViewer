@@ -136,7 +136,7 @@ export default class JsonTreeTable extends Vue {
     this.parse(str, this, true);
   }
 
-  // Have to parse THIS as Vue framework will generate a different instance
+  // Have to pass THIS as Vue framework will generate a different instance
   // of this during runtime.
   parse = _.debounce((str: string, THIS: JsonTreeTable, detectParser = false) => {
     // Auto detect parser

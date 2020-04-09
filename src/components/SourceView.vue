@@ -3,7 +3,7 @@
     <template v-if="useCodeView[0]">
       <codemirror ref='codeView' class='codeView' :options="options" v-model="val" style="height:100%"></codemirror>
     </template>
-    <textarea ref='textView' v-model="val" :class="[useCodeView[0] ? 'hiddenTextArea' : 'textArea']"></textarea>
+    <textarea ref='textView' v-model="val" :class="[useCodeView[0] ? 'hiddenTextArea' : 'textArea']" style="white-space: nowrap;"></textarea>
   </div>
 </template>
 
