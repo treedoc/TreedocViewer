@@ -20,7 +20,6 @@
 
 <script lang="ts">
 import { Component, Prop, Vue, Watch } from 'vue-property-decorator';
-import { TreeNode } from '../models/Tree';
 
 export class ExpandState {
   fullyExpand = false;

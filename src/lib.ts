@@ -10,7 +10,6 @@ import msplit from 'msplit';
 import JsonTreeTable from './components/JsonTreeTable.vue';
 import JsonTable from './components/JsonTable.vue';
 import TreeState from './models/TreeState';
-import Tree from './models/Tree';
 
 export default {
   install(vue: typeof Vue) {
@@ -24,5 +23,4 @@ export default {
 
 export {
   TreeState,
-  Tree,
 };
