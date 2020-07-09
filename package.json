@@ -19,30 +19,33 @@
     "test:unit": "vue-cli-service test:unit"
   },
   "dependencies": {
-    "@types/lodash": "^4.14.144",
-    "@types/yaml": "^1.2.0",
-    "bootstrap-vue": "^2.0.1",
+    "@types/lodash": "^4.14.157",
+    "@types/yaml": "^1.9.7",
+    "bootstrap-vue": "^2.15.0",
     "font-awesome": "^4.7.0",
-    "jquery": "^3.4.1",
+    "jest": "^26.1.0",
+    "jquery": "^3.5.1",
     "lodash": "^4.17.15",
     "msplit": "^0.1.20",
-    "treedoc": "^0.1.12",
-    "vue": "^2.6.10",
-    "vue-class-component": "^7.0.2",
+    "treedoc": "^0.2.3",
+    "vue": "^2.6.11",
+    "vue-class-component": "^7.2.3",
     "vue-codemirror-lite": "^1.0.4",
-    "vue-property-decorator": "^8.1.0",
+    "vue-property-decorator": "^9.0.0",
     "vue2-datatable-component": "github:TrueCarry/vue2-datatable",
-    "yaml": "^1.7.2"
+    "yaml": "^1.10.0"
   },
   "devDependencies": {
-    "@types/jest": "^23.1.4",
-    "@vue/cli-plugin-typescript": "^3.12.0",
-    "@vue/cli-plugin-unit-jest": "^3.12.0",
-    "@vue/cli-service": "^3.12.0",
-    "@vue/test-utils": "1.0.0-beta.29",
-    "gh-pages": "^2.1.1",
-    "ts-jest": "^23.0.0",
-    "typescript": "^3.4.3",
-    "vue-template-compiler": "^2.6.10"
+    "@types/jest": "^26.0.3",
+    "@vue/cli-plugin-typescript": "^4.4.6",
+    "@vue/cli-plugin-unit-jest": "^4.4.6",
+    "@vue/cli-service": "^4.4.6",
+    "@vue/test-utils": "^1.0.3",
+    "gh-pages": "^3.1.0",
+    "handlebars": "^4.7.6",
+    "ts-jest": "^26.1.1",
+    "typescript": "^3.9.6",
+    "vue-cli-plugin-e2e-webdriverio": "^2.0.3",
+    "vue-template-compiler": "^2.6.11"
   }
 }

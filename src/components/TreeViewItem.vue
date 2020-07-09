@@ -14,7 +14,7 @@
       <template v-for="cn in tnode.children" >
         <keep-alive :key='cn.key'>
           <!-- 
-            VUEBUG: If use TreeViewItem which is cause brokage only happen in prod mode, this inconsistency cause me
+            VUEBUG: If use TreeViewItem which will cause brokage only in prod mode, this inconsistency cause me
             many days to troubleshoot.
           -->
           <tree-view-item :key='cn.key' 

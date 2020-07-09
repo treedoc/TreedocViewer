@@ -33,7 +33,7 @@ export default class JsonPath extends Vue {
   get items() {
     const paths = new Array<Item>();
     if (!this.treeNode)
-      return null;
+      return paths;
 
     paths.unshift({ text: this.treeNode.key, active: true });
     for (let pNode = this.treeNode.parent; pNode; pNode = pNode!.parent) {

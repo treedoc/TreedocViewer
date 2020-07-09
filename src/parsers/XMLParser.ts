@@ -15,7 +15,7 @@ interface XNode {
   children?: XNode [];
 }
 
-export default class XMLParser implements  ParserPlugin<XMLParserOption> {
+export default class XMLParser implements ParserPlugin<XMLParserOption> {
   option: XMLParserOption = {};
   syntax = 'xml';
 

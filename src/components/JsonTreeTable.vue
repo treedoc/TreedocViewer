@@ -89,7 +89,6 @@ export default class JsonTreeTable extends Vue {
   defaultParser = new JSONParser();
   selectedParser = this.defaultParser;
   tstate = new TreeState({}, this.selectedParser);
-  selectedNode = this.tstate.selected;
   jsonStr = '';
 
   parseResult = '';
@@ -150,6 +149,7 @@ export default class JsonTreeTable extends Vue {
 
     const selectedPath = THIS.tstate.selected ? THIS.tstate.selected.path : [];
     THIS.tstate = new TreeState(this.strDataSynced ? THIS.data : str, THIS.selectedParser, THIS.rootObjectKey, selectedPath);
+    (window as any).tstate = THIS.tstate;
     THIS.strDataSynced = false;
     THIS.parseResult = THIS.tstate.parseResult;
 

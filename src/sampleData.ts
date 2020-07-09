@@ -28,8 +28,78 @@ const jsonStr = `
   },
 }`;
 
+const yamlStr = `
+-  martin:
+    name: Martin D'vloper
+    job: Developer
+    skills:
+      - python
+      - perl
+      - pascal
+-  tabitha:
+    name: Tabitha Bitumen
+    job: Developer
+    skills:
+      - lisp
+      - fortran
+      - erlang
+`;
+
+const xmlStr = `<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.jsonex</groupId>
+  <artifactId>jcParent</artifactId>
+  <version>0.0.1-SNAPSHOT</version>
+  <packaging>pom</packaging>
+  <name>JSONCoder Parent</name>
+  <description>JSONCoder Parent</description>
+  <url>https://github.com/eBay/jsonex.git</url>
+
+  <developers>
+    <developer>
+      <id>jianwu</id>
+      <name>Jianwu Chen</name>
+      <email>jianchen@ebay.com</email>
+      <organization>eBay</organization>
+      <organizationUrl>http://www.ebay.com</organizationUrl>
+      <roles>
+        <role>architect</role>
+        <role>developer</role>
+      </roles>
+      <timezone>America/San_Francisco</timezone>
+    </developer>
+  </developers>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>\${project.groupId}</groupId>
+        <artifactId>core</artifactId>
+        <version>\${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.projectlombok</groupId>
+        <artifactId>lombok</artifactId>
+        <version>1.18.8</version>
+        <scope>provided</scope>
+      </dependency>
+      <dependency>
+        <groupId>junit</groupId>
+        <artifactId>junit</artifactId>
+        <scope>test</scope>
+        <version>4.8.1</version>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+</project>
+`;
+
 export default {
   jsonStr,
+  yamlStr,
+  xmlStr,
   data: [
     {text: 'empty', value: {}},
     {
@@ -191,76 +261,11 @@ No \\n's!",
     },
     {
       text: 'yaml',
-      value:
-`-  martin:
-    name: Martin D'vloper
-    job: Developer
-    skills:
-      - python
-      - perl
-      - pascal
--  tabitha:
-    name: Tabitha Bitumen
-    job: Developer
-    skills:
-      - lisp
-      - fortran
-      - erlang
-`,
+      value: yamlStr,
     },
     {
       text: 'xml',
-      value:
-`<?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
-  <modelVersion>4.0.0</modelVersion>
-  <groupId>com.jsonex</groupId>
-  <artifactId>jcParent</artifactId>
-  <version>0.0.1-SNAPSHOT</version>
-  <packaging>pom</packaging>
-  <name>JSONCoder Parent</name>
-  <description>JSONCoder Parent</description>
-  <url>https://github.com/eBay/jsonex.git</url>
-
-  <developers>
-    <developer>
-      <id>jianwu</id>
-      <name>Jianwu Chen</name>
-      <email>jianchen@ebay.com</email>
-      <organization>eBay</organization>
-      <organizationUrl>http://www.ebay.com</organizationUrl>
-      <roles>
-        <role>architect</role>
-        <role>developer</role>
-      </roles>
-      <timezone>America/San_Francisco</timezone>
-    </developer>
-  </developers>
-
-  <dependencyManagement>
-    <dependencies>
-      <dependency>
-        <groupId>\${project.groupId}</groupId>
-        <artifactId>core</artifactId>
-        <version>\${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.projectlombok</groupId>
-        <artifactId>lombok</artifactId>
-        <version>1.18.8</version>
-        <scope>provided</scope>
-      </dependency>
-      <dependency>
-        <groupId>junit</groupId>
-        <artifactId>junit</artifactId>
-        <scope>test</scope>
-        <version>4.8.1</version>
-      </dependency>
-    </dependencies>
-  </dependencyManagement>
-</project>
-`,
+      value: xmlStr,
     },
   ] as Array<{text: string, value: any}>,
 };

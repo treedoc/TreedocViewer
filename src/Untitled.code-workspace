@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": ".."
+		},
+		{
+			"path": "../../treedoc_ts"
+		},
+		{
+			"path": "../../download"
+		}
+	],
+	"settings": {}
+}
