@@ -23,7 +23,7 @@
     "@types/yaml": "^1.2.0",
     "bootstrap-vue": "^2.0.1",
     "jquery": "^3.4.1",
-    "lodash": "^4.17.15",
+    "lodash": "^4.17.19",
     "msplit": "^0.1.20",
     "treedoc": "^0.1.12",
     "vue": "^2.6.10",
