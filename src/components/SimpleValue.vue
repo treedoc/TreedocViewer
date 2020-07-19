@@ -1,7 +1,7 @@
 <template>
   <span class='value'>
     <template v-if='ref'>
-      <a href="#/" @click.stop="$emit('nodeClicked', ref)">{{ref}}</a>
+      <a href="#/" @click.stop="$emit('nodeClicked', refAbsolute)">{{ref}}</a>
     </template>
     <template v-else-if="url">
       <a :href='url' target="_blank">{{url}}</a>
@@ -28,6 +28,13 @@ export default class SimpleValue extends Vue {
     if (this.tnode.key !== TreeUtil.KEY_REF || typeof(this.tnode.value) !== 'string')
       return null;
     return this.tnode.value;
+  }
+
+  get refAbsolute() {
+    let result = this.ref;
+    if (result && result.startsWith('../'))
+      result = this.tnode.parent!.pathAsString + '/' + result;
+    return result;
   }
 
   get url() {

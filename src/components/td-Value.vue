@@ -53,5 +53,4 @@ export default {
 .td-value-max-width {
   max-width: 1000px;
 }
-
 </style>>
