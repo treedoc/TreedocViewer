@@ -34,6 +34,7 @@ import TDSample from './tdSample.vue';
 import JTTOptions from './models/JTTOption';
 import YAMLParser from './parsers/YAMLParser';
 import XMLParser from './parsers/XMLParser';
+import CSVParserPlugin from './parsers/CSVParserPlugin';
 
 @Component({
   components: {
@@ -64,6 +65,8 @@ export default class App extends Vue {
       new XMLParser('XML compact', 'text/xml', true),
       new XMLParser(),
       new XMLParser('html', 'text/html'),
+      new CSVParserPlugin(),
+      new CSVParserPlugin('TSV', '\t'),
       ],
   };
 

@@ -96,6 +96,14 @@ const xmlStr = `<?xml version="1.0" encoding="UTF-8"?>
 </project>
 `;
 
+const csvStr = `
+field1,field2,field3
+v11,v12,v13
+v21, "v2l1
+V2l2" ,v23
+"v31""v31","v32""""v32",v33
+`;
+
 export default {
   jsonStr,
   yamlStr,
@@ -267,5 +275,10 @@ No \\n's!",
       text: 'xml',
       value: xmlStr,
     },
+    {
+      text: 'csv',
+      value: csvStr,
+    },
+
   ] as Array<{text: string, value: any}>,
 };

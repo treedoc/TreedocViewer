@@ -113,8 +113,8 @@ export default class JsonTable extends Vue {
         this.tableOpt.rawData.push(row);
         if (this.isExpanded && v && v.children) {
           for (const cv of v.children) {
-            this.addColumn(cv.key);
-            row[cv.key] = cv;
+            this.addColumn(cv.key!);
+            row[cv.key!] = cv;
           }
         } else {
           this.addColumn(COL_VALUE, 1);

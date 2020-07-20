@@ -127,12 +127,14 @@ export default class JsonTreeTable extends Vue {
   }
 
   @Watch('jsonStr', { immediate: true })
-  watchJsonStr(str: string) {
+  watchJsonStr(str: string, old: string) {
     if (str.length > 200_000)
       this.codeView[0] = false;
     if (str.length < 100_000)
       this.codeView[0] = true;
-    this.parse(str, this, true);
+    // Need detected only if significant changes happens. Not accurate.
+    const detectNeeded = Math.abs(old.length - str.length) > 7;
+    this.parse(str, this, detectNeeded);
   }
 
   // Have to pass THIS as Vue framework will generate a different instance

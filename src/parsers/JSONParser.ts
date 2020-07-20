@@ -24,7 +24,7 @@ export default class JSONParser implements ParserPlugin<JSONParserOption> {
   parse(str: string): ParseResult {
     const result = new ParseResult();
     try {
-      result.result = TDJSONParser.get().parse(new TDJSONParserOption(str).setDefaultRootType(TDNodeType.MAP));
+      result.result = TDJSONParser.get().parse(str, new TDJSONParserOption().setDefaultRootType(TDNodeType.MAP));
       result.message = 'TDJSONParser.parser()';
       return result;
     } catch (e2) {
