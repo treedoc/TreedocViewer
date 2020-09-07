@@ -1,4 +1,4 @@
-<a href="https://github.com/treedoc/TreedocViewer"><img alt="GitHub Actions status" src="https://github.com/treedoc/TreedocViewer/workflows/Node%20CI/badge.svg"></a>
+<a href="https://github.com/treedoc/TreedocViewer"><img alt="GitHub Actions status" src="https://github.com/treedoc/TreedocViewer/workflows/Node%20CI/badge.svg"></a><a href='https://www.npmjs.com/package/treedoc-viewer' target="_blank"><img alt="npm" src="https://img.shields.io/npm/v/treedoc-viewer"></a>
 
 # Treedoc Viewer
 
@@ -30,15 +30,6 @@ A feature-rich viewer for Treedoc implemented with VueJS and typescript. Treedoc
   * Support text protobuf which is support by JSONex parser
   * Plugable parser, so that more format can be easily added.
 * Implemented as VueJS component, so it's easy to be reused in different applications
-
-## Development
-
-    yarn install
-    yarn serve
-
-## Live Demo
-
-<http://treedoc.org>
 
 ## Usage
 ### As a Vue component
@@ -76,6 +67,16 @@ If you are not using VueJs or don't want to introduce heavy dependencies, you ca
 </script>
 ```
 For a working example, please refer to [sample/embedded.html](sample/embedded.html) in github repo.
+
+## Development
+```shell
+yarn install
+yarn serve
+```
+
+## Live Demo
+
+<http://treedoc.org>
 
 ## License
 
