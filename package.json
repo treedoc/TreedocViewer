@@ -19,11 +19,11 @@
     "test:unit": "vue-cli-service test:unit"
   },
   "dependencies": {
-    "@types/lodash": "^4.14.157",
+    "@types/lodash": "^4.14.161",
     "@types/yaml": "^1.9.7",
-    "bootstrap-vue": "^2.15.0",
+    "bootstrap-vue": "^2.16.0",
     "font-awesome": "^4.7.0",
-    "jest": "^26.1.0",
+    "jest": "^26.4.2",
     "jquery": "^3.5.1",
     "lodash": "^4.17.19",
     "msplit": "^0.1.20",
@@ -44,8 +44,8 @@
     "gh-pages": "^3.1.0",
     "handlebars": "^4.7.6",
     "ts-jest": "^26.1.1",
-    "typescript": "^3.9.6",
+    "typescript": "^3.9.7",
     "vue-cli-plugin-e2e-webdriverio": "^2.0.3",
-    "vue-template-compiler": "^2.6.11"
+    "vue-template-compiler": "^2.6.12"
   }
 }
