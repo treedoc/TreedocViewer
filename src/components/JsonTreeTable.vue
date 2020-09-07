@@ -1,6 +1,7 @@
 <template>
   <div class="jtt-container">
-    <div>
+    <div class='jtt-top'>
+      <b class="jtt-title">{{title}}</b>
       <b-button-group class="ml-1 jtt-toolbar">
         <b-btn :size="'sm'" @click='$refs.file1.click()' v-b-tooltip.hover title="Open File">
           <i class="fa fa-folder-open"></i>
@@ -77,6 +78,7 @@ import { TDNode, TDJSONWriter, TDJSONWriterOption } from 'treedoc';
   },
 })
 export default class JsonTreeTable extends Vue {
+  @Prop() title?: string;
   @Prop() data!: object | any[] | string;
   @Prop() options?: JTTOptions;
   @Prop() initalPath!: string;
@@ -219,7 +221,7 @@ export default class JsonTreeTable extends Vue {
 <style>
 .status-msg {
   font-size: smaller;
-  color: green;
+  color: darkgreen;
 }
 
 .error {
@@ -241,7 +243,6 @@ export default class JsonTreeTable extends Vue {
   height: 100%;
   flex-direction: column;
 }
-
 .split-container {
   /* max-height: 93vh; */
   /* width:100%; */
@@ -250,11 +251,17 @@ export default class JsonTreeTable extends Vue {
   /* background-color: rgba(0, 255, 255, 0.308); */
   overflow: auto;
 }
+.jtt-top {
+  background-color: lightgray;
+}
 .jtt-toolbar {
   position: sticky;
   top: 0;
   left: 0;
   z-index: 100;
+}
+.jtt-title {
+  color: darkblue;
 }
 .json-tree-table * .btn-outline-secondary:hover {
   background-color: #bdccdc;
@@ -271,5 +278,4 @@ export default class JsonTreeTable extends Vue {
 .json-tree-table * .btn-secondary:hover:not(:disabled){
   background-color: #6c757d;
 }
-
 </style>
