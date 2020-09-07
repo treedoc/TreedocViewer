@@ -263,6 +263,12 @@ export default class JsonTreeTable extends Vue {
 .jtt-title {
   color: darkblue;
 }
+
+.jtt-hint {
+  color: #aaa;
+  font-size: 90%;
+}
+
 .json-tree-table * .btn-outline-secondary:hover {
   background-color: #bdccdc;
 }

@@ -9,7 +9,7 @@
             {{tnode.key}}
           </a>
         </span>
-        <span class='hint'>{{label}}</span>
+        <span class='jtt-hint'>{{label}}</span>
       </div>
       <template v-for="cn in tnode.children" >
         <keep-alive :key='cn.key'>
@@ -172,9 +172,5 @@ export default class TreeViewItem extends Vue {
 
 .selected {
   background-color:#ffc107;
-}
-
-.hint {
-  color: #ccc;
 }
 </style>

@@ -7,9 +7,9 @@
       <a :href='url' target="_blank">{{url}}</a>
     </template>
     <template v-else-if="isInTable">
-      <pre class='jtt-value'>{{tnode.value}}</pre>
+      <pre class='jtt-value'>{{tnode.value}} <span class='jtt-hint'>{{date}}</span></pre>
     </template>
-    <template v-else>{{tnode.value}}</template>
+    <template v-else>{{tnode.value}} <span class='jtt-hint'>{{date}}</span></template>
   </span>
 </template>
 
@@ -18,6 +18,7 @@ import { Component, Prop, Vue, Watch } from 'vue-property-decorator';
 import { TDNode } from 'treedoc';
 import TreeState from '../models/TreeState';
 import TreeUtil from '../models/TreeUtil';
+import _ from 'lodash';
 
 @Component
 export default class SimpleValue extends Vue {
@@ -28,6 +29,15 @@ export default class SimpleValue extends Vue {
     if (this.tnode.key !== TreeUtil.KEY_REF || typeof(this.tnode.value) !== 'string')
       return null;
     return this.tnode.value;
+  }
+
+  get date() {
+    // number and between 1980-01-01 and 2040-01-01, maybe a Date
+    const val = this.tnode.value;
+    if (_.isNumber(val) && val > 315532800000 && val < 2208988800000) {
+      return `\n${new Date(val as number).toISOString()}`;
+    }
+    return null;
   }
 
   get refAbsolute() {
@@ -44,7 +54,7 @@ export default class SimpleValue extends Vue {
   }
 }
 </script>
-<style scoped>
+<style>
 pre.jtt-value {
   margin-bottom: 1px;
 }
