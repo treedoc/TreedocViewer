@@ -1,5 +1,5 @@
 <template>
-  <div class="td-value">
+  <div class="td-value" :class="{'td-value-max-width' : !isLastCol}">
     <div v-if='!value'></div>
     <div v-else-if="html" v-html="html"/>
     <div v-else-if="!isSimpleType">
@@ -31,9 +31,11 @@ export default {
   props: ['field', 'value', 'row', 'xprops', 'columns'],
   computed: {
     html() {
-      const col = _.find(this.columns, { field: this.field });
+      const col = this.col;
       return col && col.html && col.html(this.value, this.row);
     },
+    col() { return _.find(this.columns, { field: this.field }); },
+    isLastCol() { return this.col === this.columns[this.columns.length - 1]; },
     isSimpleType() { return this.value.type === TDNodeType.SIMPLE; },
   },
   methods: {
@@ -46,7 +48,9 @@ export default {
 <style>
 .td-value {
   overflow-x: auto;
+  
+}
+.td-value-max-width {
   max-width: 1000px;
 }
-
 </style>>

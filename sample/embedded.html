@@ -1,0 +1,24 @@
+<html>
+  <body>
+    <iframe id='jttFrame' src="https://www.treedoc.org?embeddedId=jtt_1" width="100%" height="100%"></iframe>
+  </body>
+  <script>
+    const frame = document.getElementById('jttFrame').contentWindow;
+    
+    function setJttData(target, data) {
+      target.postMessage({type:'jtt-setData', data}, '*');
+    }
+    
+    // Set data after a delay
+    setTimeout(() => setJttData(frame, {message:"after timeout"}), 3000);
+
+    // Or set data after get ready signal
+    window.addEventListener('message', (evt) => {
+      if (evt.data.type !== 'jtt-ready')
+        return;
+      console.log(evt);
+      // setJttData(frame, {message:"after ready"});  // Both ways work
+      setJttData(evt.source, {message:"after ready by source"});  // Both ways work
+    })    
+  </script>
+</html>

@@ -10,7 +10,6 @@ export interface Selection {
 
 export default class TreeState {
   parseResult = 'OBJECT';
-  parseStatus = ParseStatus.SUCCESS;
   parserPlugin: ParserPlugin<any>;
 
   history = new History<TDNode>();
@@ -18,6 +17,8 @@ export default class TreeState {
   selection: Selection = {};
   initialNode?: TDNode | null;
   tree: TreeDoc;
+
+  maxPane = '';
 
   constructor(treeData: TDNode | string | any, parserPlugin = new JSONParser(), rootLabel = 'root', selectedPath: string[] = []) {
     this.parserPlugin = parserPlugin;
@@ -30,9 +31,9 @@ export default class TreeState {
   }
 
   buildTree(treeData: TDNode | string | any, rootLabel: string) {
-    if (!treeData || treeData.constructor.name === 'TreeDoc') {
+    if (!treeData || treeData.constructor.name === 'TDNode') {
       this.parseResult = 'TreeDoc';
-      return treeData as TreeDoc;
+      return (treeData as TDNode).doc;
     }
     const tdNode = typeof(treeData) === 'string' ? this.parse(treeData) : TDObjectCoder.get().encode(treeData);
     return tdNode && tdNode.doc;
@@ -47,8 +48,6 @@ export default class TreeState {
       // when initial, we specify noNull, for the case that current node name is edited, so it can't be selected
       // we will fullback to its parent.
       selectedNode = this.findNodeByPath(node, initial);
-      if (!selectedNode)
-        return;
     } else
       selectedNode = node;
 
@@ -102,7 +101,13 @@ export default class TreeState {
   parse(jsonStr: string) {
     const result = this.parserPlugin.parse(jsonStr);
     this.parseResult = result.message;
-    this.parseStatus = result.status;
     return result.result;
+  }
+
+  toggleMaxPane(pane: string) {
+    if (this.maxPane)
+      this.maxPane = '';
+    else
+      this.maxPane = pane;
   }
 }

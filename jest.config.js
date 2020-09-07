@@ -28,5 +28,13 @@ module.exports = {
   watchPlugins: [
     'jest-watch-typeahead/filename',
     'jest-watch-typeahead/testname'
-  ]
+  ],
+  collectCoverage: true,
+  collectCoverageFrom: [
+    'src/**/*.{js,vue,ts}',
+    '!src/main.js', // No need to cover bootstrap file
+    '!src/components/td-Key1.vue', // Cause error ERROR: 'import' and 'export' may only appear at the top level (11:0), from babylon
+    '!src/components/th-Filter.vue', // Cause error
+    '!src/components/td-Value.vue', // Cause error    
+  ],
 }

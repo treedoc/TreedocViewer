@@ -1,7 +1,12 @@
 <template>
-  <div>
+  <div class='jtt-table'>
     <datatable v-bind="tableOpt">
       <div class="jtt-tbl-toolbar">
+        <span v-b-tooltip.hover title="Toggle fullscreen">
+          <b-btn size='sm' variant='outline-secondary' :pressed='tstate.maxPane==="table"' @click='tstate.toggleMaxPane("table")'>
+            <i class="fa fa-expand"></i>
+          </b-btn>
+        </span>
         <span v-b-tooltip.hover title="Expand children as columns">
           <b-btn size='sm' variant='outline-secondary' :pressed.sync='isExpanded'>
             <i class="fa fa-arrows-h"></i>
@@ -24,6 +29,7 @@
         <expand-control :state='expandState' />
         <json-path :tree-node="this.tstate ? this.tstate.selected : null" v-on:nodeClicked='nodeClicked'/>
         <!-- query: <b-form-input size='sm' :v-bind="tableOpt.query" /> -->
+        <!-- query: {{query}} -->
       </div>
     </datatable>
   </div>
@@ -31,7 +37,7 @@
 
 <script lang="ts">
 import { Component, Prop, Vue, Watch } from 'vue-property-decorator';
-
+import _ from 'lodash';
 import { DatatableOptions, Column, Query } from './Vue2DataTable';
 import DataFilter from './DataFilter';
 import thFilter from './th-Filter.vue';
@@ -55,6 +61,8 @@ const COL_KEY = '@key';
 })
 export default class JsonTable extends Vue {
   tableOpt: DatatableOptions = {
+    // fixHeaderAndSetBodyMaxHeight: 200,
+    // tblStyle: 'table-layout: fixed', // must
     tblClass: 'table-bordered',
     pageSizeOptions: [5, 20, 50, 100, 200],
     columns: [],
@@ -75,13 +83,14 @@ export default class JsonTable extends Vue {
   @Prop() private options?: DatatableOptions;
 
   rebuildTable(val: TDNode) {
+    // use defTableOpt to get rid of this.options for non-initial node
     if (!this.defTableOpt)  // backup for the first time, we have to intialize tableOpt attributes to make them reactive
       this.defTableOpt = this.tableOpt;
 
     this.defTableOpt.columns = [];
     this.tableOpt = { ...this.defTableOpt, ...(this.applyCustomOpts && this.options) };
     this.buildTable(val);
-    this.queryData();
+    this.queryData(this);
     this.tableOpt.xprops.tstate = this.tstate;
     this.tableOpt.xprops.expandState = this.expandState;
   }
@@ -104,8 +113,8 @@ export default class JsonTable extends Vue {
         this.tableOpt.rawData.push(row);
         if (this.isExpanded && v && v.children) {
           for (const cv of v.children) {
-            this.addColumn(cv.key);
-            row[cv.key] = cv;
+            this.addColumn(cv.key!);
+            row[cv.key!] = cv;
           }
         } else {
           this.addColumn(COL_VALUE, 1);
@@ -133,10 +142,16 @@ export default class JsonTable extends Vue {
     col.thComp = col.thComp || thFilter;
     col.tdComp = col.tdComp || (isKeyCol ? tdKey : tdValue);
     col.processed = true;
+    // VUETIP: we have to use Vue.$set, otherwise, once it's assigned with array syntax. this field will no longer
+    // be reactive
+    // this.tableOpt.query[field] = '';
+    this.$set(this.tableOpt.query, field, undefined);
 
+    col.thClass = 'jtt-th';
+    col.tdClass = 'jtt-td';
     if (isKeyCol) {
-      col.thClass = 'jsontable-min';
-      col.tdClass = 'jsontable-min';
+      col.thClass += ' jtt-min jtt-td';
+      col.tdClass = 'jtt-min jtt-td';
     }
   }
 
@@ -162,14 +177,13 @@ export default class JsonTable extends Vue {
 
   nodeClicked(data: TDNode) { this.tstate.select(data); }
 
-  queryData() {
-    const opt = this.tableOpt;
-    opt.data = DataFilter.filter(opt.columns, opt.rawData, opt.query);
-    opt.total = opt.rawData.length;
-  }
+  queryData = _.debounce((THIS) => {
+    const opt = THIS.tableOpt;
+    DataFilter.filter(opt);
+  });
 
   @Watch('query', {deep: true})
-  watchQuery() { this.queryData(); }
+  watchQuery() { this.queryData(this); }
 
   @Watch('isExpanded')
   watchIsExpanded() { this.rebuildTable(this.selected!); }
@@ -183,6 +197,8 @@ export default class JsonTable extends Vue {
   watchSelected(val: TDNode) {
     this.isExpanded = this.defaultExpand(val);
     this.tableOpt.query.offset = 0;
+    // if (this.defTableOpt)
+    //   this.defTableOpt.query = { limit: 100, offset: 0 };
     this.expandState = new ExpandState(0, 0);
     this.rebuildTable(val);
   }
@@ -203,24 +219,55 @@ export default class JsonTable extends Vue {
 </script>
 
 <style>
-.jsontable-min {
+.jtt-table {
+  margin: 0 auto;
+  width: 100%;
+  height: 100%
+}
+
+.jtt-th {
+  white-space: nowrap;
+}
+.jtt-min {
   width:1%;
   /* white-space: nowrap; */
 }
-.table td, .table th {
+.jtt-table * .table td, .table th {
   padding: .25rem;
 }
-pre {
+.jtt-table * pre {
   /* white-space: pre-wrap; */
   white-space: pre;
   word-wrap: break-word;
   margin-bottom: 0px;
 }
-.clearfix {
+.jtt-table * .clearfix {
   margin-bottom: 0px !important;
+  position: sticky;top: 0px;
+}
+.jtt-table * div[name="SimpleTable"] {
+  overflow: scroll;
 }
 .jtt-tbl-toolbar {
   display: flex;
   flex-wrap: wrap;
+}
+.thead>td{
+  position: sticky;
+  top: 0;
+}
+.jtt-td {
+  padding: 2px!;
+}
+
+/* Fix extra space for the row below the table */
+.jtt-table * .col-sm-6 {
+  padding-right: 0px;
+  padding-left: 0px;
+}
+
+.jtt-table * .row {
+  margin-right: 0px;
+  margin-left: 0px;
 }
 </style>

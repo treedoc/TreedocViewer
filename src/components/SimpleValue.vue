@@ -1,13 +1,13 @@
 <template>
   <span class='value'>
     <template v-if='ref'>
-      <a href="#/" @click.stop="$emit('nodeClicked', ref)">{{ref}}</a>
+      <a href="#/" @click.stop="$emit('nodeClicked', refAbsolute)">{{ref}}</a>
     </template>
     <template v-else-if="url">
       <a :href='url' target="_blank">{{url}}</a>
     </template>
     <template v-else-if="isInTable">
-      <pre>{{tnode.value}}</pre>
+      <pre class='jtt-value'>{{tnode.value}}</pre>
     </template>
     <template v-else>{{tnode.value}}</template>
   </span>
@@ -30,6 +30,13 @@ export default class SimpleValue extends Vue {
     return this.tnode.value;
   }
 
+  get refAbsolute() {
+    let result = this.ref;
+    if (result && result.startsWith('../'))
+      result = this.tnode.parent!.pathAsString + '/' + result;
+    return result;
+  }
+
   get url() {
     const val = this.tnode.value;
     if (typeof(val) === 'string' && (val.startsWith('http://') || val.startsWith('https://')))
@@ -37,3 +44,8 @@ export default class SimpleValue extends Vue {
   }
 }
 </script>
+<style scoped>
+pre.jtt-value {
+  margin-bottom: 1px;
+}
+</style>

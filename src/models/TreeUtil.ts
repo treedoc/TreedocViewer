@@ -15,13 +15,9 @@ export default class TreeUtil {
     return p2 < 0 ? typeName : typeName.substring(p + 1, p2);
   }
 
-  static getValue(node: TDNode, key: string) {
-    return node.getChildValue(key);
-  }
-
   static getTypeLabel(node: TDNode) {
     let t = null; // TODO: support type factory
-    const type = this.getValue(node, TreeUtil.KEY_TYPE);
+    const type = node.getChildValue(TreeUtil.KEY_TYPE);
     if (type && typeof(type) === 'string')
       t = type;
     if (!t)
@@ -32,7 +28,7 @@ export default class TreeUtil {
   static getTypeSizeLabel(node: TDNode) {
     let label = node.type === TDNodeType.ARRAY ? `[${node.getChildrenSize()}]` : `{${node.getChildrenSize()}}`;
     let tl = this.getTypeLabel(node);
-    const id = this.getValue(node, TreeUtil.KEY_ID);
+    const id = node.getChildValue(TreeUtil.KEY_ID);
     if (id)
       tl += `@${id}`;
 

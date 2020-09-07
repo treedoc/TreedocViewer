@@ -1,6 +1,7 @@
 <template>
   <div class="jtt-container">
-    <div>
+    <div class='jtt-top'>
+      <b class="jtt-title">{{title}}</b>
       <b-button-group class="ml-1 jtt-toolbar">
         <b-btn :size="'sm'" @click='$refs.file1.click()' v-b-tooltip.hover title="Open File">
           <i class="fa fa-folder-open"></i>
@@ -12,13 +13,13 @@
             URL: <b-input v-model="urlInput" />
           </b-modal>
         </b-btn>
-        <b-btn :size="'sm'" @click='copy' :disabled='!jsonStr' v-b-tooltip.hover title="Copy">
+        <b-btn :size="'sm'" @click='copy' class='jtt' :disabled='!jsonStr' v-b-tooltip.hover title="Copy">
           <i class="fa fa-copy"></i>
         </b-btn>
         <b-btn :size="'sm'" @click='paste' v-b-tooltip.hover title="Paste">
           <i class="fa fa-paste"></i>
         </b-btn>
-        <b-btn size='sm' variant='outline-secondary' :pressed.sync='codeView[0]' v-b-tooltip.hover title="Toggle source code syntax hi-lighting">
+        <b-btn size='sm' variant='outline-secondary' class='jtt' :pressed.sync='codeView[0]' v-b-tooltip.hover title="Toggle source code syntax hi-lighting">
           <i class="fa fa-code"></i>
         </b-btn>
         <b-btn size='sm' @click='format' v-b-tooltip.hover title="Format">
@@ -26,16 +27,16 @@
         </b-btn>
       </b-button-group>
       <b-button-group class="mx-1">
-        <b-btn size='sm' variant='outline-secondary' :pressed.sync='showSource[0]'>Source</b-btn>
-        <b-btn size='sm' variant='outline-secondary' :pressed.sync='showTree[0]'>Tree</b-btn>
-        <b-btn size='sm' variant='outline-secondary' :pressed.sync='showTable[0]'>Table</b-btn>
+        <b-btn size='sm' variant='outline-secondary' class='jtt' :pressed.sync='showSource[0]'>Source</b-btn>
+        <b-btn size='sm' variant='outline-secondary' class='jtt' :pressed.sync='showTree[0]'>Tree</b-btn>
+        <b-btn size='sm' variant='outline-secondary' class='jtt' :pressed.sync='showTable[0]'>Table</b-btn>
         Parser <b-form-select :options='parserSelectOptions' v-model='selectedParser' size="sm"></b-form-select>
       </b-button-group>
       <span><slot/></span>
       <span class="status-msg" :class="{error: hasError}" >{{parseResult}}</span>
     </div>
     <div class="split-container">
-      <msplit>
+      <msplit :maxPane='tstate.maxPane'>
         <div slot="source" :grow="20" style="width: 100%" :show="showSource"  class="panview">
           <SourceView ref="sourceView" v-model="jsonStr" :syntax='selectedParser.syntax' :selection='tstate.selection' :show='showSource[0]' :useCodeView='codeView' />
         </div>
@@ -77,6 +78,7 @@ import { TDNode, TDJSONWriter, TDJSONWriterOption } from 'treedoc';
   },
 })
 export default class JsonTreeTable extends Vue {
+  @Prop() title?: string;
   @Prop() data!: object | any[] | string;
   @Prop() options?: JTTOptions;
   @Prop() initalPath!: string;
@@ -89,7 +91,6 @@ export default class JsonTreeTable extends Vue {
   defaultParser = new JSONParser();
   selectedParser = this.defaultParser;
   tstate = new TreeState({}, this.selectedParser);
-  selectedNode = this.tstate.selected;
   jsonStr = '';
 
   parseResult = '';
@@ -128,15 +129,18 @@ export default class JsonTreeTable extends Vue {
   }
 
   @Watch('jsonStr', { immediate: true })
-  watchJsonStr(str: string) {
+  watchJsonStr(str: string, old: string) {
     if (str.length > 200_000)
       this.codeView[0] = false;
     if (str.length < 100_000)
       this.codeView[0] = true;
-    this.parse(str, this, true);
+    // Need detected only if significant changes happens. Not accurate.
+    const oldLen = old ? old.length : 0;
+    const detectNeeded = Math.abs(oldLen - str.length) > 7;
+    this.parse(str, this, detectNeeded);
   }
 
-  // Have to parse THIS as Vue framework will generate a different instance
+  // Have to pass THIS as Vue framework will generate a different instance
   // of this during runtime.
   parse = _.debounce((str: string, THIS: JsonTreeTable, detectParser = false) => {
     // Auto detect parser
@@ -150,6 +154,7 @@ export default class JsonTreeTable extends Vue {
 
     const selectedPath = THIS.tstate.selected ? THIS.tstate.selected.path : [];
     THIS.tstate = new TreeState(this.strDataSynced ? THIS.data : str, THIS.selectedParser, THIS.rootObjectKey, selectedPath);
+    (window as any).tstate = THIS.tstate;
     THIS.strDataSynced = false;
     THIS.parseResult = THIS.tstate.parseResult;
 
@@ -216,7 +221,7 @@ export default class JsonTreeTable extends Vue {
 <style>
 .status-msg {
   font-size: smaller;
-  color: green;
+  color: darkgreen;
 }
 
 .error {
@@ -238,7 +243,6 @@ export default class JsonTreeTable extends Vue {
   height: 100%;
   flex-direction: column;
 }
-
 .split-container {
   /* max-height: 93vh; */
   /* width:100%; */
@@ -247,13 +251,31 @@ export default class JsonTreeTable extends Vue {
   /* background-color: rgba(0, 255, 255, 0.308); */
   overflow: auto;
 }
-
-.btn-outline-secondary:hover {
-  background-color: #bdccdc;
+.jtt-top {
+  background-color: lightgray;
 }
 .jtt-toolbar {
   position: sticky;
   top: 0;
+  left: 0;
   z-index: 100;
+}
+.jtt-title {
+  color: darkblue;
+}
+.json-tree-table * .btn-outline-secondary:hover {
+  background-color: #bdccdc;
+}
+.json-tree-table * .btn-secondary {
+  background-color: #6c757da6;
+}
+.json-tree-table * .btn-outline-secondary:not(:disabled):not(.disabled).active {
+  background-color: #6c757da6;
+}
+.json-tree-table * .btn-outline-secondary:not(:disabled):not(.disabled).active:hover {
+  background-color: #6c757d;
+}
+.json-tree-table * .btn-secondary:hover:not(:disabled){
+  background-color: #6c757d;
 }
 </style>

@@ -31,9 +31,51 @@ A feature-rich viewer for Treedoc implemented with VueJS and typescript. Treedoc
   * Plugable parser, so that more format can be easily added.
 * Implemented as VueJS component, so it's easy to be reused in different applications
 
+## Development
+
+    yarn install
+    yarn serve
+
 ## Live Demo
 
 <http://treedoc.org>
+
+## Usage
+### As a Vue component
+
+```shell
+yarn add treedoc-viewer
+```
+
+```js
+// main.js
+import TreedocViewer from 'treedoc-viewer'
+
+Vue.use(TreedocViewer);
+```
+
+In `public/index.html`
+```html
+<link href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet">
+```
+
+In component template
+```html
+<json-tree-table :data='jsonData'>
+```
+
+### As embedded iframe
+If you are not using VueJs or don't want to introduce heavy dependencies, you can use embedded mode.
+```html
+<iframe id='jttFrame' src="https://www.treedoc.org?embeddedId=jtt_1" width="100%" height="100%"></iframe>
+<script>
+  function setJttData(target, data) {
+    target.postMessage({type:'jtt-setData', data}, '*');
+  }
+  setTimeout(() => setJttData(frame, {message:"after timeout"}), 1000);
+</script>
+```
+For a working example, please refer to [sample/embedded.html](sample/embedded.html) in github repo.
 
 ## License
 

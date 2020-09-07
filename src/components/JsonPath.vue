@@ -1,5 +1,5 @@
 <template>
-  <ol class="breadcrumb">
+  <ol class="breadcrumb jsonpath">
     <template v-if="items">
       <li v-for="(item, idx) in items" :key='item.text+idx' :class="['breadcrumb-item', item.active ? 'active' : null]">
         <span v-if="item.active" v-html="item.text"></span>
@@ -33,18 +33,18 @@ export default class JsonPath extends Vue {
   get items() {
     const paths = new Array<Item>();
     if (!this.treeNode)
-      return null;
+      return paths;
 
-    paths.unshift({ text: this.treeNode.key, active: true });
+    paths.unshift({ text: this.treeNode.key!, active: true });
     for (let pNode = this.treeNode.parent; pNode; pNode = pNode!.parent) {
-      paths.unshift({ text: pNode!.key, href: '', node: pNode });
+      paths.unshift({ text: pNode!.key!, href: '', node: pNode });
     }
     return paths;
   }
 }
 </script>
 <style>
-  .breadcrumb {
+  .breadcrumb.jsonpath {
     margin-bottom: auto;
     padding: 0.3em;
   }
