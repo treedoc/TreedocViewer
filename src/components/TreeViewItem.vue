@@ -4,7 +4,7 @@
       <div class='node' @click.stop='toggleOpen()' >
         <span :class='{opened: open, selected: selected}' class='key key-with-chevron'>
           <!-- VUETIP: in the event, don't emit object, serialization will take long time if object is big -->
-          <a href="#/" @click.stop="$emit('nodeClicked', ['', ...tnode.path])">
+          <a href="#/" @click.stop="$emit('node-clicked', ['', ...tnode.path])">
           <!-- <a href="#/" @click.stop="tstate.select(tnode)"> -->
             {{tnode.key}}
           </a>
@@ -23,13 +23,13 @@
               :currentLevel='currentLevel+1'
               :expandState='expandState'
               :tnode='cn'
-              @nodeClicked='nodeClicked' />
+              @node-clicked='nodeClicked' />
         </keep-alive>
       </template>
     </div>
     <div v-else>
       <span class='key'>{{tnode.key}}</span>:
-      <simple-value :tnode='tnode' @nodeClicked='nodeClicked' />
+      <simple-value :tnode='tnode' @node-clicked='nodeClicked' />
     </div>
   </div>
 </template>
@@ -67,7 +67,7 @@ export default class TreeViewItem extends Vue {
   toggleOpen() { this.open = !this.open; }
   // VUELIMIT: Vue $emit won't buble up the event to grand parent, so we have explicitly
   // propagate it.
-  // nodeClicked(tnode: TreeNode) { this.$emit('nodeClicked', tnode); }
+  // nodeClicked(tnode: TreeNode) { this.$emit('node-clicked', tnode); }
 
   get isSimpleType() { return this.tnode.type === TDNodeType.SIMPLE; }
 
@@ -121,8 +121,8 @@ export default class TreeViewItem extends Vue {
     //     state=${JSON.stringify(state)}, hasGrandChildren=${this.tnode.hasGrandChildren()}`);
   }
 
-  nodeClicked(data: string[]) {
-    this.$emit('nodeClicked', data);
+  nodeClicked(data: string[], evt: Event) {
+    this.$emit('node-clicked', data);
   }
 }
 </script>

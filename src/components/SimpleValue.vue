@@ -1,7 +1,7 @@
 <template>
   <span class='value'>
     <template v-if='ref'>
-      <a href="#/" @click.stop="$emit('nodeClicked', refAbsolute)">{{ref}}</a>
+      <a href="#/" @click.stop="$emit('node-clicked', refAbsolute)">{{ref}}</a>
     </template>
     <template v-else-if="url">
       <a :href='url' target="_blank">{{url}}</a>

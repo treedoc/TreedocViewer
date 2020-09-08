@@ -27,7 +27,7 @@ export default class JsonPath extends Vue {
   @Prop() private treeNode!: TDNode;
 
   onclick(item: Item) {
-    this.$emit('nodeClicked', item.node);
+    this.$emit('node-clicked', ['', ...item.node!.path]);
   }
 
   get items() {

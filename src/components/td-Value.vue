@@ -4,14 +4,14 @@
     <div v-else-if="html" v-html="html"/>
     <div v-else-if="!isSimpleType">
       <tree-view-item class='tree-view-item-root'
-          @nodeClicked='nodeClicked'
+          @node-clicked='nodeClicked'
           :tnode='value'
           :expandState='xprops.expandState'
           :currentLevel='0'
           style="margin-left: 0!important;" />
     </div>
     <div v-else>
-      <simple-value @nodeClicked='nodeClicked' :tnode='value' :isInTable='true' />
+      <simple-value @node-clicked='nodeClicked' :tnode='value' :isInTable='true' />
     </div>
   </div>
 </template>

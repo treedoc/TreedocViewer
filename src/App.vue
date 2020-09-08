@@ -2,7 +2,9 @@
 
   <div id='app' class='components-container'>
     <json-tree-table v-if="true" :data='selectedSample' :inital-path="'activityHistory'" :options='jttOption' rootObjectKey='root' class="json-tree-table" title="Treedoc Viewer">
-      Sample Data: <b-form-select v-model="selectedSample" :options="sampleData" size='sm' style="width:auto" />
+      <span v-if="embeddedId == null">
+        Sample Data: <b-form-select v-model="selectedSample" :options="sampleData" size='sm' style="width:auto" />
+      </span>
       <span class="title">
         <span id='icons'>
           <a href='https://github.com/treedoc/TreedocViewer' target="_blank"><img alt="GitHub stars" src="https://img.shields.io/github/stars/treedoc/treedocviewer"></a>

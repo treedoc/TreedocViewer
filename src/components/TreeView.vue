@@ -7,7 +7,7 @@
         :tnode='tstate.tree.root'
         :currentLevel='0'
         :expandState='expandState'
-        @nodeClicked='nodeClicked'
+        @node-clicked='nodeClicked'
         ref='item' />
   </div>
 </template>

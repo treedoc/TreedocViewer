@@ -27,7 +27,7 @@
           </span>
         </b-button-group>
         <expand-control :state='expandState' />
-        <json-path :tree-node="this.tstate ? this.tstate.selected : null" v-on:nodeClicked='nodeClicked'/>
+        <json-path :tree-node="this.tstate ? this.tstate.selected : null" @node-clicked='nodeClicked'/>
         <!-- query: <b-form-input size='sm' :v-bind="tableOpt.query" /> -->
         <!-- query: {{query}} -->
       </div>

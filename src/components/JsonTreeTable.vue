@@ -49,7 +49,7 @@
           <div v-else>No Data</div>
         </div>
         <div slot="table" :grow="50" :show="showTable" class="panview">
-          <div v-if="tstate.tree" ><json-table :table-data='tstate' v-on:nodeClicked='nodeClicked'/></div>
+          <div v-if="tstate.tree" ><json-table :table-data='tstate' @node-clicked='nodeClicked'/></div>
           <div v-else>No Data</div>
         </div>
       </msplit>
@@ -105,8 +105,8 @@ export default class JsonTreeTable extends Vue {
   // url = "https://www.googleapis.com/discovery/v1/apis"
   urlInput = '';
 
-  nodeClicked(node: TDNode) {
-    this.tstate.select(node);
+  nodeClicked(nodePath: string[]) {
+    this.tstate.select(nodePath);
   }
 
   format() {
