@@ -1,7 +1,10 @@
 <template>
 
   <div id='app' class='components-container'>
-    <json-tree-table v-if="true" :data='selectedSample' :inital-path="'activityHistory'" :options='jttOption' rootObjectKey='root' class="json-tree-table" title="Treedoc Viewer">
+    <json-tree-table v-if="true" :data='selectedSample' :inital-path="'activityHistory'" :options='jttOption' rootObjectKey='root' class="json-tree-table">
+      <template v-slot:title>
+        <a href="https://www.treedoc.org"><b class="jtt-title">Treedoc Viewer</b></a>
+      </template>
       <span v-if="embeddedId == null">
         Sample Data: <b-form-select v-model="selectedSample" :options="sampleData" size='sm' style="width:auto" />
       </span>

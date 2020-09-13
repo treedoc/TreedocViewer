@@ -1,7 +1,7 @@
 <template>
   <div class="jtt-container">
     <div class='jtt-top'>
-      <b class="jtt-title">{{title}}</b>
+      <slot name='title' />
       <b-button-group class="ml-1 jtt-toolbar">
         <b-btn :size="'sm'" @click='$refs.file1.click()' v-b-tooltip.hover title="Open File">
           <i class="fa fa-folder-open"></i>
@@ -263,12 +263,10 @@ export default class JsonTreeTable extends Vue {
 .jtt-title {
   color: darkblue;
 }
-
 .jtt-hint {
   color: #aaa;
   font-size: 90%;
 }
-
 .json-tree-table * .btn-outline-secondary:hover {
   background-color: #bdccdc;
 }

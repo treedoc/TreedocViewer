@@ -12,7 +12,6 @@ import JsonTable from './components/JsonTable.vue';
 import TreeState from './models/TreeState';
 import TreeViewItem from './components/TreeViewItem.vue';
 
-
 export default {
   install(vue: typeof Vue) {
     vue.use(BootstrapVue);
@@ -21,7 +20,7 @@ export default {
     vue.component('json-tree-table', JsonTreeTable);
     vue.component('json-table', JsonTable);
     Vue.component('tree-view-item', TreeViewItem);
-  }
+  },
 };
 
 export {
