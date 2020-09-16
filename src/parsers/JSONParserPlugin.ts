@@ -1,6 +1,7 @@
 import { ParserPlugin, ParseResult } from '../models/JTTOption';
 import { TDJSONParser, TDJSONParserOption, TDNodeType, TDNode, TDJSONWriter, TDJSONWriterOption } from 'treedoc';
 import YAMLParserPlugin from './YAMLParserPlugin';
+import Util from '../util/Util'
 
 export class JSONParserOption {
 }
@@ -13,12 +14,7 @@ export default class JSONParserPlugin implements ParserPlugin<JSONParserOption> 
   looksLike(str: string): boolean {
     if (new YAMLParserPlugin().looksLike(str))
       return false;
-
-    for (let i = 0; i < 1000 && i < str.length; i++) {
-      if (str[i] === '[' || str[i] === '{')
-        return true;
-    }
-    return false;
+    return Util.nonBlankStartsWith(str, ['[', '{']) && Util.nonBlankEndsWith(str, ["]", "}"]);
   }
 
   parse(str: string): ParseResult {
