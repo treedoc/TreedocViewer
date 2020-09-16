@@ -31,5 +31,5 @@ export {
   TreeState,
   YAMLParserPlugin,
   XMLParserPlugin,
-  CSVParserPlugin
+  CSVParserPlugin,
 };
