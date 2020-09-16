@@ -1,6 +1,7 @@
 import _ from 'lodash';
 import { ParserPlugin, ParseResult } from '../models/JTTOption';
 import { TDObjectCoder } from 'treedoc';
+import Util from '@/util/Util';
 
 export class XMLParserOption  {
 }
@@ -15,7 +16,7 @@ interface XNode {
   children?: XNode [];
 }
 
-export default class XMLParser implements ParserPlugin<XMLParserOption> {
+export default class XMLParserPlugin implements ParserPlugin<XMLParserOption> {
   option: XMLParserOption = {};
   syntax = 'xml';
 
@@ -25,15 +26,7 @@ export default class XMLParser implements ParserPlugin<XMLParserOption> {
     private compact: boolean = false) {}
 
   looksLike(str: string): boolean {
-    for (let i = 0; i < 1000 && i < str.length; i++) {
-      const c = str[i];
-      if (' \t\n\r'.indexOf(c) >= 0)
-        continue;
-      if (c === '<')
-        return true;
-      return false;
-    }
-    return false;
+    return Util.nonBlankStartsWith(str, ['<']) && Util.nonBlankEndsWith(str, [">"]);
   }
 
   parse(str: string): ParseResult {
