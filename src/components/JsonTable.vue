@@ -45,7 +45,7 @@ import tdValue from './td-Value.vue';
 import tdKey from './td-Key1.vue';
 import JsonPath from './JsonPath.vue';
 import TreeState from '../models/TreeState';
-import JSONParser from '../parsers/JSONParser';
+import JSONParserPlugin from '../parsers/JSONParserPlugin';
 import ExpandControl, { ExpandState } from './ExpandControl.vue';
 import { TDNode, TDNodeType } from 'treedoc';
 
@@ -190,7 +190,7 @@ export default class JsonTable extends Vue {
 
   @Watch('tableData', {immediate: true})
   watchTableData() {
-    this.tstate = this.tableData && this.tableData instanceof TreeState ? this.tableData : new TreeState(this.tableData, new JSONParser());
+    this.tstate = this.tableData && this.tableData instanceof TreeState ? this.tableData : new TreeState(this.tableData, new JSONParserPlugin());
   }
 
   @Watch('tstate.selected', {immediate: true})

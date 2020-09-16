@@ -38,8 +38,8 @@ import sampleData from './sampleData';
 import TreeState from './models/TreeState';
 import TDSample from './tdSample.vue';
 import JTTOptions from './models/JTTOption';
-import YAMLParser from './parsers/YAMLParser';
-import XMLParser from './parsers/XMLParser';
+import YAMLParserPlugin from './parsers/YAMLParserPlugin';
+import XMLParserPlugin from './parsers/XMLParserPlugin';
 import CSVParserPlugin from './parsers/CSVParserPlugin';
 
 @Component({
@@ -68,10 +68,10 @@ export default class App extends Vue {
   };
   jttOption: JTTOptions = {
     parsers: [
-      new YAMLParser(),
-      new XMLParser('XML compact', 'text/xml', true),
-      new XMLParser(),
-      new XMLParser('html', 'text/html'),
+      new YAMLParserPlugin(),
+      new XMLParserPlugin('XML compact', 'text/xml', true),
+      new XMLParserPlugin(),
+      new XMLParserPlugin('html', 'text/html'),
       new CSVParserPlugin(),
       new CSVParserPlugin('TSV', '\t'),
       ],

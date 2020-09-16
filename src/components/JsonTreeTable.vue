@@ -65,8 +65,7 @@ import SourceView from './SourceView.vue';
 import JTTOptions, { ParserPlugin } from '../models/JTTOption';
 import TreeView from './TreeView.vue';
 import JsonTable from './JsonTable.vue';
-import JSONParser from '../parsers/JSONParser';
-import XMLParser from '../parsers/XMLParser';
+import JSONParserPlugin from '../parsers/JSONParserPlugin';
 
 import { TDNode, TDJSONWriter, TDJSONWriterOption } from 'treedoc';
 
@@ -88,7 +87,7 @@ export default class JsonTreeTable extends Vue {
   showTree = [true];
   showTable = [true];
   codeView = [true];
-  defaultParser = new JSONParser();
+  defaultParser = new JSONParserPlugin();
   selectedParser = this.defaultParser;
   tstate = new TreeState({}, this.selectedParser);
   jsonStr = '';

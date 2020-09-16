@@ -1,18 +1,18 @@
 import YAML from 'yaml';
 import { ParserPlugin, ParseResult } from '../models/JTTOption';
 import { TDObjectCoder } from 'treedoc';
-import XMLParser from './XMLParser';
+import XMLParserPlugin from './XMLParserPlugin';
 
 export class YMLParserOption {
 }
 
-export default class YAMLParser implements ParserPlugin<YMLParserOption> {
+export default class YAMLParserPlugin implements ParserPlugin<YMLParserOption> {
   name = 'YAML';
   syntax = 'yaml';
   option: YMLParserOption = {};
 
   looksLike(str: string): boolean {
-    if (new XMLParser().looksLike(str))
+    if (new XMLParserPlugin().looksLike(str))
       return false;
 
     // A line aligned partial YAML from begining is also a valid YAML file

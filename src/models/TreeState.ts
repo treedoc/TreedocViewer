@@ -1,7 +1,7 @@
 import { TDNode, TreeDoc, Bookmark, TDObjectCoder, TDNodeType, JSONPointer } from 'treedoc';
 import History from './History';
 import { ParserPlugin, ParseStatus } from './JTTOption';
-import JSONParser from '@/parsers/JSONParser';
+import JSONParserPlugin from '@/parsers/JSONParserPlugin';
 
 export interface Selection {
   start?: Bookmark;
@@ -20,7 +20,7 @@ export default class TreeState {
 
   maxPane = '';
 
-  constructor(treeData: TDNode | string | any, parserPlugin = new JSONParser(), rootLabel = 'root', selectedPath: string[] = []) {
+  constructor(treeData: TDNode | string | any, parserPlugin = new JSONParserPlugin(), rootLabel = 'root', selectedPath: string[] = []) {
     this.parserPlugin = parserPlugin;
     this.tree = this.buildTree(treeData, rootLabel);
     if (this.tree) {

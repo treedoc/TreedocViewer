@@ -1,17 +1,17 @@
 import { ParserPlugin, ParseResult } from '../models/JTTOption';
 import { TDJSONParser, TDJSONParserOption, TDNodeType, TDNode, TDJSONWriter, TDJSONWriterOption } from 'treedoc';
-import YAMLParser from './YAMLParser';
+import YAMLParserPlugin from './YAMLParserPlugin';
 
 export class JSONParserOption {
 }
 
-export default class JSONParser implements ParserPlugin<JSONParserOption> {
+export default class JSONParserPlugin implements ParserPlugin<JSONParserOption> {
   name = 'JSON/JSONEX';
   syntax = 'json';
   option: JSONParserOption = {};
 
   looksLike(str: string): boolean {
-    if (new YAMLParser().looksLike(str))
+    if (new YAMLParserPlugin().looksLike(str))
       return false;
 
     for (let i = 0; i < 1000 && i < str.length; i++) {

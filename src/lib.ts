@@ -11,6 +11,10 @@ import JsonTreeTable from './components/JsonTreeTable.vue';
 import JsonTable from './components/JsonTable.vue';
 import TreeState from './models/TreeState';
 import TreeViewItem from './components/TreeViewItem.vue';
+import YAMLParserPlugin from './parsers/YAMLParserPlugin';
+import XMLParserPlugin from './parsers/XMLParserPlugin';
+import CSVParserPlugin from './parsers/CSVParserPlugin';
+
 
 export default {
   install(vue: typeof Vue) {
@@ -25,4 +29,7 @@ export default {
 
 export {
   TreeState,
+  YAMLParserPlugin,
+  XMLParserPlugin,
+  CSVParserPlugin
 };

@@ -1,10 +1,8 @@
-import History from '@/models/History';
 import sampleData from '@/sampleData';
-import JSONParser from '@/parsers/JSONParser';
-import { ParseResult } from '@/models/JTTOption';
+import JSONParserPlugin from '@/parsers/JSONParserPlugin';
 
 describe('JSONParser.ts', () => {
-  const parser = new JSONParser();
+  const parser = new JSONParserPlugin();
   it('looksLike', () => {
     expect(parser.looksLike(sampleData.jsonStr)).toBeTruthy();
     expect(parser.looksLike(sampleData.yamlStr)).toBeFalsy();

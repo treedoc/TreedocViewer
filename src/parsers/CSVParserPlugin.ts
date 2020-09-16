@@ -1,6 +1,5 @@
 import { ParserPlugin, ParseResult } from '../models/JTTOption';
 import { CSVParser, CSVOption, CSVWriter, TDNode } from 'treedoc';
-import YAMLParser from './YAMLParser';
 
 export class CSVParserOption {
 }
