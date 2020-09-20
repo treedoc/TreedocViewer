@@ -9,7 +9,7 @@
         </b-btn>
         <b-btn :size="'sm'" v-b-modal.modal-1 v-b-tooltip.hover title="Open URL">
           <i class="fa fa-link"></i>
-          <b-modal id="modal-1" title="Open URL" @ok='openUrl' @show='urlInput=url'>
+          <b-modal id="modal-1" title="Open URL" @ok='openUrl(urlInput)' @show='urlInput=url'>
             URL: <b-input v-model="urlInput" />
           </b-modal>
         </b-btn>
@@ -83,37 +83,37 @@ export default class JsonTreeTable extends Vue {
   @Prop() initalPath!: string;
   @Prop() rootObjectKey!: string;
 
-  showSource = [true];
-  showTree = [true];
-  showTable = [true];
-  codeView = [true];
-  defaultParser = new JSONParserPlugin();
-  selectedParser = this.defaultParser;
-  tstate = new TreeState({}, this.selectedParser);
-  jsonStr = '';
+  private showSource = [true];
+  private showTree = [true];
+  private showTable = [true];
+  private codeView = [true];
+  private defaultParser = new JSONParserPlugin();
+  private selectedParser = this.defaultParser;
+  private tstate = new TreeState({}, this.selectedParser);
+  private jsonStr = '';
 
-  parseResult = '';
-  strDataSynced = false;
-  error = {
+  private parseResult = '';
+  private strDataSynced = false;
+  private error = {
     color: 'red',
   };
 
   // url = https://maps.sensor.community/data/v2/data.24h.json
   // url = 'https://jsonplaceholder.typicode.com/posts';
-  url = 'https://www.googleapis.com/discovery/v1/apis/vision/v1p1beta1/rest';
+  private url = 'https://www.googleapis.com/discovery/v1/apis/vision/v1p1beta1/rest';
   // url = "https://www.googleapis.com/discovery/v1/apis"
-  urlInput = '';
+  private urlInput = '';
 
-  nodeClicked(nodePath: string[]) {
+  private nodeClicked(nodePath: string[]) {
     this.tstate.select(nodePath);
   }
 
-  format() {
+  private format() {
     this.jsonStr = TDJSONWriter.get().writeAsString(this.tstate.tree.root, new TDJSONWriterOption().setIndentFactor(2));
   }
 
   @Watch('data', { immediate: true })
-  watchData(d: string | object | any[]) {
+  private watchData(d: string | object | any[]) {
     if (_.isString(d))
       this.jsonStr = d;
     else {
@@ -123,12 +123,12 @@ export default class JsonTreeTable extends Vue {
   }
 
   @Watch('selectedParser')
-  watch(v: ParserPlugin<any>) {
+  private watch(v: ParserPlugin<any>) {
     this.parse(this.jsonStr, this);
   }
 
   @Watch('jsonStr', { immediate: true })
-  watchJsonStr(str: string, old: string) {
+  private watchJsonStr(str: string, old: string) {
     if (str.length > 200_000)
       this.codeView[0] = false;
     if (str.length < 100_000)
@@ -141,7 +141,7 @@ export default class JsonTreeTable extends Vue {
 
   // Have to pass THIS as Vue framework will generate a different instance
   // of this during runtime.
-  parse = _.debounce((str: string, THIS: JsonTreeTable, detectParser = false) => {
+  private parse = _.debounce((str: string, THIS: JsonTreeTable, detectParser = false) => {
     // Auto detect parser
     if (detectParser)
       for (const parser of this.parserSelectOptions) {
@@ -161,11 +161,11 @@ export default class JsonTreeTable extends Vue {
       THIS.tstate.select(THIS.initalPath, true);
   }, 500);
 
-  get hasError() {
+  private get hasError() {
     return this.parseResult.startsWith('Error');
   }
 
-  get parserSelectOptions() {
+  private get parserSelectOptions() {
     const opt = new Array<{text: string, value: ParserPlugin<any>}>();
     opt.push({ text: this.defaultParser.name, value: this.defaultParser });
     if (this.options && this.options.parsers)
@@ -173,11 +173,11 @@ export default class JsonTreeTable extends Vue {
     return opt;
   }
 
-  get sourceView() {
+  private get sourceView() {
     return this.$refs.sourceView as SourceView;
   }
 
-  readFile(ef: Event) {
+  private readFile(ef: Event) {
     const fileName = (ef.target as HTMLInputElement).files![0];
     if (!fileName)
       return;
@@ -189,8 +189,8 @@ export default class JsonTreeTable extends Vue {
     reader.readAsText(fileName);
   }
 
-  openUrl() {
-    this.url = this.urlInput;
+  openUrl(dataUrl: string) {
+    this.url = dataUrl;
     window.fetch(this.url)
       .then(res => res.text())
       .then(data => this.jsonStr = data)

@@ -56,7 +56,7 @@ In component template
 ```
 
 ### As embedded iframe
-If you are not using VueJs or don't want to introduce heavy dependencies, you can use embedded mode.
+If you are not using VueJs or don't want to introduce heavy dependencies, you can use embedded mode either through iframe or open a new window (tab)
 ```html
 <iframe id='jttFrame' src="https://www.treedoc.org?embeddedId=jtt_1" width="100%" height="100%"></iframe>
 <script>
@@ -66,7 +66,7 @@ If you are not using VueJs or don't want to introduce heavy dependencies, you ca
   setTimeout(() => setJttData(frame, {message:"after timeout"}), 1000);
 </script>
 ```
-For a working example, please refer to [sample/embedded.html](sample/embedded.html) in github repo.
+For a working example, please refer to [sample/embedded.html](https://github.com/treedoc/TreedocViewer/blob/master/sample/embedded.html) in github repo.
 
 ## Development
 ```shell

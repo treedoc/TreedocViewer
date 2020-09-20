@@ -26,7 +26,7 @@ export default class XMLParserPlugin implements ParserPlugin<XMLParserOption> {
     private compact: boolean = false) {}
 
   looksLike(str: string): boolean {
-    return Util.nonBlankStartsWith(str, ['<']) && Util.nonBlankEndsWith(str, [">"]);
+    return Util.nonBlankStartsWith(str, ['<']) && Util.nonBlankEndsWith(str, ['>']);
   }
 
   parse(str: string): ParseResult {

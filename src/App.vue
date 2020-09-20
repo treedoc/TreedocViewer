@@ -1,11 +1,11 @@
 <template>
 
   <div id='app' class='components-container'>
-    <json-tree-table v-if="true" :data='selectedSample' :inital-path="'activityHistory'" :options='jttOption' rootObjectKey='root' class="json-tree-table">
+    <json-tree-table v-if="true" :data='selectedSample' :inital-path="'activityHistory'" :options='jttOption' rootObjectKey='root' class="json-tree-table" ref="jsonTreeTable">
       <template v-slot:title>
-        <a href="https://www.treedoc.org"><b class="jtt-title">Treedoc Viewer</b></a>
+        <a href="https://www.treedoc.org"><b class="jtt-title">{{param.title}}</b></a>
       </template>
-      <span v-if="embeddedId == null">
+      <span v-if="param.embeddedId == null">
         Sample Data: <b-form-select v-model="selectedSample" :options="sampleData" size='sm' style="width:auto" />
       </span>
       <span class="title">
@@ -41,6 +41,7 @@ import JTTOptions from './models/JTTOption';
 import YAMLParserPlugin from './parsers/YAMLParserPlugin';
 import XMLParserPlugin from './parsers/XMLParserPlugin';
 import CSVParserPlugin from './parsers/CSVParserPlugin';
+import UrlParam from './UrlParam';
 
 @Component({
   components: {
@@ -49,7 +50,7 @@ import CSVParserPlugin from './parsers/CSVParserPlugin';
   },
 })
 export default class App extends Vue {
-  embeddedId: string | null = null;
+  param = new UrlParam();
   sampleData = sampleData.data;
   selectedSample: any = sampleData.data[0].value;
   jsonTableOptions = {
@@ -85,11 +86,21 @@ export default class App extends Vue {
     return state;
   }
 
+  private get jsonTreeTable() {
+    return this.$refs.jsonTreeTable as JsonTreeTable;
+  }
+
   mounted() {
-    const url = new URL(window.location.href);
-    this.embeddedId = url.searchParams.get('embeddedId');
-    if (this.embeddedId != null) {
-      window.parent.postMessage({ type: 'jtt-ready', id: this.embeddedId }, '*');
+    if (this.param.dataUrl)
+      this.jsonTreeTable.openUrl(this.param.dataUrl);
+
+    if (this.param.data)
+      this.selectedSample = this.param.data;
+
+    if (this.param.embeddedId != null) {
+      window.parent.postMessage({ type: 'jtt-ready', id: this.param.embeddedId }, '*');
+      if (window.opener)
+        window.opener.postMessage({ type: 'jtt-ready', id: this.param.embeddedId }, '*');
       window.addEventListener('message', evt => {
         if (evt.data.type !== 'jtt-setData')
           return;

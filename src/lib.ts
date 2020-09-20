@@ -28,6 +28,7 @@ export default {
 };
 
 export {
+  JsonTreeTable,
   TreeState,
   YAMLParserPlugin,
   XMLParserPlugin,

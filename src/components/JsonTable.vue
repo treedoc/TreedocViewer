@@ -160,19 +160,27 @@ export default class JsonTable extends Vue {
       return false;
     const cols = new Set<string>();
     let cellCnt = 0;
-    if (val.children) {
-      for (const v of val.children) {
-        if (v && v.children) {
-          for (const ck of Object.keys(v.children)) {
-            cols.add(ck);
-            cellCnt++;
-          }
+    if (!val.children || val.children.length === 0)
+      return false;
+
+    for (const v of val.children) {
+      if (v && v.children) {
+        for (const ck of Object.keys(v.children)) {
+          cols.add(ck);
+          cellCnt++;
         }
       }
     }
-    const totalCell = cols.size * val.getChildrenSize();
+    // k: threshold (blank cell / Total possible blank cells)
+    // k = (rc - cellCnt) / (rc - c) => cellCnt = rc - krc + kc = c (r - rk + k) = c (r - (r-1)k)
+    //     When row = 2:   2c(1-k) + ck = 2c - kc = (2-k)c <= cellcnt
+    //     When row = 3:   3c(1-k) + ck = 3c - 2ck = (3-2k)c
+    const k = 0.8;
+    const r = val.children.length;
+    const c = cols.size - 1;  // ignore the first column, as the key column is always there
+    cellCnt -= r;
     // Limited number of cols due to performance reason
-    return cols.size < 100 && cellCnt * 2 > totalCell;  // Fill ratio > 1/3
+    return cols.size < 100 && cellCnt >= c * (r - (r - 1) * k);
   }
 
   nodeClicked(data: TDNode) { this.tstate.select(data); }

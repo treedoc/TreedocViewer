@@ -1,6 +1,9 @@
 <html>
   <body>
-    <iframe id='jttFrame' src="https://www.treedoc.org?embeddedId=jtt_1" width="100%" height="100%"></iframe>
+    <a href="http://localhost:8080?embeddedId=jtt_2" target="_blank">Open in a new windows</a> | 
+    <a href="http://localhost:8080?dataUrl=https://raw.githubusercontent.com/eBay/jsonex/master/pom.xml" target="_blank">Open in a new windows with dataUrl</a> |
+    <a href="http://localhost:8080?data={number:1, string:str}" target="_blank">Open in a new windows with Data</a>
+    <iframe id='jttFrame' src="http://localhost:8080?embeddedId=jtt_1&title=Treedoc Embedded" width="100%" height="100%"></iframe>
   </body>
   <script>
     const frame = document.getElementById('jttFrame').contentWindow;
@@ -18,7 +21,7 @@
         return;
       console.log(evt);
       // setJttData(frame, {message:"after ready"});  // Both ways work
-      setJttData(evt.source, {message:"after ready by source"});  // Both ways work
+      setJttData(evt.source, {message:`after ready by source: embeddedId: ${evt.data.id}`});  // Both ways work
     })    
   </script>
 </html>

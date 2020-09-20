@@ -17,7 +17,7 @@ export declare interface DatatableOptions {
   tblStyle?: string;
   tblClass?: string;
   pageSizeOptions?: number[];
-  columns: Array<Column>;
+  columns: Column[];
   data: any[];
   total: number;
   query: Query;
