@@ -1,7 +1,7 @@
 <template>
-  <div class='jtt-table'>
+  <div class='tdv-table'>
     <datatable v-bind="tableOpt">
-      <div class="jtt-tbl-toolbar">
+      <div class="tdv-tbl-toolbar">
         <span v-b-tooltip.hover title="Toggle fullscreen">
           <b-btn size='sm' variant='outline-secondary' :pressed='tstate.maxPane==="table"' @click='tstate.toggleMaxPane("table")'>
             <i class="fa fa-expand"></i>
@@ -147,11 +147,11 @@ export default class JsonTable extends Vue {
     // this.tableOpt.query[field] = '';
     this.$set(this.tableOpt.query, field, undefined);
 
-    col.thClass = 'jtt-th';
-    col.tdClass = 'jtt-td';
+    col.thClass = 'tdv-th';
+    col.tdClass = 'tdv-td';
     if (isKeyCol) {
-      col.thClass += ' jtt-min jtt-td';
-      col.tdClass = 'jtt-min jtt-td';
+      col.thClass += ' tdv-min tdv-td';
+      col.tdClass = 'tdv-min tdv-td';
     }
   }
 
@@ -227,36 +227,36 @@ export default class JsonTable extends Vue {
 </script>
 
 <style>
-.jtt-table {
+.tdv-table {
   margin: 0 auto;
   width: 100%;
   height: 100%
 }
 
-.jtt-th {
+.tdv-th {
   white-space: nowrap;
 }
-.jtt-min {
+.tdv-min {
   width:1%;
   /* white-space: nowrap; */
 }
-.jtt-table * .table td, .table th {
+.tdv-table * .table td, .table th {
   padding: .25rem;
 }
-.jtt-table * pre {
+.tdv-table * pre {
   /* white-space: pre-wrap; */
   white-space: pre;
   word-wrap: break-word;
   margin-bottom: 0px;
 }
-.jtt-table * .clearfix {
+.tdv-table * .clearfix {
   margin-bottom: 0px !important;
   position: sticky;top: 0px;
 }
-.jtt-table * div[name="SimpleTable"] {
+.tdv-table * div[name="SimpleTable"] {
   overflow: scroll;
 }
-.jtt-tbl-toolbar {
+.tdv-tbl-toolbar {
   display: flex;
   flex-wrap: wrap;
 }
@@ -264,17 +264,17 @@ export default class JsonTable extends Vue {
   position: sticky;
   top: 0;
 }
-.jtt-td {
+.tdv-td {
   padding: 2px!;
 }
 
 /* Fix extra space for the row below the table */
-.jtt-table * .col-sm-6 {
+.tdv-table * .col-sm-6 {
   padding-right: 0px;
   padding-left: 0px;
 }
 
-.jtt-table * .row {
+.tdv-table * .row {
   margin-right: 0px;
   margin-left: 0px;
 }

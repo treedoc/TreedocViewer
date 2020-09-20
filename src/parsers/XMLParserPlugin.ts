@@ -1,5 +1,5 @@
 import _ from 'lodash';
-import { ParserPlugin, ParseResult } from '../models/JTTOption';
+import { ParserPlugin, ParseResult } from '../models/TDVOption';
 import { TDObjectCoder } from 'treedoc';
 import Util from '@/util/Util';
 

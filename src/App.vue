@@ -1,9 +1,9 @@
 <template>
 
   <div id='app' class='components-container'>
-    <json-tree-table v-if="true" :data='selectedSample' :inital-path="'activityHistory'" :options='jttOption' rootObjectKey='root' class="json-tree-table" ref="jsonTreeTable">
+    <json-tree-table v-if="true" :data='selectedSample' :inital-path="'activityHistory'" :options='tdvOption' rootObjectKey='root' class="json-tree-table" ref="jsonTreeTable">
       <template v-slot:title>
-        <a href="https://www.treedoc.org"><b class="jtt-title">{{param.title}}</b></a>
+        <a href="https://www.treedoc.org"><b class="tdv-title">{{param.title}}</b></a>
       </template>
       <span v-if="param.embeddedId == null">
         Sample Data: <b-form-select v-model="selectedSample" :options="sampleData" size='sm' style="width:auto" />
@@ -37,7 +37,7 @@ import JsonTable from './components/JsonTable.vue';
 import sampleData from './sampleData';
 import TreeState from './models/TreeState';
 import TDSample from './tdSample.vue';
-import JTTOptions from './models/JTTOption';
+import TDVOptions from './models/TDVOption';
 import YAMLParserPlugin from './parsers/YAMLParserPlugin';
 import XMLParserPlugin from './parsers/XMLParserPlugin';
 import CSVParserPlugin from './parsers/CSVParserPlugin';
@@ -67,7 +67,7 @@ export default class App extends Vue {
       },
     ],
   };
-  jttOption: JTTOptions = {
+  tdvOption: TDVOptions = {
     parsers: [
       new YAMLParserPlugin(),
       new XMLParserPlugin('XML compact', 'text/xml', true),
@@ -98,11 +98,11 @@ export default class App extends Vue {
       this.selectedSample = this.param.data;
 
     if (this.param.embeddedId != null) {
-      window.parent.postMessage({ type: 'jtt-ready', id: this.param.embeddedId }, '*');
+      window.parent.postMessage({ type: 'tdv-ready', id: this.param.embeddedId }, '*');
       if (window.opener)
-        window.opener.postMessage({ type: 'jtt-ready', id: this.param.embeddedId }, '*');
+        window.opener.postMessage({ type: 'tdv-ready', id: this.param.embeddedId }, '*');
       window.addEventListener('message', evt => {
-        if (evt.data.type !== 'jtt-setData')
+        if (evt.data.type !== 'tdv-setData')
           return;
         this.selectedSample = evt.data.data;
       }, false);

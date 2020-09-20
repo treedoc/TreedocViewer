@@ -9,7 +9,7 @@
             {{tnode.key}}
           </a>
         </span>
-        <span class='jtt-hint'>{{label}}</span>
+        <span class='tdv-hint'>{{label}}</span>
       </div>
       <template v-for="cn in tnode.children" >
         <keep-alive :key='cn.key'>

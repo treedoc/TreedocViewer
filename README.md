@@ -58,10 +58,10 @@ In component template
 ### As embedded iframe
 If you are not using VueJs or don't want to introduce heavy dependencies, you can use embedded mode either through iframe or open a new window (tab)
 ```html
-<iframe id='jttFrame' src="https://www.treedoc.org?embeddedId=jtt_1" width="100%" height="100%"></iframe>
+<iframe id='tdvFrame' src="https://www.treedoc.org?embeddedId=tdv_1" width="100%" height="100%"></iframe>
 <script>
   function setJttData(target, data) {
-    target.postMessage({type:'jtt-setData', data}, '*');
+    target.postMessage({type:'tdv-setData', data}, '*');
   }
   setTimeout(() => setJttData(frame, {message:"after timeout"}), 1000);
 </script>

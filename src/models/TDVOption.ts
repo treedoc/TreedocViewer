@@ -24,6 +24,6 @@ export interface ParserPlugin<TOpt> {
   configComp?: Component;
 }
 
-export default class JTTOptions {
+export default class TDVOptions {
   parsers?: Array<ParserPlugin<any>>;
 }

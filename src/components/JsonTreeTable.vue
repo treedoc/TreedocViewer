@@ -1,8 +1,8 @@
 <template>
-  <div class="jtt-container">
-    <div class='jtt-top'>
+  <div class="tdv-container">
+    <div class='tdv-top'>
       <slot name='title' />
-      <b-button-group class="ml-1 jtt-toolbar">
+      <b-button-group class="ml-1 tdv-toolbar">
         <b-btn :size="'sm'" @click='$refs.file1.click()' v-b-tooltip.hover title="Open File">
           <i class="fa fa-folder-open"></i>
           <input type="file" ref='file1' style="display: none" @change="readFile($event)">
@@ -13,13 +13,13 @@
             URL: <b-input v-model="urlInput" />
           </b-modal>
         </b-btn>
-        <b-btn :size="'sm'" @click='copy' class='jtt' :disabled='!jsonStr' v-b-tooltip.hover title="Copy">
+        <b-btn :size="'sm'" @click='copy' class='tdv' :disabled='!jsonStr' v-b-tooltip.hover title="Copy">
           <i class="fa fa-copy"></i>
         </b-btn>
         <b-btn :size="'sm'" @click='paste' v-b-tooltip.hover title="Paste">
           <i class="fa fa-paste"></i>
         </b-btn>
-        <b-btn size='sm' variant='outline-secondary' class='jtt' :pressed.sync='codeView[0]' v-b-tooltip.hover title="Toggle source code syntax hi-lighting">
+        <b-btn size='sm' variant='outline-secondary' class='tdv' :pressed.sync='codeView[0]' v-b-tooltip.hover title="Toggle source code syntax hi-lighting">
           <i class="fa fa-code"></i>
         </b-btn>
         <b-btn size='sm' @click='format' v-b-tooltip.hover title="Format">
@@ -27,9 +27,9 @@
         </b-btn>
       </b-button-group>
       <b-button-group class="mx-1">
-        <b-btn size='sm' variant='outline-secondary' class='jtt' :pressed.sync='showSource[0]'>Source</b-btn>
-        <b-btn size='sm' variant='outline-secondary' class='jtt' :pressed.sync='showTree[0]'>Tree</b-btn>
-        <b-btn size='sm' variant='outline-secondary' class='jtt' :pressed.sync='showTable[0]'>Table</b-btn>
+        <b-btn size='sm' variant='outline-secondary' class='tdv' :pressed.sync='showSource[0]'>Source</b-btn>
+        <b-btn size='sm' variant='outline-secondary' class='tdv' :pressed.sync='showTree[0]'>Tree</b-btn>
+        <b-btn size='sm' variant='outline-secondary' class='tdv' :pressed.sync='showTable[0]'>Table</b-btn>
         Parser <b-form-select :options='parserSelectOptions' v-model='selectedParser' size="sm"></b-form-select>
       </b-button-group>
       <span><slot/></span>
@@ -62,7 +62,7 @@ import { Component, Prop, Vue, Watch } from 'vue-property-decorator';
 import _ from 'lodash';
 import TreeState from '../models/TreeState';
 import SourceView from './SourceView.vue';
-import JTTOptions, { ParserPlugin } from '../models/JTTOption';
+import TDVOptions, { ParserPlugin } from '../models/TDVOption';
 import TreeView from './TreeView.vue';
 import JsonTable from './JsonTable.vue';
 import JSONParserPlugin from '../parsers/JSONParserPlugin';
@@ -79,7 +79,7 @@ import { TDNode, TDJSONWriter, TDJSONWriterOption } from 'treedoc';
 export default class JsonTreeTable extends Vue {
   @Prop() title?: string;
   @Prop() data!: object | any[] | string;
-  @Prop() options?: JTTOptions;
+  @Prop() options?: TDVOptions;
   @Prop() initalPath!: string;
   @Prop() rootObjectKey!: string;
 
@@ -237,7 +237,7 @@ export default class JsonTreeTable extends Vue {
   flex-direction: column;
 }
 
-.jtt-container {
+.tdv-container {
   display: flex;
   height: 100%;
   flex-direction: column;
@@ -250,19 +250,19 @@ export default class JsonTreeTable extends Vue {
   /* background-color: rgba(0, 255, 255, 0.308); */
   overflow: auto;
 }
-.jtt-top {
+.tdv-top {
   background-color: lightgray;
 }
-.jtt-toolbar {
+.tdv-toolbar {
   position: sticky;
   top: 0;
   left: 0;
   z-index: 100;
 }
-.jtt-title {
+.tdv-title {
   color: darkblue;
 }
-.jtt-hint {
+.tdv-hint {
   color: #aaa;
   font-size: 90%;
 }

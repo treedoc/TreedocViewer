@@ -1,5 +1,5 @@
 import YAML from 'yaml';
-import { ParserPlugin, ParseResult } from '../models/JTTOption';
+import { ParserPlugin, ParseResult } from '../models/TDVOption';
 import { TDObjectCoder } from 'treedoc';
 import XMLParserPlugin from './XMLParserPlugin';
 

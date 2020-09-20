@@ -1,6 +1,6 @@
 <template>
   <div class='wrapper'>
-    <div class="jtt-toolbar">
+    <div class="tdv-toolbar">
       <expand-control ref='expandControl' :state='expandState' style="float: right;"/>
     </div>
     <tree-view-item class='item-root'

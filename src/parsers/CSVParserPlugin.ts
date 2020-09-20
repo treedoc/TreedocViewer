@@ -1,4 +1,4 @@
-import { ParserPlugin, ParseResult } from '../models/JTTOption';
+import { ParserPlugin, ParseResult } from '../models/TDVOption';
 import { CSVParser, CSVOption, CSVWriter, TDNode } from 'treedoc';
 
 export class CSVParserOption {

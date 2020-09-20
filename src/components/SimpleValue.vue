@@ -7,9 +7,9 @@
       <a :href='url' target="_blank">{{url}}</a>
     </template>
     <template v-else-if="isInTable">
-      <pre class='jtt-value'>{{tnode.value}} <span class='jtt-hint'>{{date}}</span></pre>
+      <pre class='tdv-value'>{{tnode.value}} <span class='tdv-hint'>{{date}}</span></pre>
     </template>
-    <template v-else>{{tnode.value}} <span class='jtt-hint'>{{date}}</span></template>
+    <template v-else>{{tnode.value}} <span class='tdv-hint'>{{date}}</span></template>
   </span>
 </template>
 
@@ -55,7 +55,7 @@ export default class SimpleValue extends Vue {
 }
 </script>
 <style>
-pre.jtt-value {
+pre.tdv-value {
   margin-bottom: 1px;
 }
 </style>

@@ -1,4 +1,4 @@
-import { ParserPlugin, ParseResult } from '../models/JTTOption';
+import { ParserPlugin, ParseResult } from '../models/TDVOption';
 import { TDJSONParser, TDJSONParserOption, TDNodeType, TDNode, TDJSONWriter, TDJSONWriterOption } from 'treedoc';
 import YAMLParserPlugin from './YAMLParserPlugin';
 import Util from '../util/Util';
