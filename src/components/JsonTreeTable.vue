@@ -159,7 +159,7 @@ export default class JsonTreeTable extends Vue {
 
     if (selectedPath.length === 0 && THIS.initalPath && THIS.tstate.tree)
       THIS.tstate.select(THIS.initalPath, true);
-  }, 500);
+  }, 300);
 
   private get hasError() {
     return this.parseResult.startsWith('Error');

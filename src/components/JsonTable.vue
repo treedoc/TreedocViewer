@@ -165,8 +165,8 @@ export default class JsonTable extends Vue {
 
     for (const v of val.children) {
       if (v && v.children) {
-        for (const ck of Object.keys(v.children)) {
-          cols.add(ck);
+        for (const child of v.children) {
+          cols.add(child.key!);
           cellCnt++;
         }
       }
