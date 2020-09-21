@@ -1,7 +1,7 @@
 import { TDNode, TreeDoc, Bookmark, TDObjectCoder, TDNodeType, JSONPointer } from 'treedoc';
 import History from './History';
 import { ParserPlugin, ParseStatus } from './TDVOption';
-import JSONParserPlugin from '@/parsers/JSONParserPlugin';
+import JSONParserPlugin from '../parsers/JSONParserPlugin';
 
 export interface Selection {
   start?: Bookmark;

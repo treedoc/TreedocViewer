@@ -4,7 +4,7 @@
     "module": "esnext",
     "strict": true,
     "declaration": true,
-    "declarationDir": "dist",
+    "declarationDir": "dist/lib",
     "jsx": "preserve",
     "importHelpers": true,
     "moduleResolution": "node",
