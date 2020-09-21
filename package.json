@@ -1,11 +1,10 @@
 {
   "name": "treedoc-viewer",
-  "version": "0.1.23",
+  "version": "0.1.24",
   "main": "./dist/lib/lib.common.js",
   "typings": "./dist/lib/src/lib.d.ts",
   "files": [
     "dist/lib/*",
-    "dist/src/*",
     "src/*",
     "public/*",
     "*.json",
