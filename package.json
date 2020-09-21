@@ -5,6 +5,7 @@
   "typings": "./dist/lib/src/lib.d.ts",
   "files": [
     "dist/lib/*",
+    "dist/src/*",
     "src/*",
     "public/*",
     "*.json",
