@@ -1,12 +1,12 @@
 <template>
 
   <div id='app' class='components-container'>
-    <json-tree-table v-if="true" :data='selectedSample' :inital-path="'activityHistory'" :options='tdvOption' rootObjectKey='root' class="json-tree-table" ref="jsonTreeTable">
+    <json-tree-table v-if="true" :data='jsonData' :inital-path="'activityHistory'" :options='tdvOption' rootObjectKey='root' class="json-tree-table" ref="jsonTreeTable">
       <template v-slot:title>
         <a href="https://www.treedoc.org"><b class="tdv-title">{{param.title}}</b></a>
       </template>
       <span v-if="param.embeddedId == null">
-        Sample Data: <b-form-select v-model="selectedSample" :options="sampleData" size='sm' style="width:auto" />
+        Sample Data: <b-form-select v-model="jsonData" :options="sampleData" size='sm' style="width:auto" />
       </span>
       <span class="title">
         <span id='icons'>
@@ -51,7 +51,7 @@ import UrlParam from './UrlParam';
 export default class App extends Vue {
   param = new UrlParam();
   sampleData = sampleData.data;
-  selectedSample: any = sampleData.data[0].value;
+  jsonData: any = sampleData.data[0].value;
   jsonTableOptions = {
     Pagination: false,
     columns: [
@@ -94,7 +94,7 @@ export default class App extends Vue {
       this.jsonTreeTable.openUrl(this.param.dataUrl);
 
     if (this.param.data)
-      this.selectedSample = this.param.data;
+      this.jsonData = this.param.data;
 
     if (this.param.embeddedId != null) {
       window.parent.postMessage({ type: 'tdv-ready', id: this.param.embeddedId }, '*');
@@ -103,7 +103,7 @@ export default class App extends Vue {
       window.addEventListener('message', evt => {
         if (evt.data.type !== 'tdv-setData')
           return;
-        this.selectedSample = evt.data.data;
+        this.jsonData = evt.data.data;
       }, false);
     }
   }

@@ -112,6 +112,10 @@ export default class JsonTreeTable extends Vue {
     this.jsonStr = TDJSONWriter.get().writeAsString(this.tstate.tree.root, new TDJSONWriterOption().setIndentFactor(2));
   }
 
+  mounted() {
+    (window as any).tdv = this;
+  }
+
   @Watch('data', { immediate: true })
   private watchData(d: string | object | any[]) {
     if (_.isString(d))
@@ -129,6 +133,9 @@ export default class JsonTreeTable extends Vue {
 
   @Watch('jsonStr', { immediate: true })
   private watchJsonStr(str: string, old: string) {
+    if (!str)
+      str = '';
+
     if (str.length > 200_000)
       this.codeView[0] = false;
     if (str.length < 100_000)
@@ -153,7 +160,6 @@ export default class JsonTreeTable extends Vue {
 
     const selectedPath = THIS.tstate.selected ? THIS.tstate.selected.path : [];
     THIS.tstate = new TreeState(this.strDataSynced ? THIS.data : str, THIS.selectedParser, THIS.rootObjectKey, selectedPath);
-    (window as any).tstate = THIS.tstate;
     THIS.strDataSynced = false;
     THIS.parseResult = THIS.tstate.parseResult;
 

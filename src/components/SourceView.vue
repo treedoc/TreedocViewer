@@ -9,7 +9,6 @@
 
 <script lang="ts">
 import { Component, Prop, Vue, Watch } from 'vue-property-decorator';
-import { codemirror } from 'vue-codemirror-lite';
 
 import 'codemirror/mode/javascript/javascript';
 import 'codemirror/mode/vue/vue';
@@ -29,11 +28,7 @@ import 'codemirror/addon/fold/xml-fold';
 import { Selection } from '../models/TreeState';
 import Bookmark from 'treedoc/lib/Bookmark';
 
-@Component({
-  components: {
-    codemirror,
-  },
-})
+@Component
 export default class SourceView extends Vue {
   @Prop() value!: string;
   @Prop() syntax!: string;

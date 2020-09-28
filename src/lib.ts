@@ -6,6 +6,8 @@ import Vue from 'vue';
 import BootstrapVue from 'bootstrap-vue';
 import Datatable from 'vue2-datatable-component';
 import msplit from 'msplit';
+import { codemirror } from 'vue-codemirror-lite';
+
 
 import JsonTreeTable from './components/JsonTreeTable.vue';
 import JsonTable from './components/JsonTable.vue';
@@ -21,6 +23,7 @@ export default {
     vue.use(BootstrapVue);
     vue.use(Datatable);
     Vue.use(msplit);
+    Vue.component('codemirror', codemirror);
     vue.component('json-tree-table', JsonTreeTable);
     vue.component('json-table', JsonTable);
     Vue.component('tree-view-item', TreeViewItem);

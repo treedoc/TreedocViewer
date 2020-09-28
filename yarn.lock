@@ -10555,10 +10555,10 @@ tr46@^2.0.2:
   dependencies:
     punycode "^2.1.1"
 
-treedoc@^0.2.200803:
-  version "0.2.200803"
-  resolved "https://registry.yarnpkg.com/treedoc/-/treedoc-0.2.200803.tgz#5131398a253ea9ea386113e282c700f4e6ca8513"
-  integrity sha512-KHXtp840VJ6aPzKSDL6pwChaSrGC/qo5wwiSJUemA9WE5BdIYWXIVkL72vIag/CgPxbqqgG/NSoM7ioUbK+5oA==
+treedoc@^0.3.1:
+  version "0.3.1"
+  resolved "https://registry.yarnpkg.com/treedoc/-/treedoc-0.3.1.tgz#b0233654937530969c515ea51578935354ca2347"
+  integrity sha512-AlQFBfpuXR+fkl1DbbrDMqe3vvizjOGNBITKJH9cy9ekTzqcrPilDOPpBvAsGui7Zadvk+wxKfBRzl/WoxcpVw==
 
 trim-repeated@^1.0.0:
   version "1.0.0"
