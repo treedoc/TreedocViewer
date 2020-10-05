@@ -11,11 +11,13 @@ import { codemirror } from 'vue-codemirror-lite';
 
 import JsonTreeTable from './components/JsonTreeTable.vue';
 import JsonTable from './components/JsonTable.vue';
+
 import TreeState from './models/TreeState';
 import TreeViewItem from './components/TreeViewItem.vue';
 import YAMLParserPlugin from './parsers/YAMLParserPlugin';
 import XMLParserPlugin from './parsers/XMLParserPlugin';
 import CSVParserPlugin from './parsers/CSVParserPlugin';
+import TDVOption from './models/TDVOption';
 
 
 export default {
@@ -36,4 +38,5 @@ export {
   YAMLParserPlugin,
   XMLParserPlugin,
   CSVParserPlugin,
+  TDVOption,
 };
