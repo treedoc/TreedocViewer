@@ -3,7 +3,7 @@
     <template v-if="useCodeView[0]">
       <codemirror ref='codeView' class='codeView' :options="options" v-model="val" style="height:100%"></codemirror>
     </template>
-    <textarea ref='textView' v-model="val" :class="[useCodeView[0] ? 'hiddenTextArea' : 'textArea']" style="white-space: nowrap;"></textarea>
+    <textarea ref='textView' v-model="val" :class="[useCodeView[0] ? 'hiddenTextArea' : 'textArea']" class='nowrap'></textarea>
   </div>
 </template>
 
@@ -146,4 +146,10 @@ function scrollTo(textarea: HTMLTextAreaElement, offset: number) {
   flex-grow:1;
   overflow:auto;
 } */
+/* workaround for firefox bug:  https://bugzilla.mozilla.org/show_bug.cgi?id=1137650 */
+.nowrap {
+    white-space: pre;
+    overflow: auto;
+    word-wrap: normal;
+}
 </style>

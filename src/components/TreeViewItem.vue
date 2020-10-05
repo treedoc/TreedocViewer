@@ -70,8 +70,7 @@ export default class TreeViewItem extends Vue {
   // nodeClicked(tnode: TreeNode) { this.$emit('node-clicked', tnode); }
 
   get isSimpleType() { return this.tnode.type === TDNodeType.SIMPLE; }
-
-  get label() { return TreeUtil.getTypeSizeLabel(this.tnode); }
+  get label() { return TreeUtil.getTypeSizeLabel(this.tnode, !this.open); }
 
   @Watch('selected')
   private watchSelected(v: boolean) {
