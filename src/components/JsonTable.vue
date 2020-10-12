@@ -64,7 +64,7 @@ export default class JsonTable extends Vue {
     // fixHeaderAndSetBodyMaxHeight: 200,
     // tblStyle: 'table-layout: fixed', // must
     tblClass: 'table-bordered',
-    pageSizeOptions: [5, 20, 50, 100, 200],
+    pageSizeOptions: [5, 20, 50, 100, 200, 500],
     columns: [],
     data: [],
     rawData: [],
@@ -191,7 +191,7 @@ export default class JsonTable extends Vue {
   });
 
   @Watch('query', {deep: true})
-  watchQuery() { this.queryData(this); }
+  watchQuery() { this.queryData(this); this.tstate.curState.query = this.query; }
 
   @Watch('isExpanded')
   watchIsExpanded() { this.rebuildTable(this.selected!); }

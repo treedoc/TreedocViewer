@@ -1,7 +1,7 @@
 <template>
   <div>
     <div v-if="isObject" class="tdv_key">
-      <a href="#/" @click.stop="nodeClicked(row['@value'])">{{value}}</a>
+      <a href="#" @click.stop="nodeClicked(row['@value'])">{{value}}</a>
     </div>
     <div v-else class="tdv_key">{{value}}</div>
   </div>

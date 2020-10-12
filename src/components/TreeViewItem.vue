@@ -4,7 +4,7 @@
       <div class='node' @click.stop='toggleOpen()' >
         <span :class='{opened: open, selected: selected}' class='key key-with-chevron'>
           <!-- VUETIP: in the event, don't emit object, serialization will take long time if object is big -->
-          <a href="#/" @click.stop="$emit('node-clicked', ['', ...tnode.path])">
+          <a href="#" @click.stop="$emit('node-clicked', ['', ...tnode.path])">
           <!-- <a href="#/" @click.stop="tstate.select(tnode)"> -->
             {{tnode.key}}
           </a>
