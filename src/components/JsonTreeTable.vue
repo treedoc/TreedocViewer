@@ -16,7 +16,7 @@
         <b-btn :size="'sm'" @click='copy' class='tdv' :disabled='!jsonStr' v-b-tooltip.hover title="Copy">
           <i class="fa fa-copy"></i>
         </b-btn>
-        <b-btn :size="'sm'" @click='paste' v-b-tooltip.hover title="Paste">
+        <b-btn :size="'sm'" @click='paste' v-b-tooltip.hover title="Paste" v-if="pasteSupported">
           <i class="fa fa-paste"></i>
         </b-btn>
         <b-btn size='sm' variant='outline-secondary' class='tdv' :pressed.sync='codeView[0]' v-b-tooltip.hover title="Toggle source code syntax hi-lighting">
@@ -207,12 +207,10 @@ export default class JsonTreeTable extends Vue {
     }, null, 2);
   }
 
+  get pasteSupported() { return !!navigator.clipboard.readText; }
   paste() {
-    // this.codeView.editor.getTextArea().select();
-    // this.codeView.editor.focus();
-    // Doesn't work as chrome blocked for security reason
-    // const res = document.execCommand("paste");
-    // console.log(`paste result: ${res}`);
+    this.sourceView.paste();  // Only works for firefox
+    // Only works for chrome
     navigator.clipboard.readText().then((txt: string) => {
        this.jsonStr = txt;
     });

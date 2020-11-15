@@ -2,7 +2,7 @@ import { TDNode, TreeDoc, Bookmark, TDObjectCoder, TDNodeType, JSONPointer } fro
 import History from './History';
 import { ParserPlugin, ParseStatus } from './TDVOption';
 import JSONParserPlugin from '../parsers/JSONParserPlugin';
-import { Query } from '@/components/Vue2DataTable';
+import { Query, Column } from '@/components/Vue2DataTable';
 
 export interface Selection {
   start?: Bookmark;
@@ -12,8 +12,15 @@ export interface Selection {
 /** State that will be saved in history */
 class CurState {
   selection: Selection = {};
-  query: Query = { limit: 100, offset: 0 };
   constructor(public selected: TDNode | null = null) { }
+}
+
+export class TableNodeState {
+  constructor(
+    public query: Query,
+    public expandedLevel: number,
+    public columns: Column[],
+    public isColumnExpanded: boolean) { }
 }
 
 export default class TreeState {
@@ -21,6 +28,8 @@ export default class TreeState {
   parserPlugin: ParserPlugin<any>;
   history = new History<CurState>();
   initialNode?: TDNode | null;
+  tableStateCache: Map<string, TableNodeState> = new Map();
+
   tree: TreeDoc;
 
   curState = new CurState();
@@ -71,6 +80,14 @@ export default class TreeState {
     // the user won't be able to continuous editing.
     if (!initial)
       this.curState.selection = this.curState.selected!;
+  }
+
+  public saveTableState(node: TDNode, state: TableNodeState) {
+    this.tableStateCache.set(node.pathAsString, state);
+  }
+
+  public getTableState(node: TDNode) {
+    return this.tableStateCache.get(node.pathAsString);
   }
 
   get selected() { return this.curState.selected; }

@@ -1,6 +1,6 @@
 <template>
   <div id='app' class='components-container'>
-    <json-tree-table v-if="true" :data='jsonData' :inital-path="'activityHistory'" :options='tdvOption' rootObjectKey='root' class="json-tree-table" ref="jsonTreeTable">
+    <json-tree-table :data='jsonData' :inital-path="'/'" :options='tdvOption' rootObjectKey='root' class="json-tree-table" ref="jsonTreeTable">
       <template v-slot:title>
         <a href="https://www.treedoc.org"><b class="tdv-title">{{param.title}}</b></a>
       </template>

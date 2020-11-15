@@ -84,6 +84,14 @@ export default class SourceView extends Vue {
     // this.codeView.editor.execCommand('copy');
   }
 
+  paste() {
+    this.textView.select();
+    this.textView.focus();
+    // Doesn't work both in firefox and chrome
+    const res = document.execCommand('paste');
+    console.log(`paste result: ${res}`);
+  }
+
   @Watch('val')
   watchVal() { this.$emit('input', this.val); }
 

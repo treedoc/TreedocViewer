@@ -29,7 +29,8 @@
         <expand-control :state='expandState' />
         <json-path :tree-node="this.tstate ? this.tstate.selected : null" @node-clicked='nodeClicked'/>
         <!-- query: <b-form-input size='sm' :v-bind="tableOpt.query" /> -->
-        <!-- query: {{query}} -->
+        <!-- query: {{query}},  -->
+        <!-- columns: <pre>{{JSON.stringify(tableOpt.columns, null, ' ')}}</pre> -->
       </div>
     </datatable>
   </div>
@@ -44,7 +45,7 @@ import thFilter from './th-Filter.vue';
 import tdValue from './td-Value.vue';
 import tdKey from './td-Key1.vue';
 import JsonPath from './JsonPath.vue';
-import TreeState from '../models/TreeState';
+import TreeState, { TableNodeState } from '../models/TreeState';
 import JSONParserPlugin from '../parsers/JSONParserPlugin';
 import ExpandControl, { ExpandState } from './ExpandControl.vue';
 import { TDNode, TDNodeType } from 'treedoc';
@@ -77,22 +78,30 @@ export default class JsonTable extends Vue {
   // https://github.com/vuejs/vue-class-component#undefined-will-not-be-reactive
   tstate: TreeState = new TreeState({});
   isExpanded = false;
-  expandState = new ExpandState(0, 0);
+  isExpandedBuild = false;  // Flag to avoid duplicated rebuild()
+  expandState = new ExpandState(0, 0, false);
 
   @Prop() private tableData!: TreeState | TDNode | object | string;
   @Prop() private options?: DatatableOptions;
 
-  rebuildTable(val: TDNode) {
+  rebuildTable(val: TDNode, cachedState: TableNodeState | null = null) {
     // use defTableOpt to get rid of this.options for non-initial node
     if (!this.defTableOpt)  // backup for the first time, we have to intialize tableOpt attributes to make them reactive
       this.defTableOpt = this.tableOpt;
 
     this.defTableOpt.columns = [];
     this.tableOpt = { ...this.defTableOpt, ...(this.applyCustomOpts && this.options) };
+    if (cachedState) {
+      this.tableOpt.query = cachedState.query;
+      this.tableOpt.columns = cachedState.columns;
+      this.isExpanded = cachedState.isColumnExpanded;
+    }
+
     this.buildTable(val);
     this.queryData(this);
     this.tableOpt.xprops.tstate = this.tstate;
     this.tableOpt.xprops.expandState = this.expandState;
+    this.isExpandedBuild = this.isExpanded;
   }
 
   buildTable(val: TDNode) {
@@ -191,10 +200,13 @@ export default class JsonTable extends Vue {
   });
 
   @Watch('query', {deep: true})
-  watchQuery() { this.queryData(this); this.tstate.curState.query = this.query; }
+  watchQuery() { this.queryData(this); }
 
   @Watch('isExpanded')
-  watchIsExpanded() { this.rebuildTable(this.selected!); }
+  watchIsExpanded() {
+    if (this.isExpanded !== this.isExpandedBuild)
+      this.rebuildTable(this.selected!);
+  }
 
   @Watch('tableData', {immediate: true})
   watchTableData() {
@@ -202,13 +214,22 @@ export default class JsonTable extends Vue {
   }
 
   @Watch('tstate.selected', {immediate: true})
-  watchSelected(val: TDNode) {
-    this.isExpanded = this.defaultExpand(val);
-    this.tableOpt.query.offset = 0;
+  watchSelected(val: TDNode, valOld: TDNode) {
+    this.tstate.saveTableState(valOld, new TableNodeState(_.cloneDeep(
+      this.tableOpt.query), this.expandState.expandLevel, this.tableOpt.columns, this.isExpanded));
+
+    const cachedState = this.tstate.getTableState(val);
+    if (cachedState != null) {
+      this.isExpanded = cachedState.isColumnExpanded;
+    } else {
+      this.isExpanded = this.defaultExpand(val);
+    }
+
+    // this.tableOpt.query.offset = 0;
     // if (this.defTableOpt)
     //   this.defTableOpt.query = { limit: 100, offset: 0 };
-    this.expandState = new ExpandState(0, 0);
-    this.rebuildTable(val);
+    this.expandState = new ExpandState(cachedState ? cachedState.expandedLevel : 0, 0, this.expandState.showChildrenSummary);
+    this.rebuildTable(val, cachedState);
   }
 
   @Watch('options', {immediate: true})
@@ -232,7 +253,6 @@ export default class JsonTable extends Vue {
   width: 100%;
   height: 100%
 }
-
 .tdv-th {
   white-space: nowrap;
 }
@@ -267,15 +287,18 @@ export default class JsonTable extends Vue {
 .tdv-td {
   padding: 2px!;
 }
-
 /* Fix extra space for the row below the table */
 .tdv-table * .col-sm-6 {
   padding-right: 0px;
   padding-left: 0px;
 }
-
 .tdv-table * .row {
   margin-right: 0px;
   margin-left: 0px;
+}
+.tdv-table * .-page-size-select {
+  display: inline-block;
+  width: 70px;
+  font-size: small;
 }
 </style>

@@ -15,6 +15,9 @@
     <span v-b-tooltip.hover title="Expand all">
       <b-btn :size="'sm'" @click='expendAll()' :disabled='!canExpand()'>&raquo;</b-btn>
     </span>
+    <span v-b-tooltip.hover title="Toggle show children summary">
+      <b-btn :size="'sm'" :pressed.sync='state.showChildrenSummary'>s</b-btn>
+    </span>
   </b-button-group>
 </template>
 
@@ -28,6 +31,7 @@ export class ExpandState {
   constructor(
     public expandLevel = 1,
     public minLevel = 1,
+    public showChildrenSummary = true,
   ) {}
 }
 

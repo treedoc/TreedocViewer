@@ -1,6 +1,6 @@
 /**
- * History maintains a linear history path, the current position can be moved backword or forward
- * in the history stack. It won't store branching information, once append a new event at a particular postion
+ * History maintains a linear history path, the current position can be moved backward or forward
+ * in the history stack. It won't store branching information, once append a new event at a particular position
  * the history stack after the pos will be trimmed. So that only a linear path will be maintained.
  */
 export default class History<T> {
