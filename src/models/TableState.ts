@@ -2,7 +2,7 @@ import { TDNode, TreeDoc, Bookmark, TDObjectCoder, TDNodeType, JSONPointer } fro
 import History from './History';
 import { ParserPlugin, ParseStatus } from './TDVOption';
 import JSONParserPlugin from '../parsers/JSONParserPlugin';
-import { Query, Column, DataTableOptions as DataTableOptions } from '@/components/Vue2DataTable';
+import { Query, Column, DataTableOptions } from '@/components/Vue2DataTable';
 import { TreeState } from '@/lib';
 import Lazy from './Lazy';
 
@@ -16,7 +16,8 @@ export class TableNodeState {
 }
 
 export class TableOptionRule {
-  constructor(public pattern: RegExp | string,
+  constructor(
+    public pattern: RegExp | string,
     public opt: DataTableOptions) { }
 }
 
@@ -29,6 +30,7 @@ export class TDVTableOption {
     pageSizeOptions: [5, 20, 50, 100, 200, 500],
     columns: [],
     data: [],
+    rawData: [],
     total: 0,
     query: { limit: 100, offset: 0 },
     xprops: { tstate: null },
@@ -37,7 +39,7 @@ export class TDVTableOption {
 }
 
 export default class TableState {
-  _rawData = new Lazy<any[]>();  // the full dataset related to current node
+  // _rawData = new Lazy<any[]>();  // the full dataset related to current node
   filteredData: any[] | null = null; // the data after filtering
   sortedData: any[] | null = null;  // the sorted data
 
@@ -45,18 +47,14 @@ export default class TableState {
     public treeState: TreeState,
     public nodeState: TableNodeState,
     public tableOpt: TDVTableOption) {
-  }
+    }
 
-  buildDataTableOption() {
-    
-  }
+  // buildDataTableOption() {
+  // }
 
   // private get rawData() {
   //   return this._rawData.get(() => {
   //     return [];
   //   };
   // }
-
-
-
 }

@@ -39,7 +39,7 @@
 <script lang="ts">
 import { Component, Prop, Vue, Watch } from 'vue-property-decorator';
 import _ from 'lodash';
-import { DatatableOptions, Column, Query } from './Vue2DataTable';
+import { DataTableOptions, Column, Query } from './Vue2DataTable';
 import DataFilter from './DataFilter';
 import thFilter from './th-Filter.vue';
 import tdValue from './td-Value.vue';
@@ -61,7 +61,7 @@ const COL_KEY = '@key';
   },
 })
 export default class JsonTable extends Vue {
-  tableOpt: DatatableOptions = {
+  tableOpt: DataTableOptions = {
     // fixHeaderAndSetBodyMaxHeight: 200,
     // tblStyle: 'table-layout: fixed', // must
     tblClass: 'table-bordered',
@@ -82,7 +82,7 @@ export default class JsonTable extends Vue {
   expandState = new ExpandState(0, 0, false);
 
   @Prop() private tableData!: TreeState | TDNode | object | string;
-  @Prop() private options?: DatatableOptions;
+  @Prop() private options?: DataTableOptions;
 
   rebuildTable(val: TDNode, cachedState: TableNodeState | null = null) {
     // use defTableOpt to get rid of this.options for non-initial node
@@ -215,7 +215,7 @@ export default class JsonTable extends Vue {
 
   @Watch('tstate.selected', {immediate: true})
   watchSelected(node: TDNode, oldNode: TDNode) {
-    if (oldNode && oldNode.doc == node.doc)
+    if (oldNode && oldNode.doc === node.doc)
       this.tstate.saveTableState(oldNode, new TableNodeState(_.cloneDeep(
         this.tableOpt.query), this.expandState.expandLevel, this.tableOpt.columns, this.isColumnExpanded));
 

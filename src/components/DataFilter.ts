@@ -1,9 +1,9 @@
 import _ from 'lodash';
-import { Query, Column, DatatableOptions } from './Vue2DataTable';
+import { Query, Column, DataTableOptions } from './Vue2DataTable';
 import { TDNode } from 'treedoc';
 
 export default {
-  filter(opt: DatatableOptions) {
+  filter(opt: DataTableOptions) {
     opt.data = opt.rawData;
     opt.columns.forEach((c) => {
       const f = c.field;

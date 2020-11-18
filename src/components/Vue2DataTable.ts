@@ -13,7 +13,7 @@ export declare interface Query {
 }
 
 // https://onewaytech.github.io/vue2-datatable/doc/#/en/details/datatable-props
-export declare interface DatatableOptions {
+export declare interface DataTableOptions {
   fixHeaderAndSetBodyMaxHeight?: string | number;
   tblStyle?: string;
   tblClass?: string;
