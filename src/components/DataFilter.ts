@@ -11,9 +11,9 @@ export default {
       if (!fq)
         return;
       if (_.isArray(fq))
-        opt.data = opt.data .filter((row) => fq.includes(row[f]));
+        opt.data = opt.data.filter((row) => fq.includes(row[f]));
       else if (_.isString(fq))
-      opt.data  = opt.data .filter(row => row[f] && (`${row[f]}`).toLowerCase().includes(fq.toLowerCase()));
+        opt.data  = opt.data.filter(row => row[f] && (`${row[f]}`).toLowerCase().includes(fq.toLowerCase()));
       else {
         console.log(`Unknown query: ${JSON.stringify(fq)}`);
       }

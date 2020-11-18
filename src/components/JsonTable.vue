@@ -8,7 +8,7 @@
           </b-btn>
         </span>
         <span v-b-tooltip.hover title="Expand children as columns">
-          <b-btn size='sm' variant='outline-secondary' :pressed.sync='isExpanded'>
+          <b-btn size='sm' variant='outline-secondary' :pressed.sync='isColumnExpanded'>
             <i class="fa fa-arrows-h"></i>
           </b-btn>
         </span>
@@ -77,8 +77,8 @@ export default class JsonTable extends Vue {
   // !! class based component, we have to initialized the data field, "undefined" won't be reactive. !!
   // https://github.com/vuejs/vue-class-component#undefined-will-not-be-reactive
   tstate: TreeState = new TreeState({});
-  isExpanded = false;
-  isExpandedBuild = false;  // Flag to avoid duplicated rebuild()
+  isColumnExpanded = false;
+  isColumnExpandedBuild = false;  // Flag to avoid duplicated rebuild()
   expandState = new ExpandState(0, 0, false);
 
   @Prop() private tableData!: TreeState | TDNode | object | string;
@@ -94,14 +94,14 @@ export default class JsonTable extends Vue {
     if (cachedState) {
       this.tableOpt.query = cachedState.query;
       this.tableOpt.columns = cachedState.columns;
-      this.isExpanded = cachedState.isColumnExpanded;
+      this.isColumnExpanded = cachedState.isColumnExpanded;
     }
 
     this.buildTable(val);
     this.queryData(this);
     this.tableOpt.xprops.tstate = this.tstate;
     this.tableOpt.xprops.expandState = this.expandState;
-    this.isExpandedBuild = this.isExpanded;
+    this.isColumnExpandedBuild = this.isColumnExpanded;
   }
 
   buildTable(val: TDNode) {
@@ -120,7 +120,7 @@ export default class JsonTable extends Vue {
           [COL_VALUE]: v,
         };
         this.tableOpt.rawData.push(row);
-        if (this.isExpanded && v && v.children) {
+        if (this.isColumnExpanded && v && v.children) {
           for (const cv of v.children) {
             this.addColumn(cv.key!);
             row[cv.key!] = cv;
@@ -202,9 +202,9 @@ export default class JsonTable extends Vue {
   @Watch('query', {deep: true})
   watchQuery() { this.queryData(this); }
 
-  @Watch('isExpanded')
-  watchIsExpanded() {
-    if (this.isExpanded !== this.isExpandedBuild)
+  @Watch('isColumnExpanded')
+  watchisColumnExpanded() {
+    if (this.isColumnExpanded !== this.isColumnExpandedBuild)
       this.rebuildTable(this.selected!);
   }
 
@@ -214,22 +214,23 @@ export default class JsonTable extends Vue {
   }
 
   @Watch('tstate.selected', {immediate: true})
-  watchSelected(val: TDNode, valOld: TDNode) {
-    this.tstate.saveTableState(valOld, new TableNodeState(_.cloneDeep(
-      this.tableOpt.query), this.expandState.expandLevel, this.tableOpt.columns, this.isExpanded));
+  watchSelected(node: TDNode, oldNode: TDNode) {
+    if (oldNode && oldNode.doc == node.doc)
+      this.tstate.saveTableState(oldNode, new TableNodeState(_.cloneDeep(
+        this.tableOpt.query), this.expandState.expandLevel, this.tableOpt.columns, this.isColumnExpanded));
 
-    const cachedState = this.tstate.getTableState(val);
+    const cachedState = this.tstate.getTableState(node);
     if (cachedState != null) {
-      this.isExpanded = cachedState.isColumnExpanded;
+      this.isColumnExpanded = cachedState.isColumnExpanded;
     } else {
-      this.isExpanded = this.defaultExpand(val);
+      this.isColumnExpanded = this.defaultExpand(node);
     }
 
     // this.tableOpt.query.offset = 0;
     // if (this.defTableOpt)
     //   this.defTableOpt.query = { limit: 100, offset: 0 };
     this.expandState = new ExpandState(cachedState ? cachedState.expandedLevel : 0, 0, this.expandState.showChildrenSummary);
-    this.rebuildTable(val, cachedState);
+    this.rebuildTable(node, cachedState);
   }
 
   @Watch('options', {immediate: true})
@@ -240,7 +241,7 @@ export default class JsonTable extends Vue {
   }
 
   get applyCustomOpts() {
-    return this.tstate.isInitialNodeSelected() && this.isExpanded && this.options;
+    return this.tstate.isInitialNodeSelected() && this.isColumnExpanded && this.options;
   }
 
   get query() { return this.tableOpt.query; }

@@ -1,6 +1,6 @@
 import { Component } from 'vue';
 import { TDNode } from 'treedoc';
-import { DatatableOptions } from '@/components/Vue2DataTable';
+import { DataTableOptions } from '@/components/Vue2DataTable';
 
 export enum ParseStatus {
   SUCCESS,
@@ -29,8 +29,8 @@ export default class TDVOptions {
   parsers?: Array<ParserPlugin<any>>;
 
   // If pattern is string, it will use wildcard matching
-  tableOptRules?: {pattern: RegExp | string, opt: DatatableOptions};
-  defaultTableOpt?: DatatableOptions = {
+  tableOptRules?: {pattern: RegExp | string, opt: DataTableOptions};
+  defaultTableOpt?: DataTableOptions = {
     // fixHeaderAndSetBodyMaxHeight: 200,
     // tblStyle: 'table-layout: fixed', // must
     tblClass: 'table-bordered',
