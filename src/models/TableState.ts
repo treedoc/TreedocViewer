@@ -51,11 +51,11 @@ export default class TableState {
     
   }
 
-  private get rawData() {
-    return this._rawData.get(() => {
-      return [];
-    };
-  }
+  // private get rawData() {
+  //   return this._rawData.get(() => {
+  //     return [];
+  //   };
+  // }
 
 
 
