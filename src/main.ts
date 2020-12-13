@@ -24,7 +24,7 @@ Vue.component('codemirror', codemirror);
 const router = new VueRouter({
   routes: [
     { path: '/', component: Home },
-    { path: '/tableTest', component: TableTest },
+    { path: '/table', component: TableTest },
   ],
 });
 

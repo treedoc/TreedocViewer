@@ -1,5 +1,5 @@
 import { ParserPlugin, ParseResult } from '../models/TDVOption';
-import { TDJSONParser, TDJSONParserOption, TDNodeType, TDNode, TDJSONWriter, TDJSONWriterOption } from 'treedoc';
+import { TDJSONParser, TDJSONParserOption, TDNodeType, TDNode, TDJSONWriter, TDJSONWriterOption, StringCharSource, TreeDoc } from 'treedoc';
 import YAMLParserPlugin from './YAMLParserPlugin';
 import Util from '../util/Util';
 
@@ -20,7 +20,11 @@ export default class JSONParserPlugin implements ParserPlugin<JSONParserOption> 
   parse(str: string): ParseResult {
     const result = new ParseResult();
     try {
-      result.result = TDJSONParser.get().parse(str, new TDJSONParserOption().setDefaultRootType(TDNodeType.MAP));
+      const src = new StringCharSource(str);
+      const nodes: TDNode[] = [];
+      while (src.skipSpacesAndReturns()) 
+        nodes.push(TDJSONParser.get().parse(src, new TDJSONParserOption().setDefaultRootType(TDNodeType.MAP)));
+      result.result = nodes.length === 1 ? nodes[0] : TreeDoc.merge(nodes).root;
       result.message = 'TDJSONParser.parser()';
       return result;
     } catch (e2) {

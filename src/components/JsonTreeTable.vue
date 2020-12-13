@@ -49,7 +49,7 @@
           <div v-else>No Data</div>
         </div>
         <div slot="table" :grow="50" :show="showTable" class="panview">
-          <div v-if="tstate.tree" ><json-table :table-data='tstate' @node-clicked='nodeClicked'/></div>
+          <div v-if="tstate.tree" ><json-table :table-data='tstate' @node-clicked='nodeClicked' isInMuliPane="true" /></div>
           <div v-else>No Data</div>
         </div>
       </msplit>
@@ -226,11 +226,9 @@ export default class JsonTreeTable extends Vue {
   font-size: smaller;
   color: darkgreen;
 }
-
 .error {
   color: red;
 }
-
 .panview {
   /* max-height: 93vh; */
   max-height: 100%;
@@ -240,7 +238,6 @@ export default class JsonTreeTable extends Vue {
   display: flex;
   flex-direction: column;
 }
-
 .tdv-container {
   display: flex;
   height: 100%;

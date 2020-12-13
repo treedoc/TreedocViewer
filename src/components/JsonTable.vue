@@ -1,36 +1,39 @@
 <template>
   <div class='tdv-table'>
     <datatable v-bind="tableOpt">
-      <div class="tdv-tbl-toolbar">
-        <span v-b-tooltip.hover title="Toggle fullscreen">
-          <b-btn size='sm' variant='outline-secondary' :pressed='tstate.maxPane==="table"' @click='tstate.toggleMaxPane("table")'>
-            <i class="fa fa-expand"></i>
-          </b-btn>
-        </span>
-        <span v-b-tooltip.hover title="Expand children as columns">
-          <b-btn size='sm' variant='outline-secondary' :pressed.sync='isColumnExpanded'>
-            <i class="fa fa-arrows-h"></i>
-          </b-btn>
-        </span>
-        <b-button-group class="ml-1">
-          <!-- We have to wrapper the button so that tooltip will work properly when it's disabled -->
-          <!-- https://bootstrap-vue.js.org/docs/components/tooltip/ -->
-          <span v-b-tooltip.hover title="Go back">
-            <b-btn :size="'sm'" @click='tstate.back()' :disabled='!tstate.canBack()'>
-              <i class="fa fa-arrow-left"></i>
-            </b-btn>
-          </span>
-          <span v-b-tooltip.hover title="Go forward">
-            <b-btn :size="'sm'" @click='tstate.forward()' :disabled='!tstate.canForward()'>
-              <i class="fa fa-arrow-right"></i>
-            </b-btn>
-          </span>
-        </b-button-group>
-        <expand-control :state='expandState' />
+      <div class='tdv-tbl-top'>
+        <slot name='tableTitle' v-if="hasTableTitleSlot" />
         <json-path :tree-node="this.tstate ? this.tstate.selected : null" @node-clicked='nodeClicked'/>
-        <!-- query: <b-form-input size='sm' :v-bind="tableOpt.query" /> -->
-        <!-- query: {{query}},  -->
-        <!-- columns: <pre>{{JSON.stringify(tableOpt.columns, null, ' ')}}</pre> -->
+        <div class="tdv-tbl-toolbar">
+          <expand-control :state='expandState' v-if="tstate.hasTreeInTable" />
+          <span v-b-tooltip.hover title="Toggle fullscreen" v-if="isInMuliPane">
+            <b-btn size='sm' variant='outline-secondary' :pressed='tstate.maxPane==="table"' @click='tstate.toggleMaxPane("table")'>
+              <i class="fa fa-expand"></i>
+            </b-btn>
+          </span>
+          <span v-b-tooltip.hover title="Expand children as columns">
+            <b-btn size='sm' variant='outline-secondary' :pressed.sync='isColumnExpanded'>
+              <i class="fa fa-arrows-h"></i>
+            </b-btn>
+          </span>
+          <b-button-group class="ml-1">
+            <!-- We have to wrapper the button so that tooltip will work properly when it's disabled -->
+            <!-- https://bootstrap-vue.js.org/docs/components/tooltip/ -->
+            <span v-b-tooltip.hover title="Go back">
+              <b-btn :size="'sm'" @click='tstate.back()' :disabled='!tstate.canBack()'>
+                <i class="fa fa-arrow-left"></i>
+              </b-btn>
+            </span>
+            <span v-b-tooltip.hover title="Go forward">
+              <b-btn :size="'sm'" @click='tstate.forward()' :disabled='!tstate.canForward()'>
+                <i class="fa fa-arrow-right"></i>
+              </b-btn>
+            </span>
+          </b-button-group>
+          <!-- query: <b-form-input size='sm' :v-bind="tableOpt.query" /> -->
+          <!-- query: {{query}},  -->
+          <!-- columns: <pre>{{JSON.stringify(tableOpt.columns, null, ' ')}}</pre> -->
+        </div>
       </div>
     </datatable>
   </div>
@@ -83,6 +86,7 @@ export default class JsonTable extends Vue {
 
   @Prop() private tableData!: TreeState | TDNode | object | string;
   @Prop() private options?: DataTableOptions;
+  @Prop() private isInMuliPane?: boolean;  // TODO: Move to TDVTableOption
 
   rebuildTable(val: TDNode, cachedState: TableNodeState | null = null) {
     // use defTableOpt to get rid of this.options for non-initial node
@@ -98,7 +102,9 @@ export default class JsonTable extends Vue {
     }
 
     this.buildTable(val);
-    this.queryData(this);
+    this.queryData();
+    this.tstate.hasTreeInTable = false;
+    // console.log('clear hasTreeInTable');
     this.tableOpt.xprops.tstate = this.tstate;
     this.tableOpt.xprops.expandState = this.expandState;
     this.isColumnExpandedBuild = this.isColumnExpanded;
@@ -181,7 +187,7 @@ export default class JsonTable extends Vue {
       }
     }
     // k: threshold (blank cell / Total possible blank cells)
-    // k = (rc - cellCnt) / (rc - c) => cellCnt = rc - krc + kc = c (r - rk + k) = c (r - (r-1)k)
+    // k = (r * c - cellCnt) / (r * c - c) => cellCnt = r * c - k * r * c + k * c = c (r - r * k + k) = c (r - (r-1)k)
     //     When row = 2:   2c(1-k) + ck = 2c - kc = (2-k)c <= cellcnt
     //     When row = 3:   3c(1-k) + ck = 3c - 2ck = (3-2k)c
     const k = 0.8;
@@ -194,13 +200,12 @@ export default class JsonTable extends Vue {
 
   nodeClicked(data: TDNode) { this.tstate.select(data); }
 
-  queryData = _.debounce((THIS) => {
-    const opt = THIS.tableOpt;
-    DataFilter.filter(opt);
-  });
+  queryData() {
+    DataFilter.filter(this.tableOpt);
+  }
 
   @Watch('query', {deep: true})
-  watchQuery() { this.queryData(this); }
+  watchQuery() { this.queryData(); }
 
   @Watch('isColumnExpanded')
   watchisColumnExpanded() {
@@ -245,10 +250,26 @@ export default class JsonTable extends Vue {
   }
 
   get query() { return this.tableOpt.query; }
+
+  get hasTableTitleSlot() { return !!this.$slots.tableTitle; }
 }
 </script>
 
 <style>
+.tdv-tbl-top {
+  display: flex;
+  justify-content: space-between;
+}
+.tdv-tbl-toolbar {
+  display: flex;
+  flex-grow: 2;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  float: right;
+}
+.tdv-tbl-title {
+  display: inline;
+}
 .tdv-table {
   margin: 0 auto;
   width: 100%;
@@ -276,10 +297,6 @@ export default class JsonTable extends Vue {
 }
 .tdv-table * div[name="SimpleTable"] {
   overflow: scroll;
-}
-.tdv-tbl-toolbar {
-  display: flex;
-  flex-wrap: wrap;
 }
 .thead>td{
   position: sticky;

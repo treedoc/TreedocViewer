@@ -32,7 +32,15 @@ export default {
   computed: {
     html() {
       const col = this.col;
-      return col && col.html && col.html(this.value, this.row);
+      const html = this.col && col.html;
+      if (typeof(html) === 'function')
+        return html(this.value, this.row);
+      else {  // string
+        return ((value, row) => {
+          /*eslint no-eval: "ignore"*/
+          return eval(html);
+        })(this.value, this.row);
+      }
     },
     col() { return _.find(this.columns, { field: this.field }); },
     isLastCol() { return this.col === this.columns[this.columns.length - 1]; },
@@ -41,6 +49,18 @@ export default {
   methods: {
     nodeClicked(data) {
       this.xprops.tstate.select(data);
+    },
+  },
+  watch: {
+    value: {
+      immediate: true,
+      handler(val) {
+        // console.log(val && !this.html && !this.isSimpleType);
+        if (val && !this.html && !this.isSimpleType) {
+          // console.log('this.xprops.tstate.hasTreeInTable');
+          this.xprops.tstate.hasTreeInTable = true;
+        }
+      },
     },
   },
 };

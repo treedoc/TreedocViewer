@@ -4,10 +4,10 @@
       <b class='jsontable-head' :class="{'has-keyword': query[field]}">{{ title }}</b>
       <!-- <i class="m-2 fa fa-filter" :class="{ 'text-muted': !keyword}" style='margin: 1px !important;'></i> -->
     </b-button>
-    <b-popover :target="filterBtnId" triggers="focus hover" placement='top' @show='onShowPopover' boundary='window' delay='300' :no-fade='true'>
+    <b-popover :target="filterBtnId" triggers="focus hover" placement='top' fallback-placement='clockwise'  @show='onShowPopover' boundary='window' delay='300' :no-fade='true'>
       <div class="input-group input-group-sm" >
-        <input type="search" class="form-control" ref="input" @keydown.esc.prevent='close' 
-          v-model="query[field]" @keydown.enter="close" :placeholder="`Search ${field}...`">
+        <b-form-input type="search" class="form-control" ref="input" @keydown.esc.prevent='close' 
+          v-model="query[field]" @keydown.enter="close" :placeholder="`Search ${field}...`" debounce="300" />
       </div>
     </b-popover>
   </div>

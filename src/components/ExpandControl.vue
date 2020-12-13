@@ -16,7 +16,7 @@
       <b-btn :size="'sm'" @click='expendAll()' :disabled='!canExpand()'>&raquo;</b-btn>
     </span>
     <span v-b-tooltip.hover title="Toggle show children summary">
-      <b-btn :size="'sm'" :pressed.sync='state.showChildrenSummary'>s</b-btn>
+      <b-btn :size="'sm'"  variant='outline-secondary' :pressed.sync='state.showChildrenSummary'>s</b-btn>
     </span>
   </b-button-group>
 </template>

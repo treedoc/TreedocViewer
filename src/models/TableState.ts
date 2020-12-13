@@ -42,6 +42,7 @@ export default class TableState {
   // _rawData = new Lazy<any[]>();  // the full dataset related to current node
   filteredData: any[] | null = null; // the data after filtering
   sortedData: any[] | null = null;  // the sorted data
+  hasTree = false;  // If there's tree widget in the cells
 
   constructor(
     public treeState: TreeState,

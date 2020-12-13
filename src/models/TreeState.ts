@@ -25,19 +25,23 @@ export class TableNodeState {
 
 export default class TreeState {
   parseResult = 'OBJECT';
-  parserPlugin: ParserPlugin<any>;
   history = new History<CurState>();
   initialNode?: TDNode | null;
   tableStateCache: Map<string, TableNodeState> = new Map();
 
   tree: TreeDoc;
 
+  // TODO: move to TableState
+  hasTreeInTable = false;  // If there's tree widget in the cells
+
   curState = new CurState();
 
   maxPane = '';
 
-  constructor(treeData: TDNode | string | any, parserPlugin = new JSONParserPlugin(), rootLabel = 'root', selectedPath: string[] = []) {
-    this.parserPlugin = parserPlugin;
+  constructor(treeData: TDNode | string | any, 
+      public parserPlugin: ParserPlugin<any> = new JSONParserPlugin(),
+      rootLabel = 'root', 
+      selectedPath: string[] = []) {
     this.tree = this.buildTree(treeData, rootLabel);
     if (this.tree) {
       this.tree.root.key = rootLabel;
