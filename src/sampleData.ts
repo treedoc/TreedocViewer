@@ -98,6 +98,20 @@ const xmlStr = `<?xml version="1.0" encoding="UTF-8"?>
 </project>
 `;
 
+const fxml = `
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.geometry.Insets?>
+<GridPane hgap="8.0" vgap="8.0" xmlns="http://javafx.com/javafx/11.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="MainController">
+  <columnConstraints>
+    <ColumnConstraints hgrow="SOMETIMES" minWidth="10.0" />
+  </columnConstraints>
+  <rowConstraints>
+    <RowConstraints />
+    <RowConstraints vgrow="ALWAYS" />
+  </rowConstraints>
+</GridPane>
+`;
+
 const csvStr = `
 field1,field2,field3
 v11,v12,v13
@@ -276,6 +290,10 @@ No \\n's!",
     {
       text: 'xml',
       value: xmlStr,
+    },
+    {
+      text: 'fxml (JavaFx)',
+      value: fxml,
     },
     {
       text: 'csv',
