@@ -1,6 +1,6 @@
 import { Component } from 'vue';
 import { TDNode } from 'treedoc';
-import { DataTableOptions } from '@/components/Vue2DataTable';
+import { DataTableOptions } from '../components/Vue2DataTable';
 
 export enum ParseStatus {
   SUCCESS,

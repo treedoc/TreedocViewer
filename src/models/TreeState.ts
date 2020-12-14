@@ -2,7 +2,7 @@ import { TDNode, TreeDoc, Bookmark, TDObjectCoder, TDNodeType, JSONPointer } fro
 import History from './History';
 import { ParserPlugin, ParseStatus } from './TDVOption';
 import JSONParserPlugin from '../parsers/JSONParserPlugin';
-import { Query, Column } from '@/components/Vue2DataTable';
+import { Query, Column } from '../components/Vue2DataTable';
 
 export interface Selection {
   start?: Bookmark;
