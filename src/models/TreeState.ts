@@ -97,7 +97,7 @@ export default class TreeState {
   get selected() { return this.curState.selected; }
   get selection() { return this.curState.selection; }
 
-  private findNodeByPath(path: string | string[], noNull = false): TDNode {
+  public findNodeByPath(path: string | string[], noNull = false): TDNode {
     const cNode: TDNode = this.curState.selected || this.tree.root;
     let node = cNode.getByPath(path);
     if (node)

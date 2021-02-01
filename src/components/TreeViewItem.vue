@@ -1,10 +1,10 @@
 <template>
   <div class='item'>
     <div v-if='!isSimpleType' class='leaf'>
-      <div class='node' @click.stop='toggleOpen()' >
+      <div class='node' @click.stop='toggleOpen()'>
         <span :class='{opened: open, selected: selected}' class='key key-with-chevron'>
           <!-- VUETIP: in the event, don't emit object, serialization will take long time if object is big -->
-          <a href="#" @click.stop="$emit('node-clicked', ['', ...tnode.path])">
+          <a href="#" @click.stop="$emit('node-clicked', ['', ...tnode.path])" @mouseenter="mouseEnter" @mouseleave="mouseLeave">
           <!-- <a href="#/" @click.stop="tstate.select(tnode)"> -->
             {{tnode.key}}
           </a>
@@ -23,13 +23,13 @@
               :currentLevel='currentLevel+1'
               :expandState='expandState'
               :tnode='cn'
-              @node-clicked='nodeClicked' />
+              @node-clicked='bubbleEvent($event, "node-clicked")' />
         </keep-alive>
       </template>
     </div>
     <div v-else>
       <span class='key'>{{tnode.key}}</span>:
-      <simple-value :tnode='tnode' @node-clicked='nodeClicked' />
+      <simple-value :tnode='tnode' @node-clicked='bubbleEvent($event, "node-clicked")' />
     </div>
   </div>
 </template>
@@ -41,6 +41,14 @@ import { ExpandState } from './ExpandControl.vue';
 import SimpleValue from './SimpleValue.vue';
 import TreeState from '../models/TreeState';
 import TreeUtil from '../models/TreeUtil';
+
+
+export class NodeMouseEnterEvent {
+  constructor(
+    public nodePath: string,
+    public source: Element,
+  ) {}
+}
 
 // @Component({
 //   components: {
@@ -120,8 +128,26 @@ export default class TreeViewItem extends Vue {
     //     state=${JSON.stringify(state)}, hasGrandChildren=${this.tnode.hasGrandChildren()}`);
   }
 
-  nodeClicked(data: string[], evt: Event) {
-    this.$emit('node-clicked', data);
+  // Seems there's no way to get event name by default, so we have to pass it as parameter
+  bubbleEvent(data: any, evtName: string) {
+    this.$emit(evtName, data);
+  }
+
+  mouseEnter(e: MouseEvent) {
+    // setTimeout(() => this.$emit('node-mouse-enter', new MouseEnterEvent(this.tnode.pathAsString,  this.$refs.key as Element)), 500);
+    setTimeout(() => this.$el.dispatchEvent(
+      new CustomEvent('node-mouse-enter', { 
+        detail: new NodeMouseEnterEvent(this.tnode.pathAsString,  e.target as Element),
+        bubbles: true,
+        composed: true })), 1000);
+  }
+
+  mouseLeave(e: MouseEvent) {
+    setTimeout(() => this.$el.dispatchEvent(
+      new CustomEvent('node-mouse-leave', { 
+        detail: new NodeMouseEnterEvent(this.tnode.pathAsString,  e.target as Element),
+        bubbles: true,
+        composed: true })), 1000);
   }
 }
 </script>

@@ -12,7 +12,7 @@ export default class TreeUtil {
     if (p > 0)
       typeName = typeName.substr(0, p);
     const p2 = typeName.lastIndexOf('.');
-    return p2 < 0 ? typeName : typeName.substring(p + 1, p2);
+    return p2 < 0 ? typeName : typeName.substring(p2 + 1);
   }
 
   static getTypeLabel(node: TDNode) {

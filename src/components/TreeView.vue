@@ -40,9 +40,7 @@ export default class TreeView extends Vue {
       this.item.selectNode(v.path, 0, (node) => node.selected = true);
   }
 
-  get item() {
-    return this.$refs.item as TreeViewItem;
-  }
+  get item() { return this.$refs.item as TreeViewItem; }
 
   // VUELMIT: For some reason, <keep-alive> will keep the legacy node in memory.
   // That will cause the shared expandState data get corrupted.
@@ -52,9 +50,7 @@ export default class TreeView extends Vue {
     this.expandState = new ExpandState(this.expandState.expandLevel);
   }
 
-  nodeClicked(data: string[]) {
-    this.tstate.select(data);
-  }
+  nodeClicked(data: string[]) { this.tstate.select(data); }
 }
 </script>
 

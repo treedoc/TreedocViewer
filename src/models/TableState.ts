@@ -30,6 +30,7 @@ export class TDVTableOption {
     pageSizeOptions: [5, 20, 50, 100, 200, 500],
     columns: [],
     data: [],
+    filteredData: [],
     rawData: [],
     total: 0,
     query: { limit: 100, offset: 0 },

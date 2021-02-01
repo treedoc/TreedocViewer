@@ -29,4 +29,5 @@ export declare interface DataTableOptions extends TableConfig {
   query: Query;
   xprops: { [key: string]: any };
   rawData: any[];
+  filteredData: any[];
 }

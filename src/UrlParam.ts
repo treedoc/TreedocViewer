@@ -17,6 +17,6 @@ export default class UrlParam {
 
     const tableParamStr = url.searchParams.get('tableParam');
     if (tableParamStr)
-      this.tableParam = TD.parse(tableParamStr).toObject(false);
+      this.tableParam = TD.parse(tableParamStr);
   }
 }

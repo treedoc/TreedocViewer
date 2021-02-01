@@ -51,7 +51,7 @@ export default class XMLParserPlugin implements ParserPlugin<XMLParserOption> {
   docToObj(node: Node) {
     const result: XNode = {};
     // if (!this.compact)
-      result.type = node.constructor.name;
+    result.type = node.constructor.name;
     if (node instanceof Element) {
       result.tag = node.tagName;
       if (node.getAttributeNames) {

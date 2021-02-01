@@ -22,7 +22,7 @@ export default class JSONParserPlugin implements ParserPlugin<JSONParserOption> 
     try {
       const src = new StringCharSource(str);
       const nodes: TDNode[] = [];
-      while (src.skipSpacesAndReturns()) 
+      while (src.skipSpacesAndReturnsAndCommas()) 
         nodes.push(TDJSONParser.get().parse(src, new TDJSONParserOption().setDefaultRootType(TDNodeType.MAP)));
       result.result = nodes.length === 1 ? nodes[0] : TreeDoc.merge(nodes).root;
       result.message = 'TDJSONParser.parser()';

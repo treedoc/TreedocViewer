@@ -16,6 +16,11 @@
               <i class="fa fa-arrows-h"></i>
             </b-btn>
           </span>
+          <span v-b-tooltip.hover title="Copy table as JSON">
+            <b-btn size='sm' variant='outline-secondary'>
+              <i class="fa fa-copy" @click='copy'></i>
+            </b-btn>
+          </span>          
           <b-button-group class="ml-1">
             <!-- We have to wrapper the button so that tooltip will work properly when it's disabled -->
             <!-- https://bootstrap-vue.js.org/docs/components/tooltip/ -->
@@ -36,6 +41,7 @@
         </div>
       </div>
     </datatable>
+    <textarea ref='textViewCopyBuffer' v-model="copyBuffer" class='hiddenTextArea nowrap'></textarea>
   </div>
 </template>
 
@@ -51,7 +57,7 @@ import JsonPath from './JsonPath.vue';
 import TreeState, { TableNodeState } from '../models/TreeState';
 import JSONParserPlugin from '../parsers/JSONParserPlugin';
 import ExpandControl, { ExpandState } from './ExpandControl.vue';
-import { TDNode, TDNodeType } from 'treedoc';
+import { TD, TDNode, TDNodeType } from 'treedoc';
 
 const COL_VALUE = '@value';
 const COL_NO = '#';
@@ -71,6 +77,7 @@ export default class JsonTable extends Vue {
     pageSizeOptions: [5, 20, 50, 100, 200, 500],
     columns: [],
     data: [],
+    filteredData: [],
     rawData: [],
     total: 0,
     query: { limit: 100, offset: 0 },
@@ -83,6 +90,7 @@ export default class JsonTable extends Vue {
   isColumnExpanded = false;
   isColumnExpandedBuild = false;  // Flag to avoid duplicated rebuild()
   expandState = new ExpandState(0, 0, false);
+  copyBuffer = '';
 
   @Prop() private tableData!: TreeState | TDNode | object | string;
   @Prop() private options?: DataTableOptions;
@@ -202,6 +210,21 @@ export default class JsonTable extends Vue {
 
   queryData() {
     DataFilter.filter(this.tableOpt);
+  }
+
+  copy() {
+    console.log(this.tableOpt.filteredData);
+    const data = this.tableOpt.filteredData;
+    // data.forEach( r => delete r['@value']);
+    this.copyBuffer = TD.stringify(data);
+    console.log(`this.copyBuffer=${this.copyBuffer}`);
+    this.$nextTick(() => {
+      const textView = this.$refs.textViewCopyBuffer as HTMLTextAreaElement;
+      textView.select();
+      textView.setSelectionRange(0, 999999999);
+      // document.execCommand('selectAll');
+      const res = document.execCommand('copy');
+    });
   }
 
   @Watch('query', {deep: true})

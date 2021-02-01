@@ -71,27 +71,6 @@ export default class SourceView extends Vue {
     };
   }
 
-  copy() {
-    // code mirror doesn't support copy command, we have to use a hidden textarea to do the copy
-    this.textView.select();
-    this.textView.setSelectionRange(0, 999999999);
-    // document.execCommand('selectAll');
-    const res = document.execCommand('copy');
-
-    console.log(`copy result: ${res}`);
-    // this.codeView.editor.getTextArea().select();
-    // this.codeView.editor.execCommand('selectAll');
-    // this.codeView.editor.execCommand('copy');
-  }
-
-  paste() {
-    this.textView.select();
-    this.textView.focus();
-    // Doesn't work both in firefox and chrome
-    const res = document.execCommand('paste');
-    console.log(`paste result: ${res}`);
-  }
-
   @Watch('val')
   watchVal() { this.$emit('input', this.val); }
 
@@ -138,11 +117,6 @@ function scrollTo(textarea: HTMLTextAreaElement, offset: number) {
   font-size: small;
 }
 
-.hiddenTextArea {
-  width: 0px;
-  height: 0px;
-}
-
 .textArea {
   width: 100%;
   min-height:400px;
@@ -154,10 +128,4 @@ function scrollTo(textarea: HTMLTextAreaElement, offset: number) {
   flex-grow:1;
   overflow:auto;
 } */
-/* workaround for firefox bug:  https://bugzilla.mozilla.org/show_bug.cgi?id=1137650 */
-.nowrap {
-    white-space: pre;
-    overflow: auto;
-    word-wrap: normal;
-}
 </style>
