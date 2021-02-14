@@ -1,0 +1,9 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`CSVParser.ts parse 1`] = `
+ParseResult {
+  "message": "CSVParser.parser()",
+  "result": "[object Undefined]",
+  "status": 0,
+}
+`;

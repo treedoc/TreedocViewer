@@ -124,6 +124,7 @@ export default {
   jsonStr,
   yamlStr,
   xmlStr,
+  csvStr,
   data: [
     {text: 'empty', value: {}},
     {

@@ -41,6 +41,7 @@ import { ExpandState } from './ExpandControl.vue';
 import SimpleValue from './SimpleValue.vue';
 import TreeState from '../models/TreeState';
 import TreeUtil from '../models/TreeUtil';
+import Util from '../util/Util';
 
 
 export class NodeMouseEnterEvent {
@@ -71,6 +72,7 @@ export default class TreeViewItem extends Vue {
   @Prop({default: () => new ExpandState()}) expandState!: ExpandState;
   open = false;
   selected = false;
+  mouseOver = false;
 
   toggleOpen() { this.open = !this.open; }
   // VUELIMIT: Vue $emit won't buble up the event to grand parent, so we have explicitly
@@ -134,20 +136,22 @@ export default class TreeViewItem extends Vue {
   }
 
   mouseEnter(e: MouseEvent) {
+    this.mouseOver = true;
     // setTimeout(() => this.$emit('node-mouse-enter', new MouseEnterEvent(this.tnode.pathAsString,  this.$refs.key as Element)), 500);
-    setTimeout(() => this.$el.dispatchEvent(
+    setTimeout(() => Util.doIf(this.mouseOver, () => this.$el.dispatchEvent(
       new CustomEvent('node-mouse-enter', { 
         detail: new NodeMouseEnterEvent(this.tnode.pathAsString,  e.target as Element),
         bubbles: true,
-        composed: true })), 1000);
+        composed: true }))), 500);
   }
 
   mouseLeave(e: MouseEvent) {
+    this.mouseOver = false;
     setTimeout(() => this.$el.dispatchEvent(
       new CustomEvent('node-mouse-leave', { 
         detail: new NodeMouseEnterEvent(this.tnode.pathAsString,  e.target as Element),
         bubbles: true,
-        composed: true })), 1000);
+        composed: true })), 500);
   }
 }
 </script>

@@ -13,7 +13,7 @@
             URL: <b-input v-model="urlInput" />
           </b-modal>
         </b-btn>
-        <b-btn :size="'sm'" @click='copy(jsonStr)' class='tdv' :disabled='!jsonStr' v-b-tooltip.hover title="Copy">
+        <b-btn :size="'sm'" @click='copyText(jsonStr)' class='tdv' :disabled='!jsonStr' v-b-tooltip.hover title="Copy">
           <i class="fa fa-copy"></i>
         </b-btn>
         <b-btn :size="'sm'" @click='paste' v-b-tooltip.hover title="Paste" v-if="pasteSupported">
@@ -131,7 +131,13 @@ export default class JsonTreeTable extends Vue {
   }
 
   mounted() {
+    // for devtool interaction
     (window as any).tdv = this;
+  }
+
+  // for devtool interaction only
+  tranformJson(func: (obj: any) => any) {
+    this.jsonStr = JSON.stringify(func(JSON.parse(this.jsonStr)), null, 2);
   }
 
   @Watch('data', { immediate: true })

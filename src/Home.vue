@@ -9,7 +9,9 @@
       </span>
       <span class="title">
         <span id='icons'>
-          <a href='https://github.com/treedoc/TreedocViewer' target="_blank"><img alt="GitHub stars" src="https://img.shields.io/github/stars/treedoc/treedocviewer"></a>
+          <!-- <a href='https://github.com/treedoc/TreedocViewer' target="_blank"><img alt="GitHub stars" src="https://img.shields.io/github/stars/treedoc/treedocviewer"></a> -->
+          <a href='https://github.com/treedoc/TreedocViewer' target="_blank"><img alt="Github folks" src="https://img.shields.io/github/forks/treedoc/treedocviewer"></a>
+
           <!-- <a href='https://github.com/treedoc/TreedocViewer/issues' target="_blank"><img alt="GitHub issues" src="https://img.shields.io/github/issues/treedoc/treedocviewer"></a> -->
           <a href='https://www.npmjs.com/package/treedoc-viewer' target="_blank"><img alt="npm" src="https://img.shields.io/npm/v/treedoc-viewer"></a>
           <!-- <a href='https://www.reddit.com/r/javascript/comments/el6bs2/treedoc_viewer_is_a_featurerich_viewer_for/' title="Discuss on Reddit" target="_blank">
@@ -49,12 +51,12 @@ export default class Home extends Vue {
 
   tdvOption: TDVOptions = {
     parsers: [
-      new YAMLParserPlugin(),
       new XMLParserPlugin('XML compact', 'text/xml', true),
       new XMLParserPlugin(),
       new XMLParserPlugin('html', 'text/html'),
       new CSVParserPlugin(),
       new CSVParserPlugin('TSV', '\t'),
+      new YAMLParserPlugin(),
       ],
   };
 
