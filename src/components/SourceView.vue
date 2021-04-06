@@ -3,7 +3,7 @@
     <template v-if="useCodeView[0]">
       <codemirror ref='codeView' class='codeView' :options="options" v-model="val" style="height:100%"></codemirror>
     </template>
-    <textarea ref='textView' v-model="val" :class="[useCodeView[0] ? 'hiddenTextArea' : 'textArea']" style="white-space: nowrap;"></textarea>
+    <textarea ref='textView' v-model="val" :class="[useCodeView[0] ? 'hiddenTextArea' : 'textArea']" class='nowrap'></textarea>
   </div>
 </template>
 
@@ -71,19 +71,6 @@ export default class SourceView extends Vue {
     };
   }
 
-  copy() {
-    // code mirror doesn't support copy command, we have to use a hidden textarea to do the copy
-    this.textView.select();
-    this.textView.setSelectionRange(0, 999999999);
-    // document.execCommand('selectAll');
-    const res = document.execCommand('copy');
-
-    console.log(`copy result: ${res}`);
-    // this.codeView.editor.getTextArea().select();
-    // this.codeView.editor.execCommand('selectAll');
-    // this.codeView.editor.execCommand('copy');
-  }
-
   @Watch('val')
   watchVal() { this.$emit('input', this.val); }
 
@@ -128,11 +115,6 @@ function scrollTo(textarea: HTMLTextAreaElement, offset: number) {
 .CodeMirror {
   height: 100%;
   font-size: small;
-}
-
-.hiddenTextArea {
-  width: 0px;
-  height: 0px;
 }
 
 .textArea {

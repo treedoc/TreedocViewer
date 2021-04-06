@@ -1,0 +1,15 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`Util.ts topLines 1`] = `
+Object {
+  "length": 9,
+  "numLines": 3,
+}
+`;
+
+exports[`Util.ts topLines 2`] = `
+Object {
+  "length": 6,
+  "numLines": 2,
+}
+`;

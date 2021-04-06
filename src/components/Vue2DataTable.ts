@@ -1,6 +1,7 @@
 export declare interface Column {
   field: string;
   visible?: boolean;
+  html?: ((value: any, row: any) => string) | string;  //
   [key: string]: any;
 }
 
@@ -12,15 +13,21 @@ export declare interface Query {
   [key: string]: any;
 }
 
-export declare interface DatatableOptions {
+export declare interface TableConfig {
+  Pagination?: boolean;
   fixHeaderAndSetBodyMaxHeight?: string | number;
   tblStyle?: string;
   tblClass?: string;
   pageSizeOptions?: number[];
-  columns: Array<Column>;
+  columns: Column[];
+}
+
+// https://onewaytech.github.io/vue2-datatable/doc/#/en/details/datatable-props
+export declare interface DataTableOptions extends TableConfig {
   data: any[];
   total: number;
   query: Query;
   xprops: { [key: string]: any };
   rawData: any[];
+  filteredData: any[];
 }

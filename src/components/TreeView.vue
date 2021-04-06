@@ -1,13 +1,13 @@
 <template>
   <div class='wrapper'>
-    <div class="jtt-toolbar">
+    <div class="tdv-toolbar">
       <expand-control ref='expandControl' :state='expandState' style="float: right;"/>
     </div>
     <tree-view-item class='item-root'
         :tnode='tstate.tree.root'
         :currentLevel='0'
         :expandState='expandState'
-        @nodeClicked='nodeClicked'
+        @node-clicked='nodeClicked'
         ref='item' />
   </div>
 </template>
@@ -40,9 +40,7 @@ export default class TreeView extends Vue {
       this.item.selectNode(v.path, 0, (node) => node.selected = true);
   }
 
-  get item() {
-    return this.$refs.item as TreeViewItem;
-  }
+  get item() { return this.$refs.item as TreeViewItem; }
 
   // VUELMIT: For some reason, <keep-alive> will keep the legacy node in memory.
   // That will cause the shared expandState data get corrupted.
@@ -52,9 +50,7 @@ export default class TreeView extends Vue {
     this.expandState = new ExpandState(this.expandState.expandLevel);
   }
 
-  nodeClicked(data: string[]) {
-    this.tstate.select(data);
-  }
+  nodeClicked(data: string[]) { this.tstate.select(data); }
 }
 </script>
 

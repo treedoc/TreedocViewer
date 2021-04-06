@@ -1,6 +1,6 @@
-import { ParserPlugin, ParseResult } from '../models/JTTOption';
+import { ParserPlugin, ParseResult } from '../models/TDVOption';
 import { CSVParser, CSVOption, CSVWriter, TDNode } from 'treedoc';
-import YAMLParser from './YAMLParser';
+import Util from '@/util/Util';
 
 export class CSVParserOption {
 }
@@ -12,6 +12,22 @@ export default class CSVParserPlugin implements ParserPlugin<CSVParserOption> {
   constructor(public name = 'CSV', public fieldSep = ',') {}
 
   looksLike(str: string): boolean {
+    const topLines = Util.topLines(str, 5000);
+    if (topLines.numLines <= 1)
+      return false;  // Single line 
+    try {  
+      const node = CSVParser.get().parse(str.substr(0, topLines.length), this.csvOption);
+      const columnSize = node.children![0].getChildrenSize();
+      if (columnSize < 2)
+        return false;
+      for (let row = 1; row < node.getChildrenSize(); row++) {
+        if (node.children![row].getChildrenSize() !== columnSize)
+          return false;
+      }
+      return true;
+    } catch (e) {
+      return false;
+    }
     return false;
   }
 

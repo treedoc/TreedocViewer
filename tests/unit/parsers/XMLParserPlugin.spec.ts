@@ -1,11 +1,8 @@
-import History from '@/models/History';
 import sampleData from '@/sampleData';
-import JSONParser from '@/parsers/JSONParser';
-import { ParseResult } from '@/models/JTTOption';
-import XMLParser, { XMLParserOption } from '@/parsers/XMLParser';
+import XMLParserPlugin, { XMLParserOption } from '@/parsers/XMLParserPlugin';
 
 describe('JSONParser.ts', () => {
-  const parser = new XMLParser();
+  const parser = new XMLParserPlugin();
   it('looksLike', () => {
     expect(parser.looksLike(sampleData.xmlStr)).toBeTruthy();
     expect(parser.looksLike(sampleData.jsonStr)).toBeFalsy();
@@ -17,7 +14,7 @@ describe('JSONParser.ts', () => {
   });
 
   it('parse Compacted', () => {
-    const compactParser = new XMLParser('XML compact', 'text/xml', true);
+    const compactParser = new XMLParserPlugin('XML compact', 'text/xml', true);
     const result = compactParser.parse(sampleData.xmlStr);
     expect(result.message).toBe('DOMParser().parseFromString()');
   });

@@ -1,25 +1,25 @@
 <template>
-  <div class="jtt-container">
-    <div class='jtt-top'>
-      <b class="jtt-title">{{title}}</b>
-      <b-button-group class="ml-1 jtt-toolbar">
+  <div class="tdv-container">
+    <div class='tdv-top'>
+      <slot name='title' />
+      <b-button-group class="ml-1 tdv-toolbar">
         <b-btn :size="'sm'" @click='$refs.file1.click()' v-b-tooltip.hover title="Open File">
           <i class="fa fa-folder-open"></i>
           <input type="file" ref='file1' style="display: none" @change="readFile($event)">
         </b-btn>
         <b-btn :size="'sm'" v-b-modal.modal-1 v-b-tooltip.hover title="Open URL">
           <i class="fa fa-link"></i>
-          <b-modal id="modal-1" title="Open URL" @ok='openUrl' @show='urlInput=url'>
+          <b-modal id="modal-1" title="Open URL" @ok='openUrl(urlInput)' @show='urlInput=url'>
             URL: <b-input v-model="urlInput" />
           </b-modal>
         </b-btn>
-        <b-btn :size="'sm'" @click='copy' class='jtt' :disabled='!jsonStr' v-b-tooltip.hover title="Copy">
+        <b-btn :size="'sm'" @click='copyText(jsonStr)' class='tdv' :disabled='!jsonStr' v-b-tooltip.hover title="Copy">
           <i class="fa fa-copy"></i>
         </b-btn>
-        <b-btn :size="'sm'" @click='paste' v-b-tooltip.hover title="Paste">
+        <b-btn :size="'sm'" @click='paste' v-b-tooltip.hover title="Paste" v-if="pasteSupported">
           <i class="fa fa-paste"></i>
         </b-btn>
-        <b-btn size='sm' variant='outline-secondary' class='jtt' :pressed.sync='codeView[0]' v-b-tooltip.hover title="Toggle source code syntax hi-lighting">
+        <b-btn size='sm' variant='outline-secondary' class='tdv' :pressed.sync='codeView[0]' v-b-tooltip.hover title="Toggle source code syntax hi-lighting">
           <i class="fa fa-code"></i>
         </b-btn>
         <b-btn size='sm' @click='format' v-b-tooltip.hover title="Format">
@@ -27,16 +27,16 @@
         </b-btn>
       </b-button-group>
       <b-button-group class="mx-1">
-        <b-btn size='sm' variant='outline-secondary' class='jtt' :pressed.sync='showSource[0]'>Source</b-btn>
-        <b-btn size='sm' variant='outline-secondary' class='jtt' :pressed.sync='showTree[0]'>Tree</b-btn>
-        <b-btn size='sm' variant='outline-secondary' class='jtt' :pressed.sync='showTable[0]'>Table</b-btn>
+        <b-btn size='sm' variant='outline-secondary' class='tdv' :pressed.sync='showSource[0]'>Source</b-btn>
+        <b-btn size='sm' variant='outline-secondary' class='tdv' :pressed.sync='showTree[0]'>Tree</b-btn>
+        <b-btn size='sm' variant='outline-secondary' class='tdv' :pressed.sync='showTable[0]'>Table</b-btn>
         Parser <b-form-select :options='parserSelectOptions' v-model='selectedParser' size="sm"></b-form-select>
       </b-button-group>
       <span><slot/></span>
       <span class="status-msg" :class="{error: hasError}" >{{parseResult}}</span>
     </div>
     <div class="split-container">
-      <msplit :maxPane='tstate.maxPane'>
+      <msplit :maxPane='tstate.maxPane'  @node-mouse-enter.native.stop='nodeMouseEnter' @node-mouse-leave.native.stop='nodeMouseLeave'>
         <div slot="source" :grow="20" style="width: 100%" :show="showSource"  class="panview">
           <SourceView ref="sourceView" v-model="jsonStr" :syntax='selectedParser.syntax' :selection='tstate.selection' :show='showSource[0]' :useCodeView='codeView' />
         </div>
@@ -45,15 +45,25 @@
           <tree-view v-if="tstate.tree" 
               :tstate="tstate"
               :expand-level=1
-              :rootObjectKey='rootObjectKey' />
+              :rootObjectKey='rootObjectKey' 
+              />
           <div v-else>No Data</div>
+
         </div>
         <div slot="table" :grow="50" :show="showTable" class="panview">
-          <div v-if="tstate.tree" ><json-table :table-data='tstate' v-on:nodeClicked='nodeClicked'/></div>
+          <div v-if="tstate.tree" ><json-table :table-data='tstate' 
+            @node-clicked='nodeClicked'
+            isInMuliPane="true" /></div>
           <div v-else>No Data</div>
         </div>
       </msplit>
     </div>
+    <div id='treeItemActions' v-show="mouseInNode || mouseInActionBar === true" :style="treeItemActionStyle" @mouseenter="mouseEnterActionBar" @mouseleave="mouseLeaveActionBar">
+      <b-button-group class="mx-1">
+        <b-btn :size="'sm'" @click='copyNode' class='tdv' v-b-tooltip.hover title="Copy Current Node"><i class="fa fa-copy"></i></b-btn>
+      </b-button-group>
+    </div>
+    <textarea ref='copyTextArea' class='hiddenTextArea nowrap' />
   </div>
 </template>
 
@@ -62,13 +72,14 @@ import { Component, Prop, Vue, Watch } from 'vue-property-decorator';
 import _ from 'lodash';
 import TreeState from '../models/TreeState';
 import SourceView from './SourceView.vue';
-import JTTOptions, { ParserPlugin } from '../models/JTTOption';
+import TDVOptions, { ParserPlugin } from '../models/TDVOption';
 import TreeView from './TreeView.vue';
 import JsonTable from './JsonTable.vue';
-import JSONParser from '../parsers/JSONParser';
-import XMLParser from '../parsers/XMLParser';
+import JSONParserPlugin from '../parsers/JSONParserPlugin';
 
 import { TDNode, TDJSONWriter, TDJSONWriterOption } from 'treedoc';
+import { NodeMouseEnterEvent } from './TreeViewItem.vue';
+import { nextTick } from 'vue/types/umd';
 
 @Component({
   components: {
@@ -80,41 +91,57 @@ import { TDNode, TDJSONWriter, TDJSONWriterOption } from 'treedoc';
 export default class JsonTreeTable extends Vue {
   @Prop() title?: string;
   @Prop() data!: object | any[] | string;
-  @Prop() options?: JTTOptions;
+  @Prop() options?: TDVOptions;
   @Prop() initalPath!: string;
   @Prop() rootObjectKey!: string;
 
-  showSource = [true];
-  showTree = [true];
-  showTable = [true];
-  codeView = [true];
-  defaultParser = new JSONParser();
-  selectedParser = this.defaultParser;
-  tstate = new TreeState({}, this.selectedParser);
-  jsonStr = '';
+  private showSource = [true];
+  private showTree = [true];
+  private showTable = [true];
+  private codeView = [true];
+  private defaultParser = new JSONParserPlugin();
+  private selectedParser = this.defaultParser;
+  private tstate = new TreeState({}, this.selectedParser);
+  private jsonStr = '';
 
-  parseResult = '';
-  strDataSynced = false;
-  error = {
+  private parseResult = '';
+  private strDataSynced = false;
+  private error = {
     color: 'red',
   };
 
   // url = https://maps.sensor.community/data/v2/data.24h.json
   // url = 'https://jsonplaceholder.typicode.com/posts';
-  url = 'https://www.googleapis.com/discovery/v1/apis/vision/v1p1beta1/rest';
+  private url = 'https://www.googleapis.com/discovery/v1/apis/vision/v1p1beta1/rest';
   // url = "https://www.googleapis.com/discovery/v1/apis"
-  urlInput = '';
+  private urlInput = '';
 
-  nodeClicked(node: TDNode) {
-    this.tstate.select(node);
+  treeItemActionStyle = {};
+  mouseEnterEvent: NodeMouseEnterEvent | null = null;
+  mouseInActionBarRealtime = false;
+  mouseInActionBar = false;
+  mouseInNode = false;
+
+  private nodeClicked(nodePath: string[]) {
+    this.tstate.select(nodePath);
   }
 
-  format() {
+  private format() {
     this.jsonStr = TDJSONWriter.get().writeAsString(this.tstate.tree.root, new TDJSONWriterOption().setIndentFactor(2));
   }
 
+  mounted() {
+    // for devtool interaction
+    (window as any).tdv = this;
+  }
+
+  // for devtool interaction only
+  transformJson(func: (obj: any) => any) {
+    this.jsonStr = JSON.stringify(func(this.tstate.tree.root.toObject()), null, 2);
+  }
+
   @Watch('data', { immediate: true })
-  watchData(d: string | object | any[]) {
+  private watchData(d: string | object | any[]) {
     if (_.isString(d))
       this.jsonStr = d;
     else {
@@ -124,12 +151,15 @@ export default class JsonTreeTable extends Vue {
   }
 
   @Watch('selectedParser')
-  watch(v: ParserPlugin<any>) {
+  private watch(v: ParserPlugin<any>) {
     this.parse(this.jsonStr, this);
   }
 
   @Watch('jsonStr', { immediate: true })
-  watchJsonStr(str: string, old: string) {
+  private watchJsonStr(str: string, old: string) {
+    if (!str)
+      str = '';
+
     if (str.length > 200_000)
       this.codeView[0] = false;
     if (str.length < 100_000)
@@ -142,7 +172,7 @@ export default class JsonTreeTable extends Vue {
 
   // Have to pass THIS as Vue framework will generate a different instance
   // of this during runtime.
-  parse = _.debounce((str: string, THIS: JsonTreeTable, detectParser = false) => {
+  private parse = _.debounce((str: string, THIS: JsonTreeTable, detectParser = false) => {
     // Auto detect parser
     if (detectParser)
       for (const parser of this.parserSelectOptions) {
@@ -154,31 +184,29 @@ export default class JsonTreeTable extends Vue {
 
     const selectedPath = THIS.tstate.selected ? THIS.tstate.selected.path : [];
     THIS.tstate = new TreeState(this.strDataSynced ? THIS.data : str, THIS.selectedParser, THIS.rootObjectKey, selectedPath);
-    (window as any).tstate = THIS.tstate;
     THIS.strDataSynced = false;
     THIS.parseResult = THIS.tstate.parseResult;
 
     if (selectedPath.length === 0 && THIS.initalPath && THIS.tstate.tree)
       THIS.tstate.select(THIS.initalPath, true);
-  }, 500);
+  }, 300);
 
-  get hasError() {
+  private get hasError() {
     return this.parseResult.startsWith('Error');
   }
 
-  get parserSelectOptions() {
+  private get parserSelectOptions() {
     const opt = new Array<{text: string, value: ParserPlugin<any>}>();
     opt.push({ text: this.defaultParser.name, value: this.defaultParser });
     if (this.options && this.options.parsers)
       this.options.parsers.forEach(p => opt.push({text: p.name, value: p}));
     return opt;
   }
+  
+  private get copyTextArea() { return this.$refs.copyTextArea as HTMLTextAreaElement; }
+  private get sourceView() { return this.$refs.sourceView as SourceView; }
 
-  get sourceView() {
-    return this.$refs.sourceView as SourceView;
-  }
-
-  readFile(ef: Event) {
+  private readFile(ef: Event) {
     const fileName = (ef.target as HTMLInputElement).files![0];
     if (!fileName)
       return;
@@ -190,8 +218,8 @@ export default class JsonTreeTable extends Vue {
     reader.readAsText(fileName);
   }
 
-  openUrl() {
-    this.url = this.urlInput;
+  openUrl(dataUrl: string) {
+    this.url = dataUrl;
     window.fetch(this.url)
       .then(res => res.text())
       .then(data => this.jsonStr = data)
@@ -202,19 +230,68 @@ export default class JsonTreeTable extends Vue {
     }, null, 2);
   }
 
+  get pasteSupported() { return !!navigator.clipboard.readText; }
+
   paste() {
-    // this.codeView.editor.getTextArea().select();
-    // this.codeView.editor.focus();
-    // Doesn't work as chrome blocked for security reason
-    // const res = document.execCommand("paste");
+    // this.copyTextArea.select();
+    // this.copyTextArea.focus();
+    // // Doesn't work both in firefox and chrome
+    // const res = document.execCommand('paste');
     // console.log(`paste result: ${res}`);
+
+    // Only works for chrome
     navigator.clipboard.readText().then((txt: string) => {
        this.jsonStr = txt;
     });
   }
 
-  copy() {
-    this.sourceView.copy();
+
+  private copyText(text: string) {
+    // code mirror doesn't support copy command, we have to use a hidden textarea to do the copy
+    this.copyTextArea.value = text;
+    this.copyTextArea.select();
+    this.copyTextArea.setSelectionRange(0, 999999999);
+    // document.execCommand('selectAll');
+    const res = document.execCommand('copy');
+    console.log(`copy result: ${res}`);
+    // this.codeView.editor.getTextArea().select();
+    // this.codeView.editor.execCommand('selectAll');
+    // this.codeView.editor.execCommand('copy');
+  }
+
+  get mouseOverNode() { return this.tstate.findNodeByPath(this.mouseEnterEvent!.nodePath); }
+  
+  copyNode() { 
+    const node = this.mouseOverNode;
+    if (node.start && node.end)
+      this.copyText(this.jsonStr.substring(node.start.pos, node.end.pos));
+    else 
+      this.copyText(TDJSONWriter.writeAsString(node, new TDJSONWriterOption().setIndentFactor(2)));
+  }
+
+  nodeMouseEnter(e: CustomEvent) { 
+    this.mouseEnterEvent = e.detail; 
+    this.mouseInNode = true;
+    const pos = this.mouseEnterEvent!.source.getBoundingClientRect();
+    this.treeItemActionStyle = {position: 'fixed', top: `${pos.top}px`, left: `${pos.right}px`};
+  }
+
+  nodeMouseLeave(e: CustomEvent) {
+    if (this.mouseEnterEvent?.source === e.detail.source)
+      this.mouseInNode = false;
+  }
+
+  mouseEnterActionBar() {
+    this.mouseInActionBarRealtime = true;
+    setTimeout(() => this.mouseInActionBar = true, 500);
+  }
+
+  mouseLeaveActionBar() {
+    this.mouseInActionBarRealtime = false;
+    setTimeout(() => {
+      if (!this.mouseInActionBarRealtime)
+        this.mouseInActionBar = false;
+    }, 500);
   }
 }
 </script>
@@ -223,11 +300,9 @@ export default class JsonTreeTable extends Vue {
   font-size: smaller;
   color: darkgreen;
 }
-
 .error {
   color: red;
 }
-
 .panview {
   /* max-height: 93vh; */
   max-height: 100%;
@@ -237,8 +312,7 @@ export default class JsonTreeTable extends Vue {
   display: flex;
   flex-direction: column;
 }
-
-.jtt-container {
+.tdv-container {
   display: flex;
   height: 100%;
   flex-direction: column;
@@ -251,17 +325,21 @@ export default class JsonTreeTable extends Vue {
   /* background-color: rgba(0, 255, 255, 0.308); */
   overflow: auto;
 }
-.jtt-top {
+.tdv-top {
   background-color: lightgray;
 }
-.jtt-toolbar {
+.tdv-toolbar {
   position: sticky;
   top: 0;
   left: 0;
   z-index: 100;
 }
-.jtt-title {
+.tdv-title {
   color: darkblue;
+}
+.tdv-hint {
+  color: #aaa;
+  font-size: 90%;
 }
 .json-tree-table * .btn-outline-secondary:hover {
   background-color: #bdccdc;
@@ -277,5 +355,27 @@ export default class JsonTreeTable extends Vue {
 }
 .json-tree-table * .btn-secondary:hover:not(:disabled){
   background-color: #6c757d;
+}
+
+.hiddenTextArea {
+  width: 0px;
+  height: 0px;
+  left: 0px;
+  top: 0px;
+  position: static;
+}
+
+/* workaround for firefox bug:  https://bugzilla.mozilla.org/show_bug.cgi?id=1137650 */
+.nowrap {
+    white-space: pre;
+    overflow: auto;
+    word-wrap: normal;
+}
+
+.hiddenTextArea {
+  position: fixed; 
+  opacity: 0;
+  width: 0px;
+  height: 0px;
 }
 </style>

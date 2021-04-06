@@ -9,6 +9,8 @@
     ]
   },
   "rules": {
+    "no-trailing-whitespace": false,
+    "align": [true, "statements"],
     "quotemark": [true, "single", "avoid-escape", "avoid-template"],
     "indent": [true, "spaces", 2],
     "interface-name": false,
@@ -30,6 +32,7 @@
     "member-access": false,
     "max-classes-per-file": false,
     "member-ordering": false,
-    "arrow-parens": false
+    "arrow-parens": false,
+    "no-eval": false
   }
 }

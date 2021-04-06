@@ -1,15 +1,15 @@
 <template>
   <div class='item'>
     <div v-if='!isSimpleType' class='leaf'>
-      <div class='node' @click.stop='toggleOpen()' >
+      <div class='node' @click.stop='toggleOpen()'>
         <span :class='{opened: open, selected: selected}' class='key key-with-chevron'>
           <!-- VUETIP: in the event, don't emit object, serialization will take long time if object is big -->
-          <a href="#/" @click.stop="$emit('nodeClicked', ['', ...tnode.path])">
+          <a href="#" @click.stop="$emit('node-clicked', ['', ...tnode.path])" @mouseenter="mouseEnter" @mouseleave="mouseLeave">
           <!-- <a href="#/" @click.stop="tstate.select(tnode)"> -->
             {{tnode.key}}
           </a>
         </span>
-        <span class='hint'>{{label}}</span>
+        <span class='tdv-hint'>{{label}}</span>
       </div>
       <template v-for="cn in tnode.children" >
         <keep-alive :key='cn.key'>
@@ -23,13 +23,13 @@
               :currentLevel='currentLevel+1'
               :expandState='expandState'
               :tnode='cn'
-              @nodeClicked='nodeClicked' />
+              @node-clicked='bubbleEvent($event, "node-clicked")' />
         </keep-alive>
       </template>
     </div>
     <div v-else>
       <span class='key'>{{tnode.key}}</span>:
-      <simple-value :tnode='tnode' @nodeClicked='nodeClicked' />
+      <simple-value :tnode='tnode' @node-clicked='bubbleEvent($event, "node-clicked")' />
     </div>
   </div>
 </template>
@@ -41,6 +41,15 @@ import { ExpandState } from './ExpandControl.vue';
 import SimpleValue from './SimpleValue.vue';
 import TreeState from '../models/TreeState';
 import TreeUtil from '../models/TreeUtil';
+import Util from '../util/Util';
+
+
+export class NodeMouseEnterEvent {
+  constructor(
+    public nodePath: string,
+    public source: Element,
+  ) {}
+}
 
 // @Component({
 //   components: {
@@ -63,15 +72,15 @@ export default class TreeViewItem extends Vue {
   @Prop({default: () => new ExpandState()}) expandState!: ExpandState;
   open = false;
   selected = false;
+  mouseOver = false;
 
   toggleOpen() { this.open = !this.open; }
   // VUELIMIT: Vue $emit won't buble up the event to grand parent, so we have explicitly
   // propagate it.
-  // nodeClicked(tnode: TreeNode) { this.$emit('nodeClicked', tnode); }
+  // nodeClicked(tnode: TreeNode) { this.$emit('node-clicked', tnode); }
 
   get isSimpleType() { return this.tnode.type === TDNodeType.SIMPLE; }
-
-  get label() { return TreeUtil.getTypeSizeLabel(this.tnode); }
+  get label() { return TreeUtil.getTypeSizeLabel(this.tnode, !this.open && this.expandState.showChildrenSummary); }
 
   @Watch('selected')
   private watchSelected(v: boolean) {
@@ -121,8 +130,28 @@ export default class TreeViewItem extends Vue {
     //     state=${JSON.stringify(state)}, hasGrandChildren=${this.tnode.hasGrandChildren()}`);
   }
 
-  nodeClicked(data: string[]) {
-    this.$emit('nodeClicked', data);
+  // Seems there's no way to get event name by default, so we have to pass it as parameter
+  bubbleEvent(data: any, evtName: string) {
+    this.$emit(evtName, data);
+  }
+
+  mouseEnter(e: MouseEvent) {
+    this.mouseOver = true;
+    // setTimeout(() => this.$emit('node-mouse-enter', new MouseEnterEvent(this.tnode.pathAsString,  this.$refs.key as Element)), 500);
+    setTimeout(() => Util.doIf(this.mouseOver, () => this.$el.dispatchEvent(
+      new CustomEvent('node-mouse-enter', { 
+        detail: new NodeMouseEnterEvent(this.tnode.pathAsString,  e.target as Element),
+        bubbles: true,
+        composed: true }))), 500);
+  }
+
+  mouseLeave(e: MouseEvent) {
+    this.mouseOver = false;
+    setTimeout(() => this.$el.dispatchEvent(
+      new CustomEvent('node-mouse-leave', { 
+        detail: new NodeMouseEnterEvent(this.tnode.pathAsString,  e.target as Element),
+        bubbles: true,
+        composed: true })), 500);
   }
 }
 </script>
@@ -172,9 +201,5 @@ export default class TreeViewItem extends Vue {
 
 .selected {
   background-color:#ffc107;
-}
-
-.hint {
-  color: #ccc;
 }
 </style>

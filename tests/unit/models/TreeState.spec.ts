@@ -14,8 +14,8 @@ describe('TreeState.ts', () => {
 
     state.select('#/activityHistory/1');
     expect(state.selected?.key).toBe('1');
-    expect(state.selection.start?.pos).toBe(309);
-    expect(state.selection.end?.pos).toBe(522);
+    expect(state.selection.start?.pos).toBe(339);
+    expect(state.selection.end?.pos).toBe(582);
     expect(state.history.items.length).toBe(2);
 
     state.toggleMaxPane('table');

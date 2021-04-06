@@ -1,9 +1,9 @@
 <template>
   <div>
-    <div v-if="isObject" class="jtt_key">
-      <a href="#/" @click.stop="nodeClicked(row['@value'])">{{value}}</a>
+    <div v-if="isObject" class="tdv_key">
+      <a href="#" @click.stop="nodeClicked(row['@value'])">{{value}}</a>
     </div>
-    <div v-else class="jtt_key">{{value}}</div>
+    <div v-else class="tdv_key">{{value}}</div>
   </div>
 </template>
 <script lang='js'>
@@ -24,7 +24,7 @@ export default {
 };
 </script>
 <style scoped>
-.jtt_key {
+.tdv_key {
   white-space: nowrap;
   font-weight: bolder;
 }

@@ -7,6 +7,7 @@ const jsonStr = `
     $id:1234,
     creationDate:"2014/10/02 10:20:37",
     lastModifiedDate:"2014/10/02 10:20:37",
+    timeStamp: 1599461650448,
     runtimeContext:"t=118",
     partitionKey:0,
     activityType:"1-buyerCreateCancel",
@@ -16,6 +17,7 @@ const jsonStr = `
     $type:"ActivityHistBoImpl",
     creationDate:"2014/10/02 11:15:13",
     lastModifiedDate:"2014/10/02 11:15:13",
+    timeStamp: 1599481650448,
     runtimeContext:"m=t=148\nline2",
     partitionKey:0,
     activityType:"6-sellerApprove",
@@ -96,6 +98,20 @@ const xmlStr = `<?xml version="1.0" encoding="UTF-8"?>
 </project>
 `;
 
+const fxml = `
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.geometry.Insets?>
+<GridPane hgap="8.0" vgap="8.0" xmlns="http://javafx.com/javafx/11.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="MainController">
+  <columnConstraints>
+    <ColumnConstraints hgrow="SOMETIMES" minWidth="10.0" />
+  </columnConstraints>
+  <rowConstraints>
+    <RowConstraints />
+    <RowConstraints vgrow="ALWAYS" />
+  </rowConstraints>
+</GridPane>
+`;
+
 const csvStr = `
 field1,field2,field3
 v11,v12,v13
@@ -108,6 +124,7 @@ export default {
   jsonStr,
   yamlStr,
   xmlStr,
+  csvStr,
   data: [
     {text: 'empty', value: {}},
     {
@@ -274,6 +291,10 @@ No \\n's!",
     {
       text: 'xml',
       value: xmlStr,
+    },
+    {
+      text: 'fxml (JavaFx)',
+      value: fxml,
     },
     {
       text: 'csv',

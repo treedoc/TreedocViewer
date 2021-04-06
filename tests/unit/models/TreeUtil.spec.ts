@@ -1,5 +1,5 @@
 import TreeUtil from '@/models/TreeUtil';
-import { TDJSONParser, TDJSONParserOption } from 'treedoc/lib/index';
+import { TD, TDJSONParser, TDJSONParserOption } from 'treedoc/lib/index';
 
 describe('TreeUtil.ts', () => {
 
@@ -16,7 +16,7 @@ describe('TreeUtil.ts', () => {
       log:'http://www.google.com',
     }
     `;
-    const tdNode = TDJSONParser.parse(json);
+    const tdNode = TD.parse(json);
 
     expect(TreeUtil.getTypeSizeLabel(tdNode)).toBe('{8} <ActivityHist@1234>');
   });

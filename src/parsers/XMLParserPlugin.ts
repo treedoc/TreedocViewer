@@ -1,6 +1,7 @@
 import _ from 'lodash';
-import { ParserPlugin, ParseResult } from '../models/JTTOption';
+import { ParserPlugin, ParseResult } from '../models/TDVOption';
 import { TDObjectCoder } from 'treedoc';
+import Util from '../util/Util';
 
 export class XMLParserOption  {
 }
@@ -15,7 +16,7 @@ interface XNode {
   children?: XNode [];
 }
 
-export default class XMLParser implements ParserPlugin<XMLParserOption> {
+export default class XMLParserPlugin implements ParserPlugin<XMLParserOption> {
   option: XMLParserOption = {};
   syntax = 'xml';
 
@@ -25,21 +26,13 @@ export default class XMLParser implements ParserPlugin<XMLParserOption> {
     private compact: boolean = false) {}
 
   looksLike(str: string): boolean {
-    for (let i = 0; i < 1000 && i < str.length; i++) {
-      const c = str[i];
-      if (' \t\n\r'.indexOf(c) >= 0)
-        continue;
-      if (c === '<')
-        return true;
-      return false;
-    }
-    return false;
+    return Util.nonBlankStartsWith(str, ['<']) && Util.nonBlankEndsWith(str, ['>']);
   }
 
   parse(str: string): ParseResult {
     const result = new ParseResult();
     try {
-      const doc = new DOMParser().parseFromString(str, this.mineType);
+      const doc = new DOMParser().parseFromString(str.trim(), this.mineType);
       const root = doc.childNodes.length < 2 ? doc.childNodes[0] : doc;
       let xmlObj: XNode = this.docToObj(root);
       if (this.compact)
@@ -57,8 +50,8 @@ export default class XMLParser implements ParserPlugin<XMLParserOption> {
 
   docToObj(node: Node) {
     const result: XNode = {};
-    if (!this.compact)
-      result.type = node.constructor.name;
+    // if (!this.compact)
+    result.type = node.constructor.name;
     if (node instanceof Element) {
       result.tag = node.tagName;
       if (node.getAttributeNames) {
@@ -112,17 +105,21 @@ export default class XMLParser implements ParserPlugin<XMLParserOption> {
     if (n.children) {
       n.children.forEach(c => {
         if (!c.tag) {   // Assume it's comment
-          if (c.value)
+          console.log(`c.type=${c.type}, c.value=${c.value}, c.name=${c.name}`);
+          if (c.type === 'ProcessingInstruction')
+            this.addToMap(map, `?${c.name}`, c.value);
+          else if (c.value) 
             comments.push(c.value);
           else
             console.error('unknown node: ' + c);
+
           return;
         }
 
         let cnode: any = this.compactToObject(c);
         if (comments.length > 0) {
           if (_.isObject(cnode)) {
-            // ts could narrow the type based on the _.isObject method signiture by type predicate
+            // ts could narrow the type based on the _.isObject method signature by type predicate
             // (method) LoDashStatic.isObject(value?: any): value is object
             (cnode as any)['@comments'] = [...comments];
           } else

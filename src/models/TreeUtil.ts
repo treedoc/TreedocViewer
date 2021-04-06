@@ -12,7 +12,7 @@ export default class TreeUtil {
     if (p > 0)
       typeName = typeName.substr(0, p);
     const p2 = typeName.lastIndexOf('.');
-    return p2 < 0 ? typeName : typeName.substring(p + 1, p2);
+    return p2 < 0 ? typeName : typeName.substring(p2 + 1);
   }
 
   static getTypeLabel(node: TDNode) {
@@ -25,7 +25,7 @@ export default class TreeUtil {
     return TreeUtil.getSimpleTypeName(t);
   }
 
-  static getTypeSizeLabel(node: TDNode) {
+  static getTypeSizeLabel(node: TDNode, includeSummary = false) {
     let label = node.type === TDNodeType.ARRAY ? `[${node.getChildrenSize()}]` : `{${node.getChildrenSize()}}`;
     let tl = this.getTypeLabel(node);
     const id = node.getChildValue(TreeUtil.KEY_ID);
@@ -34,6 +34,10 @@ export default class TreeUtil {
 
     if (tl.length > 0) // Special handling for type and hash
       label += ` <${tl}>`;
+
+    if (includeSummary)
+      label = node.toStringInternal(label, false, false, 100);
+
     return label;
   }
 }
