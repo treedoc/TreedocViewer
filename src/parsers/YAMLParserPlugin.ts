@@ -2,6 +2,7 @@ import YAML from 'yaml';
 import { ParserPlugin, ParseResult } from '../models/TDVOption';
 import { TDObjectCoder } from 'treedoc';
 import XMLParserPlugin from './XMLParserPlugin';
+import Util from '@/util/Util';
 
 export class YMLParserOption {
 }
@@ -15,28 +16,17 @@ export default class YAMLParserPlugin implements ParserPlugin<YMLParserOption> {
     if (new XMLParserPlugin().looksLike(str))
       return false;
 
-    // A line aligned partial YAML from begining is also a valid YAML file
-    // JSON is not the case. That's how we guesss if the file is a YAML instead of JSON.
-    let i = 0;
-    let lastLine = 0;
-    for (let lines = 0; i < 1000 && i < str.length; i++) {
-      const c = str[i];
-      if (c === '\r' || c === '\n') {
-        lines ++;
-        if (lines >= 10)
-          break;
-        lastLine = i;
-      }
-    }
+    if (Util.nonBlankStartsWith(str, ["{", "["]))  // Don't accept JSON
+      return false;
 
-    if (i === str.length || i === 1000)
-      i = lastLine;
-
-    if (i === 0)
-      return false;  // a simple line mostly doesn't look like YAML.
+    // A line aligned partial YAML from beginning is also a valid YAML file
+    // JSON is not the case. That's how we guess if the file is a YAML instead of JSON.
+    const topLines = Util.topLines(str, 5000);
+    if (topLines.numLines <= 1)
+      return false;  // Single line 
 
     try {
-      YAML.parse(str.substr(0, i));
+      YAML.parse(str.substr(0, topLines.length));
       return true;
     } catch (e) {
       return false;
@@ -45,7 +35,8 @@ export default class YAMLParserPlugin implements ParserPlugin<YMLParserOption> {
   parse(str: string): ParseResult {
     const result = new ParseResult();
     try {
-      const doc = YAML.parseAllDocuments(str);
+      // Not sure why some string accepted by parse(), but can't accepted by parseAllDocuments()
+      // const doc = YAML.parseAllDocuments(str);
       // doc[0].cstNode
 
       result.result = TDObjectCoder.get().encode(YAML.parse(str));

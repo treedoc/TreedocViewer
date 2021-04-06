@@ -16,7 +16,7 @@ export default class CSVParserPlugin implements ParserPlugin<CSVParserOption> {
     if (topLines.numLines <= 1)
       return false;  // Single line 
     try {  
-      const node = CSVParser.get().parse(str.substr(0, topLines.length));
+      const node = CSVParser.get().parse(str.substr(0, topLines.length), this.csvOption);
       const columnSize = node.children![0].getChildrenSize();
       if (columnSize < 2)
         return false;

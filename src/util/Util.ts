@@ -1,5 +1,5 @@
 export default class Util {
-  static nonBlankStartsWith(str: string, pattern: string[], detectLength= 1000): boolean {
+  static nonBlankStartsWith(str: string, pattern: string[], detectLength = 1000): boolean {
     for (let i = 0; i < detectLength && i < str.length; i++) {
       if (this.isBlank(str[i]))
         continue;
