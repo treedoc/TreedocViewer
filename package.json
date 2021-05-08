@@ -44,7 +44,7 @@
     "@vue/cli-service": "^4.4.6",
     "@vue/test-utils": "^1.0.3",
     "gh-pages": "^3.1.0",
-    "handlebars": "^4.7.6",
+    "handlebars": "^4.7.7",
     "ts-jest": "^26.1.1",
     "typescript": "^3.9.7",
     "vue-cli-plugin-e2e-webdriverio": "^2.0.3",
