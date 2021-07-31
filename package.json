@@ -20,8 +20,6 @@
     "test:unit": "vue-cli-service test:unit"
   },
   "dependencies": {
-    "@types/lodash": "^4.14.161",
-    "@types/yaml": "^1.9.7",
     "bootstrap-vue": "^2.16.0",
     "font-awesome": "^4.7.0",
     "jest": "^26.4.2",
@@ -38,6 +36,8 @@
     "yaml": "^1.10.0"
   },
   "devDependencies": {
+    "@types/lodash": "^4.14.161",
+    "@types/yaml": "^1.9.7",    
     "@types/jest": "^26.0.3",
     "@vue/cli-plugin-typescript": "^4.4.6",
     "@vue/cli-plugin-unit-jest": "^4.4.6",

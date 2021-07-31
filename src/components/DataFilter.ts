@@ -11,7 +11,7 @@ export default {
       if (!fq)
         return;
       if (_.isArray(fq))
-        opt.filteredData = opt.filteredData.filter((row) => fq.includes(row[f]));
+        opt.filteredData = opt.filteredData.filter(row => fq.includes(row[f]));
       else if (_.isString(fq))
         opt.filteredData  = opt.filteredData.filter(row => row[f] && (`${row[f]}`).toLowerCase().includes(fq.toLowerCase()));
       else {
@@ -19,7 +19,7 @@ export default {
       }
 
       if (!c.visible)
-        opt.filteredData.forEach((r) =>  delete r[c.field]);
+        opt.filteredData.forEach(r =>  delete r[c.field]);
     });
 
     const q = opt.query;

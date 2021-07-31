@@ -16,7 +16,7 @@ export default class YAMLParserPlugin implements ParserPlugin<YMLParserOption> {
     if (new XMLParserPlugin().looksLike(str))
       return false;
 
-    if (Util.nonBlankStartsWith(str, ["{", "["]))  // Don't accept JSON
+    if (Util.nonBlankStartsWith(str, ['{', '[']))  // Don't accept JSON
       return false;
 
     // A line aligned partial YAML from beginning is also a valid YAML file
