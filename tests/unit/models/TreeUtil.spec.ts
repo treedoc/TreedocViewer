@@ -16,7 +16,7 @@ describe('TreeUtil.ts', () => {
       log:'http://www.google.com',
     }
     `;
-    const tdNode = TD.parse(json);
+    const tdNode = TDJSONParser.get().parse(json);
 
     expect(TreeUtil.getTypeSizeLabel(tdNode)).toBe('{8} <ActivityHist@1234>');
   });

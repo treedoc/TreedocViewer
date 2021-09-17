@@ -37,6 +37,7 @@ import YAMLParserPlugin from './parsers/YAMLParserPlugin';
 import XMLParserPlugin from './parsers/XMLParserPlugin';
 import CSVParserPlugin from './parsers/CSVParserPlugin';
 import UrlParam from './UrlParam';
+import JSONParserPlugin, { JSONParserOption, JSONParserType } from './parsers/JSONParserPlugin';
 
 @Component({
   components: {
@@ -51,6 +52,7 @@ export default class Home extends Vue {
 
   tdvOption: TDVOptions = {
     parsers: [
+      new JSONParserPlugin('Map.toString', JSONParserType.JAVA_MAP_TO_STRING),
       new XMLParserPlugin('XML compact', 'text/xml', true),
       new XMLParserPlugin(),
       new XMLParserPlugin('html', 'text/html'),

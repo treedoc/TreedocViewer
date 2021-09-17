@@ -120,11 +120,14 @@ V2l2" ,v23
 "v31""v31","v32""""v32",v33
 `;
 
+const mapToStringStr = '{K1=v1, k2=123, k3={c=Test with ,in}, k4=[ab,c, def]}';
+
 export default {
   jsonStr,
   yamlStr,
   xmlStr,
   csvStr,
+  mapToStringStr,
   data: [
     {text: 'empty', value: {}},
     {
@@ -300,6 +303,9 @@ No \\n's!",
       text: 'csv',
       value: csvStr,
     },
-
+    {
+      text: 'map.toString',
+      value: mapToStringStr,
+    },
   ] as Array<{text: string, value: any}>,
 };

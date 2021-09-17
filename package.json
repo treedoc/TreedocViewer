@@ -11,6 +11,7 @@
     "*.js"
   ],
   "scripts": {
+    "test": "jest --config jest.config.js",
     "serve": "vue-cli-service serve",
     "build-app": "vue-cli-service build --dest dist/app",
     "build-lib": "vue-cli-service build --dest dist/lib --target lib --name lib src/lib.ts",
@@ -26,7 +27,7 @@
     "jquery": "^3.5.1",
     "lodash": "^4.17.19",
     "msplit": "^0.1.20",
-    "treedoc": "^0.3.14",
+    "treedoc": "^0.3.23",
     "vue": "^2.6.11",
     "vue-class-component": "^7.2.3",
     "vue-codemirror-lite": "^1.0.4",
