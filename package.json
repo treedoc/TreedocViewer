@@ -1,6 +1,6 @@
 {
   "name": "treedoc-viewer",
-  "version": "0.1.40",
+  "version": "0.1.41",
   "main": "./dist/lib/lib.common.js",
   "typings": "./dist/lib/src/lib.d.ts",
   "files": [
@@ -37,9 +37,9 @@
     "yaml": "^1.10.0"
   },
   "devDependencies": {
-    "@types/lodash": "^4.14.161",
-    "@types/yaml": "^1.9.7",    
     "@types/jest": "^26.0.3",
+    "@types/lodash": "^4.14.161",
+    "@types/yaml": "^1.9.7",
     "@vue/cli-plugin-typescript": "^4.4.6",
     "@vue/cli-plugin-unit-jest": "^4.4.6",
     "@vue/cli-service": "^4.4.6",
