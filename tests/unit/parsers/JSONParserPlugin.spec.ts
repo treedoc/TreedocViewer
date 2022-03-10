@@ -3,7 +3,7 @@ import JSONParserPlugin, { JSONParserType } from '@/parsers/JSONParserPlugin';
 
 describe('JSONParser.ts', () => {
   const parser = new JSONParserPlugin();
-  const parserMapToString = new JSONParserPlugin("Map.toString", JSONParserType.JAVA_MAP_TO_STRING);
+  const parserMapToString = new JSONParserPlugin('Map.toString', JSONParserType.JAVA_MAP_TO_STRING);
   it('looksLike', () => {
     expect(parser.looksLike(sampleData.jsonStr)).toBeTruthy();
     expect(parser.looksLike(sampleData.yamlStr)).toBeFalsy();

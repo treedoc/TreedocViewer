@@ -35,8 +35,8 @@
               </b-btn>
             </span>
           </b-button-group>
-          <!-- query: <b-form-input size='sm' :v-bind="tableOpt.query" /> -->
-          <!-- query: {{query}},  -->
+          query: <b-form-input size='sm' :v-bind="tableOpt.query" />
+          query: {{query}}, 
           <!-- columns: <pre>{{JSON.stringify(tableOpt.columns, null, ' ')}}</pre> -->
         </div>
       </div>
@@ -57,7 +57,7 @@ import JsonPath from './JsonPath.vue';
 import TreeState, { TableNodeState } from '../models/TreeState';
 import JSONParserPlugin from '../parsers/JSONParserPlugin';
 import ExpandControl, { ExpandState } from './ExpandControl.vue';
-import { TD, TDNode, TDNodeType } from 'treedoc';
+import { identity, ListUtil, TD, TDNode, TDNodeType } from 'treedoc';
 
 const COL_VALUE = '@value';
 const COL_NO = '#';
@@ -216,7 +216,10 @@ export default class JsonTable extends Vue {
     console.log(this.tableOpt.filteredData);
     const data = this.tableOpt.filteredData;
     // data.forEach( r => delete r['@value']);
-    this.copyBuffer = TD.stringify(data);
+    // Support object
+    const exportData = data.map(row => 
+      ListUtil.map(row, identity, val => val instanceof TDNode ? val.toObject() : val));
+    this.copyBuffer = TD.stringify(exportData);
     console.log(`this.copyBuffer=${this.copyBuffer}`);
     this.$nextTick(() => {
       const textView = this.$refs.textViewCopyBuffer as HTMLTextAreaElement;
