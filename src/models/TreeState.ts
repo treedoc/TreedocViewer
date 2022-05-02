@@ -37,6 +37,7 @@ export default class TreeState {
   curState = new CurState();
 
   maxPane = '';
+  textWrap = false;
 
   constructor(treeData: TDNode | string | any, 
       public parserPlugin: ParserPlugin<any> = new JSONParserPlugin(),

@@ -11,7 +11,7 @@
           style="margin-left: 0!important;" />
     </div>
     <div v-else>
-      <simple-value @node-clicked='nodeClicked' :tnode='value' :isInTable='true' />
+      <simple-value @node-clicked='nodeClicked' :tnode='value' :isInTable='true' :textWrap='xprops.tstate.textWrap' />
     </div>
   </div>
 </template>

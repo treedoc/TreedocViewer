@@ -21,7 +21,7 @@
     "test:unit": "vue-cli-service test:unit"
   },
   "dependencies": {
-    "bootstrap-vue": "^2.16.0",
+    "bootstrap-vue": "^2.22.0",
     "font-awesome": "^4.7.0",
     "jest": "^26.4.2",
     "jquery": "^3.5.1",
@@ -31,18 +31,18 @@
     "vue": "^2.6.11",
     "vue-class-component": "^7.2.3",
     "vue-codemirror-lite": "^1.0.4",
-    "vue-property-decorator": "^9.0.0",
+    "vue-property-decorator": "9.0.0",
     "vue-router": "^3.4.6",
     "vue2-datatable-component": "github:TrueCarry/vue2-datatable",
     "yaml": "^1.10.0"
   },
   "devDependencies": {
-    "@types/jest": "^26.0.3",
-    "@types/lodash": "^4.14.161",
+    "@types/jest": "^27.4.1",
+    "@types/lodash": "^4.14.182",
     "@types/yaml": "^1.9.7",
-    "@vue/cli-plugin-typescript": "^4.4.6",
-    "@vue/cli-plugin-unit-jest": "^4.4.6",
-    "@vue/cli-service": "^4.4.6",
+    "@vue/cli-plugin-typescript": "^4.5.17",
+    "@vue/cli-plugin-unit-jest": "^4.5.17",
+    "@vue/cli-service": "^4.5.17",
     "@vue/test-utils": "^1.0.3",
     "gh-pages": "^3.1.0",
     "handlebars": "^4.7.6",
