@@ -230,7 +230,7 @@ export default class JsonTreeTable extends Vue {
     }, null, 2);
   }
 
-  get pasteSupported() { return !!navigator.clipboard.readText; }
+  get pasteSupported() { return !!navigator?.clipboard?.readText; }
 
   paste() {
     // this.copyTextArea.select();

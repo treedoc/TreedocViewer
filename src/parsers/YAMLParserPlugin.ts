@@ -16,7 +16,7 @@ export default class YAMLParserPlugin implements ParserPlugin<YMLParserOption> {
     if (new XMLParserPlugin().looksLike(str))
       return false;
 
-    if (Util.nonBlankStartsWith(str, ["{", "["]))  // Don't accept JSON
+    if (Util.nonBlankStartsWith(str, ['{', '[']))  // Don't accept JSON
       return false;
 
     // A line aligned partial YAML from beginning is also a valid YAML file
@@ -26,12 +26,13 @@ export default class YAMLParserPlugin implements ParserPlugin<YMLParserOption> {
       return false;  // Single line 
 
     try {
-      YAML.parse(str.substr(0, topLines.length));
+      this.parseYaml(str.substring(0, topLines.length));
       return true;
     } catch (e) {
       return false;
     }
   }
+
   parse(str: string): ParseResult {
     const result = new ParseResult();
     try {
@@ -39,13 +40,22 @@ export default class YAMLParserPlugin implements ParserPlugin<YMLParserOption> {
       // const doc = YAML.parseAllDocuments(str);
       // doc[0].cstNode
 
-      result.result = TDObjectCoder.get().encode(YAML.parse(str));
+      result.result = TDObjectCoder.get().encode(this.parseYaml(str));
       result.message = 'YAML.parse()';
       return result;
-    } catch (e) {
+    } catch (e: any) {
       result.message = `Error:${e.message}`;
       console.error(e);
       return result;
+    }
+  }
+
+  /** Try parse and parseAllDocuments */
+  parseYaml(str: string): any {
+    try {
+      return YAML.parse(str);
+    } catch (e) {
+      return YAML.parseAllDocuments(str);
     }
   }
 
