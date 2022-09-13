@@ -43,7 +43,7 @@ export default class YAMLParserPlugin implements ParserPlugin<YMLParserOption> {
       result.result = TDObjectCoder.get().encode(this.parseYaml(str));
       result.message = 'YAML.parse()';
       return result;
-    } catch (e: any) {
+    } catch (e) {
       result.message = `Error:${e.message}`;
       console.error(e);
       return result;
