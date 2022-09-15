@@ -39,7 +39,6 @@ import { Component, Prop, Vue, Watch } from 'vue-property-decorator';
 import { TDNode, TDNodeType } from 'treedoc';
 import { ExpandState } from './ExpandControl.vue';
 import SimpleValue from './SimpleValue.vue';
-import TreeState from '../models/TreeState';
 import TreeUtil from '../models/TreeUtil';
 import Util from '../util/Util';
 

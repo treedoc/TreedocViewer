@@ -34,7 +34,7 @@ export default class SimpleValue extends Vue {
 
   get date() {
     // number and between 1980-01-01 and 2040-01-01, maybe a Date
-    const val = new Number(this.tnode.value);
+    const val = Number(this.tnode.value);
     if (_.isNumber(val) && val > 315532800000 && val < 2208988800000) {
       return `\n${new Date(val as number).toISOString()}`;
     }

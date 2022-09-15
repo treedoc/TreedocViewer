@@ -44,7 +44,7 @@ export default class YAMLParserPlugin implements ParserPlugin<YMLParserOption> {
       result.message = 'YAML.parse()';
       return result;
     } catch (e) {
-      result.message = `Error:${e.message}`;
+      result.message = `Error:${(e as any).message}`;
       console.error(e);
       return result;
     }
@@ -55,7 +55,7 @@ export default class YAMLParserPlugin implements ParserPlugin<YMLParserOption> {
     try {
       return YAML.parse(str);
     } catch (e) {
-      return YAML.parseAllDocuments(str);
+      return YAML.parseAllDocuments(str).map(e => e.toJSON());
     }
   }
 

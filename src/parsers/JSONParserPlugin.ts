@@ -48,7 +48,7 @@ export default class JSONParserPlugin implements ParserPlugin<JSONParserOption> 
       result.message = 'TDJSONParser.parser()';
       return result;
     } catch (e2) {
-      result.message = `Error:${e2.message}`;
+      result.message = `Error:${(e2 as any).message}`;
       console.error(e2);
       return result;
     }

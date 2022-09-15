@@ -47,7 +47,7 @@
     "gh-pages": "^3.1.0",
     "handlebars": "^4.7.6",
     "ts-jest": "^26.1.1",
-    "typescript": "^3.9.7",
+    "typescript": "^4.9.0-dev.20220915",
     "vue-cli-plugin-e2e-webdriverio": "^2.0.3",
     "vue-template-compiler": "^2.6.12"
   }

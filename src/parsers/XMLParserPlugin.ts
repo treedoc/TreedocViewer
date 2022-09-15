@@ -22,7 +22,7 @@ export default class XMLParserPlugin implements ParserPlugin<XMLParserOption> {
 
   constructor(
     public name = 'XML',
-    private mineType: SupportedType = 'text/xml',
+    private mineType: DOMParserSupportedType = 'text/xml',
     private compact: boolean = false) {}
 
   looksLike(str: string): boolean {
@@ -42,7 +42,7 @@ export default class XMLParserPlugin implements ParserPlugin<XMLParserOption> {
       result.message = 'DOMParser().parseFromString()';
       return result;
     } catch (e) {
-      result.message = `Error:${e.message}`;
+      result.message = `Error:${(e as any).message}`;
       console.error(e);
       return result;
     }
