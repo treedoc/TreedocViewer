@@ -1,6 +1,7 @@
 import _ from 'lodash';
 import { Query, Column, DataTableOptions } from './Vue2DataTable';
 import { TDNode } from 'treedoc';
+import { TableUtil } from '../models/TableUtil';
 
 export default {
   filter(opt: DataTableOptions) {
@@ -11,7 +12,7 @@ export default {
       if (!fq)
         return;
       if (_.isArray(fq))
-        opt.filteredData = opt.filteredData.filter((row) => fq.includes(row[f]));
+        opt.filteredData = opt.filteredData.filter(row => fq.includes(row[f]));
       else if (_.isString(fq))
         opt.filteredData  = opt.filteredData.filter(row => row[f] && (`${row[f]}`).toLowerCase().includes(fq.toLowerCase()));
       else {
@@ -19,8 +20,13 @@ export default {
       }
 
       if (!c.visible)
-        opt.filteredData.forEach((r) =>  delete r[c.field]);
+        opt.filteredData.forEach(r => delete r[c.field]);
     });
+    
+    if (opt.query.jsQuery) {
+      const filterFunc = eval(opt.query.jsQuery);
+      opt.filteredData = opt.filteredData.filter(r => filterFunc(TableUtil.rowToMapWithAllFields(r, opt)));
+    }
 
     const q = opt.query;
     opt.total = opt.filteredData.length;

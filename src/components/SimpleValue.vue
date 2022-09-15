@@ -7,7 +7,7 @@
       <a :href='url' target="_blank">{{url}}</a>
     </template>
     <template v-else-if="isInTable">
-      <pre class='tdv-value'>{{tnode.value}} <span class='tdv-hint'>{{date}}</span></pre>
+      <pre class='tdv-value' :style="{'white-space': whiteSpaceStyle}">{{tnode.value}} <span class='tdv-hint'>{{date}}</span></pre>
     </template>
     <template v-else>{{tnode.value}} <span class='tdv-hint'>{{date}}</span></template>
   </span>
@@ -24,6 +24,7 @@ import _ from 'lodash';
 export default class SimpleValue extends Vue {
   @Prop() tnode!: TDNode;
   @Prop({required: false, default: false}) isInTable!: boolean;
+  @Prop({required: false, default: false}) textWrap!: boolean;
 
   get ref() {
     if (this.tnode.key !== TreeUtil.KEY_REF || typeof(this.tnode.value) !== 'string')
@@ -33,7 +34,7 @@ export default class SimpleValue extends Vue {
 
   get date() {
     // number and between 1980-01-01 and 2040-01-01, maybe a Date
-    const val = this.tnode.value;
+    const val = new Number(this.tnode.value);
     if (_.isNumber(val) && val > 315532800000 && val < 2208988800000) {
       return `\n${new Date(val as number).toISOString()}`;
     }
@@ -52,6 +53,8 @@ export default class SimpleValue extends Vue {
     if (typeof(val) === 'string' && (val.startsWith('http://') || val.startsWith('https://')))
       return val;
   }
+
+  get whiteSpaceStyle() { return this.textWrap ? 'pre-wrap' : 'pre'; }
 }
 </script>
 <style>

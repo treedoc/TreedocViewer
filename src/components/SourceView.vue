@@ -27,7 +27,7 @@ import 'codemirror/addon/fold/indent-fold';
 import 'codemirror/addon/fold/brace-fold';
 import 'codemirror/addon/fold/xml-fold';
 import { Selection } from '../models/TreeState';
-import Bookmark from 'treedoc/lib/Bookmark';
+import { Bookmark } from 'treedoc/lib/Bookmark';
 
 @Component({
   components: {

@@ -1,5 +1,3 @@
-import _ from 'lodash';
-
 import { TDNode, TDNodeType } from 'treedoc';
 
 export default class TreeUtil {

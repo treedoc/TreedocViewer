@@ -10,6 +10,7 @@ export declare interface Query {
   order?: boolean | 'asc' | 'desc';
   offset: number;
   limit: number;
+  jsQuery?: string;
   [key: string]: any;
 }
 

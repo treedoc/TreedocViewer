@@ -99,8 +99,8 @@ export default class JsonTreeTable extends Vue {
   private showTree = [true];
   private showTable = [true];
   private codeView = [true];
-  private defaultParser = new JSONParserPlugin();
-  private selectedParser = this.defaultParser;
+  private defaultParser: ParserPlugin<any> = new JSONParserPlugin();
+  private selectedParser: ParserPlugin<any> = this.defaultParser;
   private tstate = new TreeState({}, this.selectedParser);
   private jsonStr = '';
 
@@ -174,13 +174,15 @@ export default class JsonTreeTable extends Vue {
   // of this during runtime.
   private parse = _.debounce((str: string, THIS: JsonTreeTable, detectParser = false) => {
     // Auto detect parser
-    if (detectParser)
+    if (detectParser) {
+      THIS.selectedParser = this.parserSelectOptions[0].value;  // Default to first parser
       for (const parser of this.parserSelectOptions) {
         if (parser.value.looksLike(str)) {
           THIS.selectedParser = parser.value;
           break;
         }
       }
+    }
 
     const selectedPath = THIS.tstate.selected ? THIS.tstate.selected.path : [];
     THIS.tstate = new TreeState(this.strDataSynced ? THIS.data : str, THIS.selectedParser, THIS.rootObjectKey, selectedPath);
