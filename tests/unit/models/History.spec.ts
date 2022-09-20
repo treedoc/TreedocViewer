@@ -1,7 +1,8 @@
-import History from '@/models/History';
+import History from '../../../src/models/History';
+import { describe, expect, test } from 'vitest'
 
 describe('History.ts', () => {
-  it('History should works', () => {
+  test('History should works', () => {
     const hist = new History<string>();
     expect(hist.canBack()).toBe(false);
     expect(hist.canForward()).toBe(false);
@@ -22,4 +23,4 @@ describe('History.ts', () => {
     expect(hist.canForward()).toBe(false);
     expect(hist.canBack()).toBe(true);
   });
-});
+})

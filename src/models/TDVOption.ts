@@ -9,7 +9,7 @@ export enum ParseStatus {
 }
 
 export class ParseResult {
-  result?: any;
+  result?: TDNode;
   status = ParseStatus.SUCCESS;
   message = '';
 }
@@ -26,7 +26,7 @@ export interface ParserPlugin<TOpt> {
 }
 
 export default class TDVOptions {
-  parsers?: Array<ParserPlugin<any>>;
+  parsers?: ParserPlugin<any>[];
 
   // If pattern is string, it will use wildcard matching
   tableOptRules?: {pattern: RegExp | string, opt: DataTableOptions};

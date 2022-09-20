@@ -1,9 +1,9 @@
-import TreeUtil from '@/models/TreeUtil';
+import TreeUtil from '../../../src/models/TreeUtil';
 import { TD, TDJSONParser, TDJSONParserOption } from 'treedoc/lib/index';
+import { describe, expect, test } from 'vitest'
 
 describe('TreeUtil.ts', () => {
-
-  it('getTypeSizeLabel', () => {
+  test('getTypeSizeLabel', () => {
     const json = `
     {
       $type:'ActivityHist<Something>',

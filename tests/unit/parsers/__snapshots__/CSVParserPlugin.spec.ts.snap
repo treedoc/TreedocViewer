@@ -1,6 +1,6 @@
-// Jest Snapshot v1, https://goo.gl/fbAQLP
+// Vitest Snapshot v1
 
-exports[`CSVParser.ts parse 1`] = `
+exports[`CSVParser.ts > parse 1`] = `
 ParseResult {
   "message": "CSVParser.parser()",
   "result": "[object Undefined]",

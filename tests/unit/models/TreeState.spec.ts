@@ -1,8 +1,9 @@
-import TreeState from '@/models/TreeState';
-import sampleData from '@/sampleData';
+import TreeState from '../../../src/models/TreeState';
+import sampleData from '../../../src/sampleData';
+import { describe, expect, test } from 'vitest'
 
-describe('TreeState.ts', () => {
-  it('JsonString', () => {
+describe('TreeState.ts', ()=> {
+  test('JsonString', () => {
     const state = new TreeState(sampleData.jsonStr);
     expect(state.tree).toBeDefined();
     expect(state.selected?.key).toBe('root');
@@ -23,4 +24,4 @@ describe('TreeState.ts', () => {
     state.toggleMaxPane('table');
     expect(state.maxPane).toBe('');
   });
-});
+})

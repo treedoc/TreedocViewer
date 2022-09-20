@@ -307,5 +307,5 @@ No \\n's!",
       text: 'map.toString',
       value: mapToStringStr,
     },
-  ] as Array<{text: string, value: any}>,
+  ] as {text: string, value: any}[],
 };

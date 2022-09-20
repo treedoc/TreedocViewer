@@ -11,23 +11,24 @@
     "*.js"
   ],
   "scripts": {
-    "test": "jest --config jest.config.js",
+    "test": "vitest",
+    "coverage": "vitest run --coverage",
     "serve": "vue-cli-service serve",
     "build-app": "vue-cli-service build --dest dist/app",
     "build-lib": "vue-cli-service build --dest dist/lib --target lib --name lib src/lib.ts",
     "build": "yarn build-app && yarn build-lib",
     "deploy": "yarn build-app && gh-pages -d dist/app && yarn gh-pages -d dist/app -r git@github.com:treedoc/treedoc.github.io.git -b master",
-    "lint": "vue-cli-service lint",
-    "test:unit": "vue-cli-service test:unit"
+    "lint": "vue-cli-service lint"
   },
   "dependencies": {
     "bootstrap-vue": "^2.22.0",
     "font-awesome": "^4.7.0",
-    "jest": "^26.4.2",
     "jquery": "^3.5.1",
+    "jsdom": "^20.0.0",
     "lodash": "^4.17.19",
     "msplit": "^0.1.20",
     "treedoc": "^0.3.27",
+    "ts-node": "~10.7.0",
     "vue": "^2.6.11",
     "vue-class-component": "^7.2.3",
     "vue-codemirror-lite": "^1.0.4",
@@ -37,17 +38,16 @@
     "yaml": "^1.10.0"
   },
   "devDependencies": {
-    "@types/jest": "^27.4.1",
     "@types/lodash": "^4.14.182",
     "@types/yaml": "^1.9.7",
     "@vue/cli-plugin-typescript": "^4.5.17",
-    "@vue/cli-plugin-unit-jest": "^4.5.17",
     "@vue/cli-service": "^4.5.17",
     "@vue/test-utils": "^1.0.3",
     "gh-pages": "^3.1.0",
     "handlebars": "^4.7.6",
-    "ts-jest": "^26.1.1",
-    "typescript": "^4.9.0-dev.20220915",
+    "tslint": "^6.1.3",
+    "typescript": "~4.6.4",
+    "vitest": "^0.23.4",
     "vue-cli-plugin-e2e-webdriverio": "^2.0.3",
     "vue-template-compiler": "^2.6.12"
   }

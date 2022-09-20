@@ -43,7 +43,7 @@ export default class TreeState {
       public parserPlugin: ParserPlugin<any> = new JSONParserPlugin(),
       rootLabel = 'root', 
       selectedPath: string[] = []) {
-    this.tree = this.buildTree(treeData, rootLabel);
+    this.tree = this.buildTree(treeData, rootLabel)!;
     if (this.tree) {
       this.tree.root.key = rootLabel;
       this.tree.root.freeze();

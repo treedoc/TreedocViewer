@@ -1,10 +1,11 @@
-import sampleData from '@/sampleData';
-import JSONParserPlugin, { JSONParserType } from '@/parsers/JSONParserPlugin';
+import sampleData from '../../../src/sampleData';
+import JSONParserPlugin, { JSONParserType } from '../../../src/parsers/JSONParserPlugin';
+import { describe, expect, test } from 'vitest'
 
 describe('JSONParser.ts', () => {
   const parser = new JSONParserPlugin();
   const parserMapToString = new JSONParserPlugin('Map.toString', JSONParserType.JAVA_MAP_TO_STRING);
-  it('looksLike', () => {
+  test('looksLike', () => {
     expect(parser.looksLike(sampleData.jsonStr)).toBeTruthy();
     expect(parser.looksLike(sampleData.yamlStr)).toBeFalsy();
 
@@ -12,7 +13,7 @@ describe('JSONParser.ts', () => {
     expect(parserMapToString.looksLike(sampleData.xmlStr)).toBeFalsy();
   });
 
-  it('parse', () => {
+  test('parse', () => {
     const result = parser.parse(sampleData.jsonStr);
     expect(result.message).toBe('TDJSONParser.parser()');
   });

@@ -1,6 +1,6 @@
 import { ParserPlugin, ParseResult } from '../models/TDVOption';
 import { CSVParser, CSVOption, CSVWriter, TDNode } from 'treedoc';
-import Util from '@/util/Util';
+import Util from '../util/Util';
 
 export class CSVParserOption {
 }
