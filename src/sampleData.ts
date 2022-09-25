@@ -47,6 +47,14 @@ const yamlStr = `
       - erlang
 `;
 
+const yamlMultiDocStr = 
+`document: 1
+name: 'John'
+---
+document: 2
+name: 'config'
+`;
+
 const xmlStr = `<?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
@@ -290,6 +298,10 @@ No \\n's!",
     {
       text: 'yaml',
       value: yamlStr,
+    },
+    {
+      text: 'yaml-Multi-Doc',
+      value: yamlMultiDocStr,
     },
     {
       text: 'xml',

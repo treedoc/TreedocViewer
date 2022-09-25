@@ -12,6 +12,6 @@ describe('CSVParser.ts', () => {
   test('parse', () => {
     const result = parser.parse(sampleData.csvStr);
     expect(result.message).toBe('CSVParser.parser()');
-    expect(result).toMatchSnapshot();
+    expect(result.result?.toStringInternal("", true, true)).toMatchSnapshot();
   });
 });

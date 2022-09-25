@@ -1,8 +1,11 @@
 import YAML from 'yaml';
 import { ParserPlugin, ParseResult } from '../models/TDVOption';
-import { TDObjectCoder } from 'treedoc';
+import { Bookmark, TD, TDNode, TDNodeType, TDObjectCoder, TreeDoc } from 'treedoc';
 import XMLParserPlugin from './XMLParserPlugin';
 import Util from '../util/Util';
+import { Node, YAMLMap, Pair, YAMLSeq, Scalar } from 'yaml/types';
+import { Type } from 'yaml/util';
+import TextLine from '@/util/TextLine';
 
 export class YMLParserOption {
 }
@@ -26,7 +29,7 @@ export default class YAMLParserPlugin implements ParserPlugin<YMLParserOption> {
       return false;  // Single line 
 
     try {
-      this.parseYaml(str.substring(0, topLines.length));
+      YAML.parseAllDocuments(str.substring(0, topLines.length));
       return true;
     } catch (e) {
       return false;
@@ -40,7 +43,7 @@ export default class YAMLParserPlugin implements ParserPlugin<YMLParserOption> {
       // const doc = YAML.parseAllDocuments(str);
       // doc[0].cstNode
 
-      result.result = TDObjectCoder.get().encode(this.parseYaml(str));
+      result.result =this.parseYaml(str);
       result.message = 'YAML.parse()';
       return result;
     } catch (e) {
@@ -50,13 +53,63 @@ export default class YAMLParserPlugin implements ParserPlugin<YMLParserOption> {
     }
   }
 
+  private textLine?: TextLine;   // Assume no concurrent parsing
   /** Try parse and parseAllDocuments */
   parseYaml(str: string): any {
-    try {
-      return YAML.parse(str);
-    } catch (e) {
-      return YAML.parseAllDocuments(str).map(e => e.toJSON());
+    this.textLine = new TextLine(str);
+    const yaml = YAML.parseAllDocuments(str);
+    const doc = new TreeDoc();
+    if (yaml.length === 1) {
+      this.toTDNode(yaml[0].contents!, doc.root);
+    } else {
+      doc.root.type =  TDNodeType.ARRAY;
+      doc.root.children = yaml.map(y => this.toTDNode(y.contents!, doc.root.createChild()));
     }
+    return doc.root;
+  }
+
+  toTDNode(yaml: Node, node: TDNode): TDNode {
+    // console.log(TD.stringify(yaml));
+    // console.log(yaml.type);
+    switch(yaml.type) {
+      case Type.FLOW_MAP:
+      case Type.MAP: 
+        this.toTDNodeMap(yaml as YAMLMap, node); break;
+      case Type.FLOW_SEQ:
+      case Type.SEQ: 
+        this.toTDNodeAray(yaml as YAMLSeq, node); break;
+      // Scala.Type
+      case Type.PLAIN:
+      case Type.BLOCK_FOLDED:
+      case Type.BLOCK_LITERAL:
+      case Type.PLAIN:
+      case Type.QUOTE_DOUBLE:
+      case Type.QUOTE_SINGLE:
+         node.value = (yaml as Scalar).value; break;
+      default: console.warn(`Unsupported type: ${yaml.type}, ${TD.stringify(yaml)}, ${typeof yaml}, ${Object.keys(yaml)}`);
+    }
+    node.start = this.textLine!.getBookmark(yaml.range![0]);
+    node.end = this.textLine!.getBookmark(yaml.range![1]);
+
+    return node;
+  }
+
+  toTDNodeMap(yaml: YAMLMap, node: TDNode) {
+    node.type = TDNodeType.MAP;
+    for (const item of yaml.items as Pair[]) {
+      const cNode = node.createChild(item.key.value)
+      this.toTDNode(item.value, cNode);
+    }
+    return node;
+  }
+
+  toTDNodeAray(yaml: YAMLSeq, node: TDNode) {
+    node.type = TDNodeType.ARRAY;
+    for (const item of yaml.items) {
+      const cNode = node.createChild();
+      this.toTDNode(item, cNode);
+    }
+    return node;
   }
 
   stringify(obj: any): string {

@@ -26,6 +26,6 @@ export default {
 <style scoped>
 .tdv_key {
   white-space: nowrap;
-  font-weight: bolder;
+  /* font-weight: bolder; */
 }
 </style>

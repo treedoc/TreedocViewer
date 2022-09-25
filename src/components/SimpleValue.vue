@@ -7,9 +7,9 @@
       <a :href='url' target="_blank">{{url}}</a>
     </template>
     <template v-else-if="isInTable">
-      <pre class='tdv-value' :style="{'white-space': whiteSpaceStyle}">{{tnode.value}} <span class='tdv-hint'>{{date}}</span></pre>
+      <pre class='tdv-value' :class="valueStyle" :style="{'white-space': whiteSpaceStyle}">{{tnode.value}} <span class='tdv-hint'>{{date}}</span></pre>
     </template>
-    <template v-else>{{tnode.value}} <span class='tdv-hint'>{{date}}</span></template>
+    <template v-else><span :class="valueStyle">{{tnode.value}}</span> <span class='tdv-hint'>{{date}}</span></template>
   </span>
 </template>
 
@@ -54,6 +54,8 @@ export default class SimpleValue extends Vue {
       return val;
   }
 
+  get valueStyle() { return typeof(this.tnode.value) === 'string' ? 'string' : 'number'; }
+
   get whiteSpaceStyle() { return this.textWrap ? 'pre-wrap' : 'pre'; }
 }
 </script>
@@ -61,4 +63,13 @@ export default class SimpleValue extends Vue {
 pre.tdv-value {
   margin-bottom: 1px;
 }
+
+.number {
+  color: #164;
+}
+
+.string {
+  color: #a11;
+}
+
 </style>

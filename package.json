@@ -16,7 +16,7 @@
     "serve": "vue-cli-service serve",
     "build-app": "vue-cli-service build --dest dist/app",
     "build-lib": "vue-cli-service build --dest dist/lib --target lib --name lib src/lib.ts",
-    "build": "yarn build-app && yarn build-lib",
+    "build": "vitest --run && yarn build-app && yarn build-lib",
     "deploy": "yarn build-app && gh-pages -d dist/app && yarn gh-pages -d dist/app -r git@github.com:treedoc/treedoc.github.io.git -b master",
     "lint": "vue-cli-service lint"
   },
@@ -27,7 +27,7 @@
     "jsdom": "^20.0.0",
     "lodash": "^4.17.19",
     "msplit": "^0.1.20",
-    "treedoc": "^0.3.27",
+    "treedoc": "^0.3.30",
     "ts-node": "~10.7.0",
     "vue": "^2.6.11",
     "vue-class-component": "^7.2.3",

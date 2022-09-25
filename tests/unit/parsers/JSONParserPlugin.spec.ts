@@ -16,5 +16,6 @@ describe('JSONParser.ts', () => {
   test('parse', () => {
     const result = parser.parse(sampleData.jsonStr);
     expect(result.message).toBe('TDJSONParser.parser()');
+    expect(result.result?.toStringInternal("", true, true)).toMatchSnapshot();
   });
 });

@@ -172,7 +172,7 @@ export default class TreeViewItem extends Vue {
 }
 
 .key {
-  font-weight: bold;
+  /* font-weight: bold; */
 }
 
 .key-with-chevron {
