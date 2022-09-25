@@ -68,10 +68,13 @@ export default class YAMLParserPlugin implements ParserPlugin<YMLParserOption> {
     return doc.root;
   }
 
-  toTDNode(yaml: Node, node: TDNode): TDNode {
+  toTDNode(yaml: Node | undefined, node: TDNode): TDNode {
     // console.log(TD.stringify(yaml));
     // console.log(yaml.type);
-    switch(yaml.type) {
+    if (!yaml)
+      return node;
+
+    switch(yaml?.type) {
       case Type.FLOW_MAP:
       case Type.MAP: 
         this.toTDNodeMap(yaml as YAMLMap, node); break;
@@ -86,7 +89,7 @@ export default class YAMLParserPlugin implements ParserPlugin<YMLParserOption> {
       case Type.QUOTE_DOUBLE:
       case Type.QUOTE_SINGLE:
          node.value = (yaml as Scalar).value; break;
-      default: console.warn(`Unsupported type: ${yaml.type}, ${TD.stringify(yaml)}, ${typeof yaml}, ${Object.keys(yaml)}`);
+      default: console.warn(`Unsupported type: ${yaml?.type}, ${TD.stringify(yaml)}, ${typeof yaml}, ${Object.keys(yaml)}`);
     }
     node.start = this.textLine!.getBookmark(yaml.range![0]);
     node.end = this.textLine!.getBookmark(yaml.range![1]);
