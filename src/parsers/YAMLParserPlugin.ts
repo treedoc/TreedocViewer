@@ -58,7 +58,11 @@ export default class YAMLParserPlugin implements ParserPlugin<YMLParserOption> {
   parseYaml(str: string): any {
     this.textLine = new TextLine(str);
     const yaml = YAML.parseAllDocuments(str);
+    if (!yaml[yaml.length-1].contents) {  // Remote the last empty one
+      yaml.splice(yaml.length - 1, 1);
+    }
     const doc = new TreeDoc();
+
     if (yaml.length === 1) {
       this.toTDNode(yaml[0].contents!, doc.root);
     } else {
