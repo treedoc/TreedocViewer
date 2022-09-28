@@ -1,28 +1,26 @@
 <template>
   <div id='app' class='components-container'>
-    <json-table :table-data="tstateTable" :options="tableParam.option">
+    <json-table :table-data="tstateTable" :options="tableParam.tableConfig">
       <div slot="tableTitle">
-        <h5 style="margin-top:6px">{{tableParam.title}}</h5>
+        <h5 style="margin-top:6px;margin-right: 5px;">{{tableParam.title}}&nbsp;</h5>
       </div>
     </json-table>
   </div>
 </template>
 
 <script lang='ts'>
-import { Component, Prop, Vue, Watch } from 'vue-property-decorator';
+import { Component, Vue } from 'vue-property-decorator';
 
-import JsonTreeTable from './components/JsonTreeTable.vue';
 import JsonTable from './components/JsonTable.vue';
 import sampleData from './sampleData';
 import TreeState from './models/TreeState';
 import TDSample from './tdSample.vue';
-import TDVOptions from './models/TDVOption';
-import YAMLParserPlugin from './parsers/YAMLParserPlugin';
-import XMLParserPlugin from './parsers/XMLParserPlugin';
-import CSVParserPlugin from './parsers/CSVParserPlugin';
 import UrlParam from './UrlParam';
-import { TDJSONParser } from 'treedoc';
 import TableParam from './models/TableParam';
+import { table } from 'console';
+import { LangUtil }  from 'treedoc';
+
+const doIfNotNull = LangUtil.doIfNotNull;
 
 @Component({
   components: {
@@ -35,7 +33,7 @@ export default class TableTest extends Vue {
     title: 'Test Table Title',
     jsonData: sampleData.jsonStr,
     initialPath: '/activityHistory',
-    options: {
+    tableConfig: {
       Pagination: false,
       columns: [
         { field: 'activityType' },
@@ -63,10 +61,12 @@ export default class TableTest extends Vue {
     return state;
   }
 
+  // Sample URL: http://localhost:8081/?data={a:1,b:[{b1:2,b2:3},%20{b1:4,b2:5}],c:3}&initialPath=/b&tableConfig={Pagination:false,columns:[{field:b1}]}&title=tableTest&#/table
   mounted() {
-    if (this.param.tableParam) {
-      this.tableParam = this.param.tableParam;
-    }
+    doIfNotNull(this.param.title, $ => this.tableParam.title = $)  
+    doIfNotNull(this.param.tableConfig, $ => this.tableParam.tableConfig = $)  
+    doIfNotNull(this.param.data, $ => this.tableParam.jsonData = $)
+    doIfNotNull(this.param.initialPath, $ => this.tableParam.initialPath = $);
   }
 }
 </script>

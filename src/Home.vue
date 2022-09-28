@@ -30,8 +30,6 @@ import { Component, Prop, Vue, Watch } from 'vue-property-decorator';
 import JsonTreeTable from './components/JsonTreeTable.vue';
 import JsonTable from './components/JsonTable.vue';
 import sampleData from './sampleData';
-import TreeState from './models/TreeState';
-import TDSample from './tdSample.vue';
 import TDVOptions from './models/TDVOption';
 import YAMLParserPlugin from './parsers/YAMLParserPlugin';
 import XMLParserPlugin from './parsers/XMLParserPlugin';
@@ -72,11 +70,13 @@ export default class Home extends Vue {
 
     if (this.param.data)
       this.jsonData = this.param.data;
+      
 
     if (this.param.embeddedId != null) {
       window.parent.postMessage({ type: 'tdv-ready', id: this.param.embeddedId }, '*');
       if (window.opener)
         window.opener.postMessage({ type: 'tdv-ready', id: this.param.embeddedId }, '*');
+
       window.addEventListener('message', evt => {
         if (evt.data.type !== 'tdv-setData')
           return;

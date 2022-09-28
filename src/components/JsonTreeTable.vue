@@ -19,7 +19,7 @@
         <b-btn :size="'sm'" @click='paste' v-b-tooltip.hover title="Paste" v-if="pasteSupported">
           <i class="fa fa-paste"></i>
         </b-btn>
-        <b-btn size='sm' variant='outline-secondary' class='tdv' :pressed.sync='codeView[0]' v-b-tooltip.hover title="Toggle source code syntax hi-lighting">
+        <b-btn size='sm' variant='outline-secondary' class='tdv' :pressed.sync='tstate.codeView[0]' v-b-tooltip.hover title="Toggle source code syntax hi-lighting">
           <i class="fa fa-code"></i>
         </b-btn>
         <b-btn size='sm' @click='format' v-b-tooltip.hover title="Format">
@@ -27,9 +27,9 @@
         </b-btn>
       </b-button-group>
       <b-button-group class="mx-1">
-        <b-btn size='sm' variant='outline-secondary' class='tdv' :pressed.sync='showSource[0]'>Source</b-btn>
-        <b-btn size='sm' variant='outline-secondary' class='tdv' :pressed.sync='showTree[0]'>Tree</b-btn>
-        <b-btn size='sm' variant='outline-secondary' class='tdv' :pressed.sync='showTable[0]'>Table</b-btn>
+        <b-btn size='sm' variant='outline-secondary' class='tdv' :pressed.sync='tstate.showSource[0]'>Source</b-btn>
+        <b-btn size='sm' variant='outline-secondary' class='tdv' :pressed.sync='tstate.showTree[0]'>Tree</b-btn>
+        <b-btn size='sm' variant='outline-secondary' class='tdv' :pressed.sync='tstate.showTable[0]'>Table</b-btn>
         Parser <b-form-select :options='parserSelectOptions' v-model='selectedParser' size="sm"></b-form-select>
       </b-button-group>
       <span><slot/></span>
@@ -37,10 +37,10 @@
     </div>
     <div class="split-container">
       <msplit :maxPane='tstate.maxPane'  @node-mouse-enter.native.stop='nodeMouseEnter' @node-mouse-leave.native.stop='nodeMouseLeave'>
-        <div slot="source" :grow="20" style="width: 100%" :show="showSource"  class="panview">
-          <SourceView ref="sourceView" v-model="jsonStr" :syntax='selectedParser.syntax' :selection='tstate.selection' :show='showSource[0]' :useCodeView='codeView' />
+        <div slot="source" :grow="20" style="width: 100%" :show="tstate.showSource"  class="panview">
+          <SourceView ref="sourceView" v-model="jsonStr" :syntax='selectedParser.syntax' :selection='tstate.selection' :show='tstate.showSource[0]' :useCodeView='tstate.codeView' />
         </div>
-        <div slot="tree" :grow="30" :show="showTree" class="panview">
+        <div slot="tree" :grow="30" :show="tstate.showTree" class="panview">
           <!-- tstate.selected={{tstate.selected}} -->
           <tree-view v-if="tstate.tree" 
               :tstate="tstate"
@@ -50,7 +50,7 @@
           <div v-else>No Data</div>
 
         </div>
-        <div slot="table" :grow="50" :show="showTable" class="panview">
+        <div slot="table" :grow="50" :show="tstate.showTable" class="panview">
           <div v-if="tstate.tree" ><json-table :table-data='tstate' 
             @node-clicked='nodeClicked'
             isInMuliPane="true" /></div>
@@ -95,10 +95,6 @@ export default class JsonTreeTable extends Vue {
   @Prop() initalPath!: string;
   @Prop() rootObjectKey!: string;
 
-  private showSource = [true];
-  private showTree = [true];
-  private showTable = [true];
-  private codeView = [true];
   private defaultParser: ParserPlugin<any> = new JSONParserPlugin();
   private selectedParser: ParserPlugin<any> = this.defaultParser;
   private tstate = new TreeState({}, this.selectedParser);
@@ -161,9 +157,9 @@ export default class JsonTreeTable extends Vue {
       str = '';
 
     if (str.length > 200_000)
-      this.codeView[0] = false;
+      this.tstate.codeView[0] = false;
     if (str.length < 100_000)
-      this.codeView[0] = true;
+      this.tstate.codeView[0] = true;
     // Need detected only if significant changes happens. Not accurate.
     const oldLen = old ? old.length : 0;
     const detectNeeded = Math.abs(oldLen - str.length) > 7;

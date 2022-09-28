@@ -38,6 +38,10 @@ export default class TreeState {
 
   maxPane = '';
   textWrap = false;
+  showSource = [true];
+  showTree = [true];
+  showTable = [true];
+  codeView = [true];
 
   constructor(treeData: TDNode | string | any, 
       public parserPlugin: ParserPlugin<any> = new JSONParserPlugin(),

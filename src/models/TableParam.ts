@@ -7,6 +7,6 @@ import { TableConfig, DataTableOptions } from '@/components/Vue2DataTable';
 export default interface TableParam {
   title?: string;
   jsonData: any | string;
-  initialPath?: string;
-  options?: TableConfig;
+  initialPath?: string | null;
+  tableConfig?: TableConfig;
 }
