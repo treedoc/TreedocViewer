@@ -1,5 +1,6 @@
 import { TD, TDJSONParser } from 'treedoc';
 import { TableConfig } from './components/Vue2DataTable';
+import { TDVOption } from './lib';
 import TableParam from './models/TableParam';
 
 export default class UrlParam {
@@ -9,6 +10,7 @@ export default class UrlParam {
   title: string;
   initialPath?: string | null;
   tableConfig?: TableConfig;
+  option?: TDVOption;
 
   constructor() {
     const url = new URL(window.location.href);
@@ -21,5 +23,10 @@ export default class UrlParam {
     const tableConfigStr = url.searchParams.get('tableConfig');
     if (tableConfigStr)
       this.tableConfig = TD.parse(tableConfigStr);
+
+    const optStr = url.searchParams.get('option');
+    if (optStr)
+      this.option = TD.parse(optStr);
+  
   }
 }

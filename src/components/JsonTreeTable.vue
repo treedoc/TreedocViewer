@@ -30,13 +30,13 @@
         <b-btn size='sm' variant='outline-secondary' class='tdv' :pressed.sync='tstate.showSource[0]'>Source</b-btn>
         <b-btn size='sm' variant='outline-secondary' class='tdv' :pressed.sync='tstate.showTree[0]'>Tree</b-btn>
         <b-btn size='sm' variant='outline-secondary' class='tdv' :pressed.sync='tstate.showTable[0]'>Table</b-btn>
-        Parser <b-form-select :options='parserSelectOptions' v-model='selectedParser' size="sm"></b-form-select>
+        <template v-if="parserSelectOptions.length > 1">Parser <b-form-select :options='parserSelectOptions' v-model='selectedParser' size="sm"></b-form-select></template>
       </b-button-group>
       <span><slot/></span>
       <span class="status-msg" :class="{error: hasError}" >{{parseResult}}</span>
     </div>
     <div class="split-container">
-      <msplit :maxPane='tstate.maxPane'  @node-mouse-enter.native.stop='nodeMouseEnter' @node-mouse-leave.native.stop='nodeMouseLeave'>
+      <msplit :maxPane='tstate.maxPane' @node-mouse-enter.native.stop='nodeMouseEnter' @node-mouse-leave.native.stop='nodeMouseLeave'>
         <div slot="source" :grow="20" style="width: 100%" :show="tstate.showSource"  class="panview">
           <SourceView ref="sourceView" v-model="jsonStr" :syntax='selectedParser.syntax' :selection='tstate.selection' :show='tstate.showSource[0]' :useCodeView='tstate.codeView' />
         </div>
@@ -48,10 +48,9 @@
               :rootObjectKey='rootObjectKey' 
               />
           <div v-else>No Data</div>
-
         </div>
         <div slot="table" :grow="50" :show="tstate.showTable" class="panview">
-          <div v-if="tstate.tree" ><json-table :table-data='tstate' 
+          <div v-if="tstate.tree"><json-table :table-data='tstate' :options="tableOpt"
             @node-clicked='nodeClicked'
             isInMuliPane="true" /></div>
           <div v-else>No Data</div>
@@ -97,7 +96,7 @@ export default class JsonTreeTable extends Vue {
 
   private defaultParser: ParserPlugin<any> = new JSONParserPlugin();
   private selectedParser: ParserPlugin<any> = this.defaultParser;
-  private tstate = new TreeState({}, this.selectedParser);
+  tstate = new TreeState({}, this.selectedParser).setInitSOpt(this.options);
   private jsonStr = '';
 
   private parseResult = '';
@@ -181,7 +180,7 @@ export default class JsonTreeTable extends Vue {
     }
 
     const selectedPath = THIS.tstate.selected ? THIS.tstate.selected.path : [];
-    THIS.tstate = new TreeState(this.strDataSynced ? THIS.data : str, THIS.selectedParser, THIS.rootObjectKey, selectedPath);
+    THIS.tstate = new TreeState(this.strDataSynced ? THIS.data : str, THIS.selectedParser, THIS.rootObjectKey, selectedPath).retainState(THIS.tstate);
     THIS.strDataSynced = false;
     THIS.parseResult = THIS.tstate.parseResult;
 
@@ -191,6 +190,10 @@ export default class JsonTreeTable extends Vue {
 
   private get hasError() {
     return this.parseResult.startsWith('Error');
+  }
+
+  get tableOpt() {
+    return this.options?.defaultTableOpt;
   }
 
   private get parserSelectOptions() {

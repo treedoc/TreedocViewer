@@ -1,10 +1,10 @@
 <template>
   <div id='app' class='components-container'>
-    <json-tree-table :data='jsonData' :inital-path="'/'" :options='tdvOption' rootObjectKey='root' class="json-tree-table" ref="jsonTreeTable">
+    <json-tree-table :data='jsonData' :inital-path="param.initialPath || '/'" :options='tdvOption' rootObjectKey='root' class="json-tree-table" ref="jsonTreeTable">
       <template v-slot:title>
         <a href="https://www.treedoc.org"><b class="tdv-title">{{param.title}}</b></a>
       </template>
-      <span v-if="param.embeddedId == null">
+      <span v-if="param.embeddedId == null && !param.data &&  !param.dataUrl">
         Sample Data: <b-form-select v-model="jsonData" :options="sampleData" size='sm' style="width:auto" />
       </span>
       <span class="title">
@@ -48,8 +48,7 @@ export default class Home extends Vue {
   sampleData = sampleData.data;
   jsonData: any = sampleData.data[0].value;
 
-  tdvOption: TDVOptions = {
-    parsers: [
+  tdvOption: TDVOptions = new TDVOptions().setParsers([
       new JSONParserPlugin('Map.toString', JSONParserType.JAVA_MAP_TO_STRING),
       new XMLParserPlugin('XML compact', 'text/xml', true),
       new XMLParserPlugin(),
@@ -57,20 +56,28 @@ export default class Home extends Vue {
       new CSVParserPlugin(),
       new CSVParserPlugin('TSV', '\t'),
       new YAMLParserPlugin(),
-      ],
-  };
+      ]);
 
   private get jsonTreeTable() {
     return this.$refs.jsonTreeTable as JsonTreeTable;
   }
 
-  mounted() {
+  // Example url: http://localhost:8081/?data={a:1,b:[{b1:2,b2:3},%20{b1:4,b2:5}],c:3}&initialPath=/b&tableConfig={Pagination:false,columns:[{field:b1}]}&title=tableTest&option={maxPane:table,parsers:[]}#/
+  beforeMount() {
+    
     if (this.param.dataUrl)
       this.jsonTreeTable.openUrl(this.param.dataUrl);
 
     if (this.param.data)
       this.jsonData = this.param.data;
-      
+
+    if (this.param.option) {
+      Object.assign(this.tdvOption, this.param.option);
+    }
+
+    if (this.param.tableConfig) {
+      Object.assign(this.tdvOption.defaultTableOpt!, this.param.tableConfig);
+    }
 
     if (this.param.embeddedId != null) {
       window.parent.postMessage({ type: 'tdv-ready', id: this.param.embeddedId }, '*');

@@ -26,6 +26,12 @@ export interface ParserPlugin<TOpt> {
 }
 
 export default class TDVOptions {
+  maxPane?: string;
+  textWrap?: boolean;
+  showTable?: boolean;
+  showSource?: boolean;
+  showTree?: boolean;
+
   parsers?: ParserPlugin<any>[];
 
   // If pattern is string, it will use wildcard matching
@@ -43,4 +49,9 @@ export default class TDVOptions {
     query: { limit: 100, offset: 0 },
     xprops: { tstate: null },
   };
+
+  setParsers(parsers?: ParserPlugin<any>[]) {
+    this.parsers = parsers;
+    return this;
+  }
 }

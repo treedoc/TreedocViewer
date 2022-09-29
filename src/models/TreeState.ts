@@ -1,8 +1,11 @@
-import { TDNode, TreeDoc, Bookmark, TDObjectCoder, TDNodeType, JSONPointer } from 'treedoc';
+import { TDNode, TreeDoc, Bookmark, TDObjectCoder, TDNodeType, JSONPointer, LangUtil } from 'treedoc';
 import History from './History';
 import { ParserPlugin, ParseStatus } from './TDVOption';
 import JSONParserPlugin from '../parsers/JSONParserPlugin';
 import { Query, Column } from '../components/Vue2DataTable';
+import { TDVOption } from '@/lib';
+
+const { doIfNotNull } = LangUtil;
 
 export interface Selection {
   start?: Bookmark;
@@ -53,6 +56,27 @@ export default class TreeState {
       this.tree.root.freeze();
       this.select(selectedPath, true);
     }
+  }
+
+  setInitSOpt(opt?: TDVOption) {
+    doIfNotNull(opt?.maxPane, $ => this.maxPane = $);
+    doIfNotNull(opt?.textWrap, $ => this.textWrap = $);
+    doIfNotNull(opt?.showSource, $ => this.showSource[0] = $);
+    doIfNotNull(opt?.showTree, $ => this.showTree[0] = $);
+    doIfNotNull(opt?.showTable, $ => this.showTable[0] = $);  
+    return this;  
+  }
+
+  retainState(orgState: TreeState) {
+    if (orgState == null)
+      return this;
+    this.maxPane = orgState.maxPane;
+    this.textWrap = orgState.textWrap;
+    this.showSource = orgState.showSource;
+    this.showTree = orgState.showTree
+    this.showTable = orgState.showTable;
+    this.codeView = orgState.codeView;
+    return this;
   }
 
   buildTree(treeData: TDNode | string | any, rootLabel: string) {

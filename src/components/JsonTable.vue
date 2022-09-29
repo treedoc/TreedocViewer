@@ -111,7 +111,7 @@ export default class JsonTable extends Vue {
   showAdvancedQuery = false;
 
   @Prop() private tableData!: TreeState | TDNode | object | string;
-  @Prop() private options?: DataTableOptions;
+  @Prop() options?: DataTableOptions;
   @Prop() private isInMuliPane?: boolean;  // TODO: Move to TDVTableOption
 
   rebuildTable(val: TDNode, cachedState: TableNodeState | null = null) {
