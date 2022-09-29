@@ -50,7 +50,8 @@
           <div v-else>No Data</div>
         </div>
         <div slot="table" :grow="50" :show="tstate.showTable" class="panview">
-          <div v-if="tstate.tree"><json-table :table-data='tstate' :options="tableOpt"
+          <!-- <div v-if="tstate.tree"><json-table :table-data='tstate' :options="tableOpt" -->
+            <div v-if="tstate.tree"><json-table :table-data='tstate'
             @node-clicked='nodeClicked'
             isInMuliPane="true" /></div>
           <div v-else>No Data</div>
