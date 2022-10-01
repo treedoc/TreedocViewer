@@ -4,7 +4,7 @@
       <div style="display: flex column">
         <div class='tdv-tbl-top'>
           <slot name='tableTitle' v-if="hasTableTitleSlot" />
-          <json-path :tree-node="this.tstate ? this.tstate.selected : null" @node-clicked='nodeClicked'/>
+          <json-path :tree-node="tstate ? tstate.selected : null" @node-clicked='nodeClicked'/>
           <div class="tdv-tbl-toolbar">
             <expand-control :state='expandState' v-if="tstate.hasTreeInTable" />
             <span v-b-tooltip.hover title="Toggle fullscreen" v-if="isInMuliPane">
@@ -110,9 +110,9 @@ export default class JsonTable extends Vue {
   copyBuffer = '';
   showAdvancedQuery = false;
 
-  @Prop() private tableData!: TreeState | TDNode | object | string;
+  @Prop() tableData!: TreeState | TDNode | object | string;
   @Prop() options?: DataTableOptions;
-  @Prop() private isInMuliPane?: boolean;  // TODO: Move to TDVTableOption
+  @Prop() isInMuliPane?: boolean;  // TODO: Move to TDVTableOption
 
   rebuildTable(val: TDNode, cachedState: TableNodeState | null = null) {
     // use defTableOpt to get rid of this.options for non-initial node

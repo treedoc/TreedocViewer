@@ -95,22 +95,22 @@ export default class JsonTreeTable extends Vue {
   @Prop() initalPath!: string;
   @Prop() rootObjectKey!: string;
 
-  private defaultParser: ParserPlugin<any> = new JSONParserPlugin();
-  private selectedParser: ParserPlugin<any> = this.defaultParser;
+  defaultParser: ParserPlugin<any> = new JSONParserPlugin();
+  selectedParser: ParserPlugin<any> = this.defaultParser;
   tstate = new TreeState({}, this.selectedParser).setInitSOpt(this.options);
-  private jsonStr = '';
+  jsonStr = '';
 
-  private parseResult = '';
-  private strDataSynced = false;
-  private error = {
+  parseResult = '';
+  strDataSynced = false;
+  error = {
     color: 'red',
   };
 
   // url = https://maps.sensor.community/data/v2/data.24h.json
   // url = 'https://jsonplaceholder.typicode.com/posts';
-  private url = 'https://www.googleapis.com/discovery/v1/apis/vision/v1p1beta1/rest';
+  url = 'https://www.googleapis.com/discovery/v1/apis/vision/v1p1beta1/rest';
   // url = "https://www.googleapis.com/discovery/v1/apis"
-  private urlInput = '';
+  urlInput = '';
 
   treeItemActionStyle = {};
   mouseEnterEvent: NodeMouseEnterEvent | null = null;
@@ -118,11 +118,11 @@ export default class JsonTreeTable extends Vue {
   mouseInActionBar = false;
   mouseInNode = false;
 
-  private nodeClicked(nodePath: string[]) {
+  nodeClicked(nodePath: string[]) {
     this.tstate.select(nodePath);
   }
 
-  private format() {
+  format() {
     this.jsonStr = TDJSONWriter.get().writeAsString(this.tstate.tree.root, new TDJSONWriterOption().setIndentFactor(2));
   }
 
@@ -189,7 +189,7 @@ export default class JsonTreeTable extends Vue {
       THIS.tstate.select(THIS.initalPath, true);
   }, 300);
 
-  private get hasError() {
+  get hasError() {
     return this.parseResult.startsWith('Error');
   }
 
@@ -197,7 +197,7 @@ export default class JsonTreeTable extends Vue {
     return this.options?.defaultTableOpt;
   }
 
-  private get parserSelectOptions() {
+  get parserSelectOptions() {
     const opt = new Array<{text: string, value: ParserPlugin<any>}>();
     opt.push({ text: this.defaultParser.name, value: this.defaultParser });
     if (this.options && this.options.parsers)
@@ -205,10 +205,10 @@ export default class JsonTreeTable extends Vue {
     return opt;
   }
   
-  private get copyTextArea() { return this.$refs.copyTextArea as HTMLTextAreaElement; }
-  private get sourceView() { return this.$refs.sourceView as SourceView; }
+  get copyTextArea() { return this.$refs.copyTextArea as HTMLTextAreaElement; }
+  get sourceView() { return this.$refs.sourceView as SourceView; }
 
-  private readFile(ef: Event) {
+  readFile(ef: Event) {
     const fileName = (ef.target as HTMLInputElement).files![0];
     if (!fileName)
       return;
@@ -248,7 +248,7 @@ export default class JsonTreeTable extends Vue {
   }
 
 
-  private copyText(text: string) {
+  copyText(text: string) {
     // code mirror doesn't support copy command, we have to use a hidden textarea to do the copy
     this.copyTextArea.value = text;
     this.copyTextArea.select();
