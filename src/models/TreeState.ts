@@ -3,7 +3,7 @@ import History from './History';
 import { ParserPlugin, ParseStatus } from './TDVOption';
 import JSONParserPlugin from '../parsers/JSONParserPlugin';
 import { Query, Column } from '../components/Vue2DataTable';
-import { TDVOption } from '@/lib';
+import TDVOption from './TDVOption';
 
 const { doIfNotNull } = LangUtil;
 

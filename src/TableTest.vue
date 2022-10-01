@@ -61,6 +61,7 @@ export default class TableTest extends Vue {
     return state;
   }
 
+  // tslint:disable-next-line:max-line-length
   // Sample URL: http://localhost:8081/?data={a:1,b:[{b1:2,b2:3},%20{b1:4,b2:5}],c:3}&initialPath=/b&tableConfig={Pagination:false,columns:[{field:b1}]}&title=tableTest&#/table
   mounted() {
     doIfNotNull(this.param.title, $ => this.tableParam.title = $)  

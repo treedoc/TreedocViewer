@@ -63,6 +63,7 @@ export default class Home extends Vue {
     return this.$refs.jsonTreeTable as JsonTreeTable;
   }
 
+  // tslint:disable-next-line:max-line-length
   // Example url: http://localhost:8081/?data={a:1,b:[{b1:2,b2:3},%20{b1:4,b2:5}],c:3}&initialPath=/b&tableConfig={Pagination:false,columns:[{field:b1}]}&title=tableTest&option={maxPane:table,parsers:[]}#/
   beforeMount() {
     

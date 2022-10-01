@@ -16,6 +16,9 @@ interface XNode {
   children?: XNode [];
 }
 
+// when compiled with "typescript": "^3.9.7", it will throw error: Cannot find name 'DOMParserSupportedType'. so we redefine it here
+type DOMParserSupportedType = 'application/xhtml+xml' | 'application/xml' | 'image/svg+xml' | 'text/html' | 'text/xml';
+
 export default class XMLParserPlugin implements ParserPlugin<XMLParserOption> {
   option: XMLParserOption = {};
   syntax = 'xml';
