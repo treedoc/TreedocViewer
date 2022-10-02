@@ -5,6 +5,7 @@ export declare interface Column {
   [key: string]: any;
 }
 
+export const JS_QUERY_DEFAULT = 'r => r';
 export declare interface Query {
   sort?: string;
   order?: boolean | 'asc' | 'desc';

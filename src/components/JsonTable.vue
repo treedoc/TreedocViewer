@@ -64,7 +64,7 @@
 <script lang="ts">
 import { Component, Prop, Vue, Watch } from 'vue-property-decorator';
 import _ from 'lodash';
-import { DataTableOptions, Column, Query } from './Vue2DataTable';
+import { DataTableOptions, JS_QUERY_DEFAULT } from './Vue2DataTable';
 import DataFilter from './DataFilter';
 import thFilter from './th-Filter.vue';
 import tdValue from './td-Value.vue';
@@ -97,7 +97,7 @@ export default class JsonTable extends Vue {
     filteredData: [],
     rawData: [],
     total: 0,
-    query: { limit: 100, offset: 0, jsQuery: 'r => r' },
+    query: { limit: 100, offset: 0, jsQuery: JS_QUERY_DEFAULT },
     xprops: { tstate: null },
   };
   defTableOpt!: any;

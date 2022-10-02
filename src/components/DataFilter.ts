@@ -1,5 +1,5 @@
 import _ from 'lodash';
-import { Query, Column, DataTableOptions } from './Vue2DataTable';
+import { Query, Column, DataTableOptions, JS_QUERY_DEFAULT } from './Vue2DataTable';
 import { TDNode } from 'treedoc';
 import { TableUtil } from '../models/TableUtil';
 
@@ -23,9 +23,14 @@ export default {
         opt.filteredData.forEach(r => delete r[c.field]);
     });
     
-    if (opt.query.jsQuery) {
-      const filterFunc = eval(opt.query.jsQuery);
-      opt.filteredData = opt.filteredData.filter(r => filterFunc(TableUtil.rowToMapWithAllFields(r, opt)));
+    if (opt.query.jsQuery && opt.query.jsQuery != JS_QUERY_DEFAULT) {
+      try {
+        const filterFunc = eval(opt.query.jsQuery);
+        opt.filteredData = opt.filteredData.filter(r => filterFunc(TableUtil.rowToMapWithAllFields(r, opt)));
+      } catch(e) {
+        // When run in chrome extension, eval is not allowed
+        console.error(`Error evaluate JSQuery:${e}`);
+      }
     }
 
     const q = opt.query;
