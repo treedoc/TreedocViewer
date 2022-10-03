@@ -23,7 +23,7 @@ export default {
         opt.filteredData.forEach(r => delete r[c.field]);
     });
     
-    if (opt.query.jsQuery && opt.query.jsQuery != JS_QUERY_DEFAULT) {
+    if (opt.query.jsQuery && opt.query.jsQuery !== JS_QUERY_DEFAULT) {
       try {
         const filterFunc = eval(opt.query.jsQuery);
         opt.filteredData = opt.filteredData.filter(r => filterFunc(TableUtil.rowToMapWithAllFields(r, opt)));
