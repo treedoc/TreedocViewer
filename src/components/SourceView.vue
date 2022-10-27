@@ -121,6 +121,7 @@ function scrollTo(textarea: HTMLTextAreaElement, offset: number) {
   width: 100%;
   min-height:400px;
   height:100%;
+  resize: none;
   flex-grow:1;
   overflow:auto;
 }

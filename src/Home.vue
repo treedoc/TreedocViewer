@@ -65,10 +65,6 @@ export default class Home extends Vue {
   // tslint:disable-next-line:max-line-length
   // Example url: http://localhost:8081/?data={a:1,b:[{b1:2,b2:3},%20{b1:4,b2:5}],c:3}&initialPath=/b&tableConfig={Pagination:false,columns:[{field:b1}]}&title=tableTest&option={maxPane:table,parsers:[]}#/
   beforeMount() {
-    
-    if (this.param.dataUrl)
-      this.jsonTreeTable.openUrl(this.param.dataUrl);
-
     if (this.param.data)
       this.jsonData = this.param.data;
 
@@ -91,6 +87,11 @@ export default class Home extends Vue {
         this.jsonData = evt.data.data;
       }, false);
     }
+  }
+
+  mounted() {    
+    if (this.param.dataUrl)
+      this.jsonTreeTable.openUrl(this.param.dataUrl);
   }
 }
 </script>

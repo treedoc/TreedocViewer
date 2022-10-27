@@ -5787,10 +5787,10 @@ ms@^2.1.1:
   resolved "https://registry.yarnpkg.com/ms/-/ms-2.1.3.tgz"
   integrity sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==
 
-msplit@0.1.20:
-  version "0.1.20"
-  resolved "https://registry.yarnpkg.com/msplit/-/msplit-0.1.20.tgz#ae40a1c0b809e05e5828593ca98932f09cf2c4f7"
-  integrity sha512-rNXBCcmm2y0YD7GI2fS23YNm/yekN/7/qkZq/+0l1UfICRobVcIvlc+tSsutLW2RFbdm5ZC2e9cARnljTlvccg==
+msplit@0.1.24:
+  version "0.1.24"
+  resolved "https://registry.yarnpkg.com/msplit/-/msplit-0.1.24.tgz#8026c265c6086969a117c56ef11410183537cc4d"
+  integrity sha512-is6fT9eGaNxmHZJ1ul8w5xzJp4owpbTZZGq8ZEbM+Gdrs3PMHTJsEnrWSNwMwswOLpXKOVhF3NpWNorcNR5FKg==
   dependencies:
     vue "^2.6.10"
     vue-class-component "^7.0.2"
