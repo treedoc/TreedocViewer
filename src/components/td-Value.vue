@@ -68,7 +68,6 @@ export default {
 <style>
 .td-value {
   overflow-x: auto;
-  
 }
 .td-value-max-width {
   max-width: 1500px;

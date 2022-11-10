@@ -336,7 +336,7 @@ export default class JsonTable extends Vue {
 .tdv-table * pre {
   /* white-space: pre-wrap; */
   white-space: pre;
-  word-wrap: break-word;
+  /* word-wrap: break-word; */
   margin-bottom: 0px;
 }
 .tdv-table * .clearfix {

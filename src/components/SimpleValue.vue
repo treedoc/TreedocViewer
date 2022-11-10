@@ -62,6 +62,7 @@ export default class SimpleValue extends Vue {
 <style>
 pre.tdv-value {
   margin-bottom: 1px;
+  overflow-wrap: anywhere;
 }
 
 .number {
