@@ -34,7 +34,7 @@
     "vue-codemirror-lite": "^1.0.4",
     "vue-property-decorator": "9.0.0",
     "vue-router": "^3.4.6",
-    "vue2-datatable-component": "github:TrueCarry/vue2-datatable",
+    "vue2-datatable-component": "https://github.com/TrueCarry/vue2-datatable",
     "yaml": "^1.10.0"
   },
   "devDependencies": {
