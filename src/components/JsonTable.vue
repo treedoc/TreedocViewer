@@ -22,12 +22,12 @@
                 <i class="fa fa-copy" @click='copy'></i>
               </b-btn>
             </span>
-            <span v-b-tooltip.hover title="Wrap text" v-if="isInMuliPane">
+            <span v-b-tooltip.hover title="Wrap text">
               <b-btn size='sm' variant='outline-secondary' :pressed='tstate.textWrap' @click='tstate.textWrap = !tstate.textWrap'>
                 <i class="fa fa-level-down"></i>
               </b-btn>
             </span>
-            <span v-b-tooltip.hover title="Advanced Query" v-if="isInMuliPane">
+            <span v-b-tooltip.hover title="Advanced Query">
               <b-btn size='sm' variant='outline-secondary' :pressed='showAdvancedQuery' @click='showAdvancedQuery = !showAdvancedQuery'>
                 <i class="fa fa-filter"></i>
               </b-btn>
@@ -51,7 +51,10 @@
         </div>
         <template v-if="showAdvancedQuery">
           <div style="display: flex;"  v-b-tooltip.hover title="Advanced Query with Javascript">
-            JSQuery:<b-form-input size='sm' style="display:inline;width:100%" v-model="tableOpt.query.jsQuery" placeholder="Custom query in JS" debounce="500" /><br>
+            JSQuery:<b-form-input size='sm' style="display:inline;width:100%" v-model="tableOpt.query.jsQuery" placeholder="Custom query in JS. E.g. $.name.size() > 10" debounce="500" />
+          </div>
+          <div style="display: flex;"  v-b-tooltip.hover title="Extended Fields">
+            ExtendedFields:<b-form-input size='sm' name="extendedFields" style="display:inline;width:100%" v-model="tableOpt.query.extendedFields" placeholder="Extends Fields. E.g. createdName: $.created.name, createdDate: $.created.data" @blur="buildTableAndQuery(selected)" />
           </div>
           Query:{{tableOpt.query}}
         </template>
@@ -75,6 +78,7 @@ import JSONParserPlugin from '../parsers/JSONParserPlugin';
 import ExpandControl, { ExpandState } from './ExpandControl.vue';
 import { identity, ListUtil, TD, TDNode, TDNodeType } from 'treedoc';
 import { TableUtil } from '../models/TableUtil';
+import { createVerify } from 'crypto';
 
 const COL_VALUE = '@value';
 const COL_NO = '#';
@@ -97,7 +101,8 @@ export default class JsonTable extends Vue {
     filteredData: [],
     rawData: [],
     total: 0,
-    query: { limit: 100, offset: 0, jsQuery: JS_QUERY_DEFAULT },
+    // Have to initialize all the fields to make them able to be persisted in cache. (reactivity problem by proxy?)
+    query: { limit: 100, offset: 0, jsQuery: JS_QUERY_DEFAULT, extendedFields:'' },
     xprops: { tstate: null },
   };
   defTableOpt!: any;
@@ -114,7 +119,7 @@ export default class JsonTable extends Vue {
   @Prop() options?: DataTableOptions;
   @Prop() isInMuliPane?: boolean;  // TODO: Move to TDVTableOption
 
-  rebuildTable(val: TDNode, cachedState: TableNodeState | null = null) {
+  rebuildTable(val: TDNode | null, cachedState: TableNodeState | null = null) {
     // use defTableOpt to get rid of this.options for non-initial node
     if (!this.defTableOpt)  // backup for the first time, we have to intialize tableOpt attributes to make them reactive
       this.defTableOpt = this.tableOpt;
@@ -126,9 +131,7 @@ export default class JsonTable extends Vue {
       this.tableOpt.columns = cachedState.columns;
       this.isColumnExpanded = cachedState.isColumnExpanded;
     }
-
-    this.buildTable(val);
-    this.queryData();
+    this.buildTableAndQuery(val);
     this.tstate.hasTreeInTable = false;
     // console.log('clear hasTreeInTable');
     this.tableOpt.xprops.tstate = this.tstate;
@@ -136,15 +139,36 @@ export default class JsonTable extends Vue {
     this.isColumnExpandedBuild = this.isColumnExpanded;
   }
 
-  buildTable(val: TDNode) {
+  buildTableAndQuery(val: TDNode | null) {
+    this.buildTable(val);
+    this.queryData();
+  }
+
+  buildTable(val: TDNode | null) {
     this.tableOpt.rawData = [];
 
     if (!val)
       return;
+    
+    let extFunc = null;
+    if (this.query.extendedFields) {
+      const exp = `
+        with($) {   // With doesn't work with Proxy (not sure why)
+          // console.log(JSON.stringify($));
+          return {${this.query.extendedFields}}
+        }
+      `;
+      try { 
+        extFunc = new Function('$', exp);
+      } catch(e) {
+        console.error(`Error parsing extend fields: ${exp}`);
+        console.error(e);
+      }
+    }
+
     const ia = val.type === TDNodeType.ARRAY;
     const keyCol = ia ? COL_NO : COL_KEY;
     this.addColumn(keyCol, 0);
-
     if (val.children) {
       for (const v of val.children) {
         const row = {
@@ -156,6 +180,18 @@ export default class JsonTable extends Vue {
           for (const cv of v.children) {
             this.addColumn(cv.key!);
             row[cv.key!] = cv;
+          }
+          if (extFunc) {
+            try {
+              const ext = extFunc(v.toProxy());
+              for (const k of Object.keys(ext)) {
+                this.addColumn(k);
+                row[k] = ext[k];
+              }
+            } catch(e) {
+              console.error(`Error evalute ext fields: ${this.query.extendedFields}`);
+              console.error(e);
+            }
           }
         } else {
           this.addColumn(COL_VALUE, 1);
@@ -268,6 +304,7 @@ export default class JsonTable extends Vue {
 
   @Watch('tstate.selected', {immediate: true})
   watchSelected(node: TDNode, oldNode: TDNode) {
+    console.log(`tstate.selected: ${oldNode?.pathAsString} -> ${node?.pathAsString}`)
     if (oldNode && oldNode.doc === node.doc)
       this.tstate.saveTableState(oldNode, new TableNodeState(_.cloneDeep(
         this.tableOpt.query), this.expandState.expandLevel, this.tableOpt.columns, this.isColumnExpanded));
@@ -277,6 +314,8 @@ export default class JsonTable extends Vue {
       this.isColumnExpanded = cachedState.isColumnExpanded;
     } else {
       this.isColumnExpanded = this.defaultExpand(node);
+      this.tableOpt.query.extendedFields = '';
+      this.tableOpt.query.jsQuery = '$';
     }
 
     // this.tableOpt.query.offset = 0;

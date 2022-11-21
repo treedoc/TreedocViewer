@@ -24,12 +24,14 @@ export default {
     });
     
     if (opt.query.jsQuery && opt.query.jsQuery !== JS_QUERY_DEFAULT) {
+      const func = `$=> ${opt.query.jsQuery}`;
       try {
-        const filterFunc = eval(opt.query.jsQuery);
+        const filterFunc = eval(func)
         opt.filteredData = opt.filteredData.filter(r => filterFunc(TableUtil.rowToMapWithAllFields(r, opt)));
       } catch(e) {
         // When run in chrome extension, eval is not allowed
-        console.error(`Error evaluate JSQuery:${e}`);
+        console.error(`Error evaluate JSQuery:${func}`);
+        console.error(e)
       }
     }
 

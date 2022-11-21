@@ -5,13 +5,15 @@ export declare interface Column {
   [key: string]: any;
 }
 
-export const JS_QUERY_DEFAULT = 'r => r';
+export const JS_QUERY_DEFAULT = '$';
 export declare interface Query {
   sort?: string;
   order?: boolean | 'asc' | 'desc';
   offset: number;
   limit: number;
   jsQuery?: string;
+  // In Javascript map syntax: e.g.  "{createdDate: $.created.date, nameUpper: $.name.toUpperCase()}"
+  extendedFields?: string; 
   [key: string]: any;
 }
 
