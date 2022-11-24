@@ -55,6 +55,7 @@ export default class Home extends Vue {
       new XMLParserPlugin('html', 'text/html'),
       new CSVParserPlugin(),
       new CSVParserPlugin('TSV', '\t'),
+      new CSVParserPlugin('SSV', ' '),
       new YAMLParserPlugin(),
       ]);
 

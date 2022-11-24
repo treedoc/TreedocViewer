@@ -2,6 +2,7 @@
   <div class="td-value" :class="{'td-value-max-width' : !isLastCol}">
     <div v-if='!value'></div>
     <div v-else-if="html" v-html="html"/>
+    <div v-else-if="isRawValue">{{value}}</div>
     <div v-else-if="!isSimpleType">
       <tree-view-item class='tree-view-item-root'
           @node-clicked='nodeClicked'
@@ -10,7 +11,6 @@
           :currentLevel='0'
           style="margin-left: 0!important;" />
     </div>
-    <div v-else-if="isRawValue">{{value}}</div>
     <div v-else>
       <simple-value @node-clicked='nodeClicked' :tnode='value' :isInTable='true' :textWrap='xprops.tstate.textWrap' />
     </div>
@@ -45,8 +45,8 @@ export default {
     },
     col() { return _.find(this.columns, { field: this.field }); },
     isLastCol() { return this.col === this.columns[this.columns.length - 1]; },
-    isSimpleType() { return !this.value.type && this.value.type === TDNodeType.SIMPLE; },
-    isRawValue() { return !this.value.hasOwnProperty('type'); }
+    isSimpleType() { return this.value.type === TDNodeType.SIMPLE; },
+    isRawValue() { return !this.value.hasOwnProperty('type') && !this.value.hasOwnProperty('isLeaf'); }
   },
   methods: {
     nodeClicked(data) {
