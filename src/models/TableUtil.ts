@@ -26,6 +26,6 @@ export class TableUtil {
   }
 
   static valToObject(val: any) {
-    return val instanceof TDNode ? val.toObject() : val;
+    return val instanceof TDNode ? val.toObject(false, false) : val;
   }
 }

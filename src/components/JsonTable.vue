@@ -181,23 +181,47 @@ export default class JsonTable extends Vue {
             this.addColumn(cv.key!);
             row[cv.key!] = cv;
           }
-          if (extFunc) {
-            try {
-              const ext = extFunc(v.toProxy());
-              for (const k of Object.keys(ext)) {
-                this.addColumn(k);
-                row[k] = ext[k];
-              }
-            } catch(e) {
-              console.error(`Error evalute ext fields: ${this.query.extendedFields}`);
-              console.error(e);
-            }
-          }
         } else {
           this.addColumn(COL_VALUE, 1);
         }
+        if (extFunc) {
+          try {
+            const ext = extFunc(v.toObject(true, true));
+            for (const k in ext)
+              if(!k.startsWith('$$'))   // internal fields (e.g. $$tdNode)
+                this.addExtObject(k, ext[k], row);
+          } catch(e) {
+            console.error(`Error evalute ext fields: ${this.query.extendedFields}`);
+            console.error(e);
+          }
+        }
       }
     }
+  }
+
+  addExtObject(key: string, val: any, row: any) {
+    if (key.endsWith('_') && val) {  // spread the children
+      if (Array.isArray(val)) {
+        for (let i = 0; i < val.length; i++) {
+          this.addColumn(key + i);
+          row[key+i] = val[i]?.$$tdNode || val[i];
+        }
+        return;
+      } else if (typeof val === 'object') {
+        // for (const cv of val.children) {
+        //   const ck = key + cv.key
+        //   this.addColumn(ck);
+        //   row[ck] = cv;
+        // }
+        for (const k of Object.keys(val)) {
+          this.addColumn(key + k);
+          row[key+k] = val[k]?.$$tdNode || val[k];
+        }
+        return;
+      }
+    }
+    this.addColumn(key);
+    row[key] = val?.$$tdNode || val;
   }
 
   addColumn(field: string, idx = this.tableOpt.columns.length) {

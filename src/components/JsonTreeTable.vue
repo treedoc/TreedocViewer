@@ -133,7 +133,7 @@ export default class JsonTreeTable extends Vue {
 
   // for devtool interaction only
   transformJson(func: (obj: any) => any) {
-    this.jsonStr = JSON.stringify(func(this.tstate.tree.root.toObject()), null, 2);
+    this.jsonStr = JSON.stringify(func(this.tstate.tree.root.toObject(true)), null, 2);
   }
 
   @Watch('data', { immediate: true })
