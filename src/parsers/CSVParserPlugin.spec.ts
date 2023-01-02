@@ -1,5 +1,5 @@
-import sampleData from '../../../src/sampleData';
-import CSVParserPlugin from '../../../src/parsers/CSVParserPlugin';
+import sampleData from '../sampleData';
+import CSVParserPlugin from './CSVParserPlugin';
 import { describe, expect, test } from 'vitest'
 
 describe('CSVParser.ts', () => {
@@ -11,7 +11,7 @@ describe('CSVParser.ts', () => {
 
   test('parse', () => {
     const result = parser.parse(sampleData.csvStr);
-    expect(result.message).toBe('CSVParser.parser()');
+    expect(result.message).toBe('CSVParser.parse()');
     expect(result.result?.toStringInternal("", true, true)).toMatchSnapshot();
   });
 });

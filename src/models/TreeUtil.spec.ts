@@ -1,4 +1,4 @@
-import TreeUtil from '../../../src/models/TreeUtil';
+import TreeUtil from './TreeUtil';
 import { TD, TDJSONParser, TDJSONParserOption } from 'treedoc/lib/index';
 import { describe, expect, test } from 'vitest'
 

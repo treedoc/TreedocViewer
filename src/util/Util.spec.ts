@@ -1,4 +1,4 @@
-import Util from '../../../src/util/Util';
+import Util from './Util';
 import { describe, expect, test } from 'vitest'
 
 describe('Util.ts', () => {

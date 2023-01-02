@@ -54,7 +54,7 @@
             JSQuery:<b-form-input size='sm' style="display:inline;width:100%" v-model="tableOpt.query.jsQuery" placeholder="Custom query in JS. E.g. $.name.size() > 10" debounce="500" />
           </div>
           <div style="display: flex;"  v-b-tooltip.hover title="Extended Fields">
-            ExtendedFields:<b-form-input size='sm' name="extendedFields" style="display:inline;width:100%" v-model="tableOpt.query.extendedFields" placeholder="Extends Fields. E.g. createdName: $.created.name, createdDate: $.created.data" @blur="buildTableAndQuery(selected)" />
+            ExtendedFields:<b-form-input size='sm' name="extendedFields" style="display:inline;width:100%" v-model="tableOpt.query.extendedFields" placeholder="Extends Fields. E.g. `createdName: $.created.name, createdDate: $.created.data` or spread child: `c_:created`" @blur="buildTableAndQuery(selected)" />
           </div>
           Query:{{tableOpt.query}}
         </template>
@@ -214,6 +214,7 @@ export default class JsonTable extends Vue {
         //   row[ck] = cv;
         // }
         for (const k of Object.keys(val)) {
+          if(k.startsWith('$$')) continue;
           this.addColumn(key + k);
           row[key+k] = val[k]?.$$tdNode || val[k];
         }

@@ -36,6 +36,7 @@ import XMLParserPlugin from './parsers/XMLParserPlugin';
 import CSVParserPlugin from './parsers/CSVParserPlugin';
 import UrlParam from './UrlParam';
 import JSONParserPlugin, { JSONParserOption, JSONParserType } from './parsers/JSONParserPlugin';
+import PrometheusParserPlugin from './parsers/PrometheusParserPlugin';
 
 @Component({
   components: {
@@ -56,6 +57,7 @@ export default class Home extends Vue {
       new CSVParserPlugin(),
       new CSVParserPlugin('TSV', '\t'),
       new CSVParserPlugin('SSV', ' '),
+      new PrometheusParserPlugin(),
       new YAMLParserPlugin(),
       ]);
 

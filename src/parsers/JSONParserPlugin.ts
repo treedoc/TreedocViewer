@@ -45,7 +45,7 @@ export default class JSONParserPlugin implements ParserPlugin<JSONParserOption> 
       while (src.skipSpacesAndReturnsAndCommas()) 
         nodes.push(TDJSONParser.get().parse(src, opt));
       result.result = nodes.length === 1 ? nodes[0] : TreeDoc.merge(nodes).root;
-      result.message = 'TDJSONParser.parser()';
+      result.message = 'TDJSONParser.parse()';
       return result;
     } catch (e2) {
       result.message = `Error:${(e2 as any).message}`;

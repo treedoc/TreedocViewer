@@ -1,6 +1,6 @@
-import sampleData from '../../../src/sampleData';
+import sampleData from '../sampleData';
 import { describe, expect, test } from 'vitest'
-import YAMLParserPlugin  from '../../../src/parsers/YAMLParserPlugin';
+import YAMLParserPlugin  from './YAMLParserPlugin';
 import { TD, TDEncodeOption } from 'treedoc';
 
 describe('YAMLParser.ts', () => {

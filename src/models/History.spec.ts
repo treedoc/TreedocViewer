@@ -1,4 +1,4 @@
-import History from '../../../src/models/History';
+import History from './History';
 import { describe, expect, test } from 'vitest'
 
 describe('History.ts', () => {

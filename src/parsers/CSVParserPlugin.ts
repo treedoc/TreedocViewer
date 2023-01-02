@@ -39,7 +39,7 @@ export default class CSVParserPlugin implements ParserPlugin<CSVParserOption> {
     const result = new ParseResult();
     try {
       result.result = CSVParser.get().parse(str, this.csvOption);
-      result.message = 'CSVParser.parser()';
+      result.message = 'CSVParser.parse()';
       return result;
     } catch (e2) {
       result.message = `Error:${(e2 as any).message}`;

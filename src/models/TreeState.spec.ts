@@ -1,5 +1,5 @@
-import TreeState from '../../../src/models/TreeState';
-import sampleData from '../../../src/sampleData';
+import TreeState from './TreeState';
+import sampleData from '../sampleData';
 import { describe, expect, test } from 'vitest'
 
 describe('TreeState.ts', ()=> {

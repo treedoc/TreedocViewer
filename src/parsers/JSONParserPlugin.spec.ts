@@ -1,5 +1,5 @@
-import sampleData from '../../../src/sampleData';
-import JSONParserPlugin, { JSONParserType } from '../../../src/parsers/JSONParserPlugin';
+import sampleData from '../sampleData';
+import JSONParserPlugin, { JSONParserType } from './JSONParserPlugin';
 import { describe, expect, test } from 'vitest'
 
 describe('JSONParser.ts', () => {
@@ -15,7 +15,7 @@ describe('JSONParser.ts', () => {
 
   test('parse', () => {
     const result = parser.parse(sampleData.jsonStr);
-    expect(result.message).toBe('TDJSONParser.parser()');
+    expect(result.message).toBe('TDJSONParser.parse()');
     expect(result.result?.toStringInternal("", true, true)).toMatchSnapshot();
   });
 });
