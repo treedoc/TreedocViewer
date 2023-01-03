@@ -12,7 +12,7 @@ export default class PrometheusParserPlugin implements ParserPlugin<PrometheusPa
   constructor(public name = 'Prometheus', public fieldSep = ',') {}
 
   looksLike(str: string): boolean {
-    return str.indexOf("\n# HELP ") >= 0 && str.indexOf("\n# TYPE ") >= 0
+    return str.indexOf('\n# HELP ') >= 0 && str.indexOf('\n# TYPE ') >= 0
   }
 
   get csvOption(): CSVOption {

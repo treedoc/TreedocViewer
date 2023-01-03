@@ -1,15 +1,15 @@
-import { CharSource, LangUtil, ListUtil, StringCharSource } from "treedoc"
+import { CharSource, LangUtil, ListUtil, StringCharSource } from 'treedoc'
 import _ from 'lodash';
 
-const HELP = "HELP";
-const TYPE = "TYPE";
+const HELP = 'HELP';
+const TYPE = 'TYPE';
 export class Metrics {
   [key: string]: Metric;
 }
 
 export class Metric {
-  help: string = "";
-  type: string = "";
+  help: string = '';
+  type: string = '';
   metricsValues: MetricValue[] = [];
 
   getOrCreateMetrics(labels: {[key: string]: string}): MetricValue {
@@ -62,12 +62,12 @@ export class MetricLine {
 export default class PrometheusParser {
   result: Metrics = {};
   currentMetric: Metric = new Metric();
-  currentMetricKey: string = "";
+  currentMetricKey: string = '';
     
   parse(str: string) : Metrics {
     const src = new StringCharSource(str);
     while(src.skipSpacesAndReturns()) {
-      if (src.peek() == '#') {
+      if (src.peek() === '#') {
         src.skip(1);
         this.parseComment(src);
       } else {
@@ -89,29 +89,29 @@ export default class PrometheusParser {
       if (type) 
         this.getOrCreateMetric(type.name).type = type.value;
     }
-    src.skipUntilTerminator("\n\r", true);
+    src.skipUntilTerminator('\n\r', true);
   }
 
   parseCommentOfKey(src: CharSource, key: string): {name: string, value: string} | null {
     if (src.startsWith(key)) {
       src.skip(key.length);
       src.skipChars(' ');
-      const name = src.readUntilTerminator(" ");
+      const name = src.readUntilTerminator(' ');
       src.skipChars(' ');
-      return {name, value: src.readUntilTerminator("\n\r")};
+      return {name, value: src.readUntilTerminator('\n\r')};
     } 
     return null;
   }
 
   parseMetricLine(src: CharSource): MetricLine {
-    const ret: MetricLine = new MetricLine(src.readUntilTerminator("{ "));
+    const ret: MetricLine = new MetricLine(src.readUntilTerminator('{ '));
     if (src.peek() === '{') {
       src.skip(1);
       while(true) {
         const key = src.readUntilTerminator('=');
         src.skip(1);  // "=";
         const quote = src.read();
-        if (quote != '"' && quote != "'") throw src.createParseRuntimeException(`missing quote when expecting a string label vale`);
+        if (quote !== '"' && quote !== '\'') throw src.createParseRuntimeException('missing quote when expecting a string label vale');
         const val = src.readQuotedString(quote);
         ret.labels[key] = val;
         const sep = src.read();
@@ -119,20 +119,20 @@ export default class PrometheusParser {
         if (sep !== ',') throw src.createParseRuntimeException(`expect ',' after label: ${key}=${val}`);
       }
     }
-    src.skipChars(" \t");
-    ret.value = Number.parseFloat(src.readUntilTerminator(" \n\r"));
+    src.skipChars(' \t');
+    ret.value = Number.parseFloat(src.readUntilTerminator(' \n\r'));
     if (src.isEof())
       return ret;
-    if (src.peek() == ' ')
-    ret.timestamp = Number.parseFloat(src.readUntilTerminator("\n\r"));
+    if (src.peek() === ' ')
+    ret.timestamp = Number.parseFloat(src.readUntilTerminator(' \n\r'));
     return ret;
   }
   
   updateCurrentMetric(metricLine: MetricLine) {
     if (metricLine.name === this.currentMetricKey) {
-      const quantile = metricLine.labels?.["quantile"];
+      const quantile = metricLine.labels.quantile;
       if (quantile) {
-        delete metricLine.labels!["quantile"];
+        delete metricLine.labels.quantile;
         this.currentMetric.getOrCreateMetrics(metricLine.labels).addQuantile(quantile, metricLine.value);
         return;
       }
@@ -140,21 +140,21 @@ export default class PrometheusParser {
       return;
     }
 
-    if (metricLine.name == this.currentMetricKey + "_count") {
+    if (metricLine.name === this.currentMetricKey + '_count') {
       this.currentMetric.getOrCreateMetrics(metricLine.labels).count = metricLine.value;
       return;
     }
 
-    if (metricLine.name == this.currentMetricKey + "_sum") {
+    if (metricLine.name === this.currentMetricKey + '_sum') {
       this.currentMetric.getOrCreateMetrics(metricLine.labels).sum = metricLine.value;
       return;
     }
 
-    if (metricLine.name == this.currentMetricKey + "_bucket") {
-      const bucket = metricLine.labels["le"];
+    if (metricLine.name === this.currentMetricKey + '_bucket') {
+      const bucket = metricLine.labels.le;
       if (!bucket)
         throw new Error(`missing bucket label: ${JSON.stringify(metricLine)}`);
-      delete metricLine.labels["le"];
+      delete metricLine.labels.le;
       this.currentMetric.getOrCreateMetrics(metricLine.labels).addBucket(bucket, metricLine.value);
       return;
     }    
