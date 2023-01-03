@@ -124,7 +124,7 @@ export default class PrometheusParser {
     if (src.isEof())
       return ret;
     if (src.peek() === ' ')
-    ret.timestamp = Number.parseFloat(src.readUntilTerminator(' \n\r'));
+    ret.timestamp = Number.parseFloat(src.readUntilTerminator('\n\r'));
     return ret;
   }
   
