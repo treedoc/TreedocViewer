@@ -130,7 +130,7 @@ V2l2" ,v23
 
 const mapToStringStr = '{K1=v1, k2=123, k3={c=Test with ,in}, k4=[ab,c, def]}';
 
-export const promethusStr = String.raw`
+export const prometheusStr = String.raw`
 # Sample from: https://prometheus.io/docs/instrumenting/exposition_formats/#text-based-format
 # HELP http_requests_total The total number of HTTP requests.
 # TYPE http_requests_total counter
@@ -186,6 +186,7 @@ export default {
   xmlStr,
   csvStr,
   mapToStringStr,
+  prometheusStr,
   data: [
     {text: 'empty', value: {}},
     {
@@ -368,6 +369,10 @@ No \\n's!",
     {
       text: 'map.toString',
       value: mapToStringStr,
+    },
+    {
+      text: 'prometheus',
+      value: prometheusStr,
     },
   ] as {text: string, value: any}[],
 };
