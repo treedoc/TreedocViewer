@@ -1,5 +1,5 @@
 import sampleData from '../sampleData';
-import XMLParserPlugin, { XMLParserOption } from '../parsers/XMLParserPlugin';
+import XMLParserPlugin from '../parsers/XMLParserPlugin';
 import { describe, expect, test } from 'vitest'
 
 /**

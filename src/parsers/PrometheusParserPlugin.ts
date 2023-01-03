@@ -1,6 +1,5 @@
 import { ParserPlugin, ParseResult } from '../models/TDVOption';
-import { CSVParser, CSVOption, CSVWriter, TDNode, TDObjectCoder } from 'treedoc';
-import Util from '../util/Util';
+import { CSVOption, TDNode, TDObjectCoder } from 'treedoc';
 import PrometheusParser from './PrometheusParser';
 
 export class PrometheusParserOption {

@@ -2,7 +2,6 @@ import { ParserPlugin, ParseResult } from '../models/TDVOption';
 import { TDJSONParser, TDJSONParserOption, TDNodeType, TDNode, TDJSONWriter, TDJSONWriterOption, StringCharSource, TreeDoc } from 'treedoc';
 import YAMLParserPlugin from './YAMLParserPlugin';
 import Util from '../util/Util';
-import { indexOf } from 'lodash';
 
 export class JSONParserOption {
 }

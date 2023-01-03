@@ -1,9 +1,8 @@
-import sampleData, {promethusStr} from '../sampleData';
+import {promethusStr} from '../sampleData';
 
-import JSONParserPlugin, { JSONParserType } from './JSONParserPlugin';
 import { describe, expect, test } from 'vitest'
 import PrometheusParser from './PrometheusParser';
-import { TD, TreeDoc } from 'treedoc';
+import { TD } from 'treedoc';
 
 describe('PrometheusParser.ts', () => {
   const parser = new PrometheusParser();

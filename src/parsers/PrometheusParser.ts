@@ -1,7 +1,5 @@
 import { CharSource, LangUtil, ListUtil, StringCharSource } from "treedoc"
 import _ from 'lodash';
-import { assert } from "vitest";
-import { n } from "vitest/dist/index-6e18a03a";
 
 const HELP = "HELP";
 const TYPE = "TYPE";
