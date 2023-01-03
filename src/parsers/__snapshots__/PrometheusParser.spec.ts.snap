@@ -19,6 +19,24 @@ exports[`PrometheusParser.ts > parse 1`] = `
     ],
     "type": "summary",
   },
+  "http_request_duration_seconds": Metric {
+    "help": "A histogram of the request duration.",
+    "metricsValues": [
+      MetricValue {
+        "bucket": {
+          "+Inf": 144320,
+          "0.05": 24054,
+          "0.1": 33444,
+          "0.2": 100392,
+          "0.5": 129389,
+          "1": 133988,
+        },
+        "count": 144320,
+        "sum": 53423,
+      },
+    ],
+    "type": "histogram",
+  },
   "http_requests_total": Metric {
     "help": "The total number of HTTP requests.",
     "metricsValues": [
@@ -26,6 +44,11 @@ exports[`PrometheusParser.ts > parse 1`] = `
         "code": "200",
         "method": "post",
         "value": 1027,
+      },
+      MetricValue {
+        "code": "400",
+        "method": "post",
+        "value": 3,
       },
     ],
     "type": "counter",
