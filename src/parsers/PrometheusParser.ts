@@ -12,7 +12,7 @@ export class Metric {
   type: string = '';
   metricsValues: MetricValue[] = [];
 
-  getOrCreateMetrics(labels: {[key: string]: string}): MetricValue {
+  getOrCreateValue(labels: {[key: string]: string}): MetricValue {
     for (const m of this.metricsValues) {
       if (m.matchLabels(labels))
         return m;
@@ -108,8 +108,8 @@ export default class PrometheusParser {
     if (src.peek() === '{') {
       src.skip(1);
       while(true) {
-        const key = src.readUntilTerminator('=');
-        src.skip(1);  // "=";
+        const key = src.readUntilTerminator('=}');
+        if (src.read() == '}') break;  // either = or }
         const quote = src.read();
         if (quote !== '"' && quote !== '\'') throw src.createParseRuntimeException('missing quote when expecting a string label vale');
         const val = src.readQuotedString(quote);
@@ -133,20 +133,20 @@ export default class PrometheusParser {
       const quantile = metricLine.labels.quantile;
       if (quantile) {
         delete metricLine.labels.quantile;
-        this.currentMetric.getOrCreateMetrics(metricLine.labels).addQuantile(quantile, metricLine.value);
+        this.currentMetric.getOrCreateValue(metricLine.labels).addQuantile(quantile, metricLine.value);
         return;
       }
-      this.currentMetric.getOrCreateMetrics(metricLine.labels).value = metricLine.value;
+      this.currentMetric.getOrCreateValue(metricLine.labels).value = metricLine.value;
       return;
     }
 
     if (metricLine.name === this.currentMetricKey + '_count') {
-      this.currentMetric.getOrCreateMetrics(metricLine.labels).count = metricLine.value;
+      this.currentMetric.getOrCreateValue(metricLine.labels).count = metricLine.value;
       return;
     }
 
     if (metricLine.name === this.currentMetricKey + '_sum') {
-      this.currentMetric.getOrCreateMetrics(metricLine.labels).sum = metricLine.value;
+      this.currentMetric.getOrCreateValue(metricLine.labels).sum = metricLine.value;
       return;
     }
 
@@ -155,9 +155,14 @@ export default class PrometheusParser {
       if (!bucket)
         throw new Error(`missing bucket label: ${JSON.stringify(metricLine)}`);
       delete metricLine.labels.le;
-      this.currentMetric.getOrCreateMetrics(metricLine.labels).addBucket(bucket, metricLine.value);
+      this.currentMetric.getOrCreateValue(metricLine.labels).addBucket(bucket, metricLine.value);
       return;
     }
+    
+    // No matching, will assume it's an `count` without a type and help definition 
+    const metric = this.getOrCreateMetric(metricLine.name);
+    metric.type = 'count';
+    metric.getOrCreateValue({}).value = metricLine.value;
   }
 
   getOrCreateMetric(name: string): Metric {

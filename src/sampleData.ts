@@ -143,6 +143,11 @@ msdos_file_access_time_seconds{path="C:\\DIR\\FILE.TXT",error="Cannot find file:
 # Minimalistic line:
 metric_without_timestamp_and_labels 12.47
 
+# Minimalistic line:
+# HELP metric_without_timestamp_and_labels The total number of HTTP requests.
+# TYPE metric_without_timestamp_and_labels counter
+metric_without_timestamp_and_labels{} 12.47
+
 # A weird metric from before the epoch:
 something_weird{problem="division by zero"} +Inf -3982045
 

@@ -53,6 +53,24 @@ exports[`PrometheusParser.ts > parse 1`] = `
     ],
     "type": "counter",
   },
+  "metric_without_timestamp_and_labels": Metric {
+    "help": "The total number of HTTP requests.",
+    "metricsValues": [
+      MetricValue {
+        "value": 12.47,
+      },
+    ],
+    "type": "counter",
+  },
+  "msdos_file_access_time_seconds": Metric {
+    "help": "",
+    "metricsValues": [
+      MetricValue {
+        "value": 1458255915,
+      },
+    ],
+    "type": "count",
+  },
   "rpc_duration_seconds": Metric {
     "help": "A summary of the RPC duration in seconds.",
     "metricsValues": [
@@ -69,6 +87,15 @@ exports[`PrometheusParser.ts > parse 1`] = `
       },
     ],
     "type": "summary",
+  },
+  "something_weird": Metric {
+    "help": "",
+    "metricsValues": [
+      MetricValue {
+        "value": NaN,
+      },
+    ],
+    "type": "count",
   },
 }
 `;
