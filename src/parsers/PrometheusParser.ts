@@ -157,7 +157,7 @@ export default class PrometheusParser {
       delete metricLine.labels.le;
       this.currentMetric.getOrCreateMetrics(metricLine.labels).addBucket(bucket, metricLine.value);
       return;
-    }    
+    }
   }
 
   getOrCreateMetric(name: string): Metric {

@@ -42,7 +42,7 @@ export default {
     if (opt.query.sort) {
       const getFieldValue = (row: any) => {
         const v = row[q.sort!];
-        return v instanceof TDNode && v.value ? v.value : v;
+        return v instanceof TDNode && v.value !== undefined ? v.value : v;
       };
 
       opt.filteredData  = _.orderBy(opt.filteredData , getFieldValue, q.order);
