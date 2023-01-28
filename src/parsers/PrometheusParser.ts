@@ -24,7 +24,6 @@ export class Metric {
   }
 }
 
-
 export class MetricValue {
   [key: string]: any;
   value?: number;
@@ -109,7 +108,7 @@ export default class PrometheusParser {
       src.skip(1);
       while(true) {
         const key = src.readUntilTerminator('=}');
-        if (src.read() == '}') break;  // either = or }
+        if (src.read() === '}') break;  // either = or }
         const quote = src.read();
         if (quote !== '"' && quote !== '\'') throw src.createParseRuntimeException('missing quote when expecting a string label vale');
         const val = src.readQuotedString(quote);
