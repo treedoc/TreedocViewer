@@ -50,6 +50,7 @@ export default class Home extends Vue {
   jsonData: any = sampleData.data[0].value;
 
   tdvOption: TDVOptions = new TDVOptions().setParsers([
+      new JSONParserPlugin('Lombok.toString', JSONParserType.LOMBOK_TO_STRING),
       new JSONParserPlugin('Map.toString', JSONParserType.JAVA_MAP_TO_STRING),
       new XMLParserPlugin('XML compact', 'text/xml', true),
       new XMLParserPlugin(),

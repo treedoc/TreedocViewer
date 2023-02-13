@@ -129,6 +129,7 @@ V2l2" ,v23
 `;
 
 const mapToStringStr = '{K1=v1, k2=123, k3={c=Test with ,in}, k4=[ab,c, def]}';
+const lombokToString = "TestBean(treeMap={key1=value1}, linkedList1=[value1], intField=100, floatField=1.4, dateField=Wed Dec 31 19:23:32 PST 1969, bean2=TestBean2(strField=it's a string value, enumField=value2))"
 
 export const prometheusStr = String.raw`
 # Sample from: https://prometheus.io/docs/instrumenting/exposition_formats/#text-based-format
@@ -375,6 +376,11 @@ No \\n's!",
       text: 'map.toString',
       value: mapToStringStr,
     },
+    {
+      text: 'lombok.toString',
+      value: lombokToString,
+    },
+
     {
       text: 'prometheus',
       value: prometheusStr,

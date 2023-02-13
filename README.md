@@ -26,8 +26,14 @@ A feature-rich viewer for Treedoc implemented with VueJS and typescript. Treedoc
 * Support multiple file formats
   * different sources of the document: open local file, open URL or copy/paste
   * Auto-detect format to choose the right parser
-  * Support JSONex format (extension of JSON) (Based on [treedoc](https://www.npmjs.com/package/treedoc))
-  * Support text protobuf which is support by JSONex parser
+  * Buildin Support following formats
+    * JSONex format (extension of JSON) (Based on [treedoc](https://www.npmjs.com/package/treedoc))
+    * `text protobuf` which is support by JSONex parser
+    * Custom format such as java `Map.toString`, java `Lombok.toString`
+    * `Prometheus` text format.  
+    * `csv`, `tsv`, `ssv` (space-separated values)
+    * `XML`, `Compact XML`
+    * `YAML`, include multiple document format
   * Plugable parser, so that more format can be easily added.
 * Implemented as VueJS component, so it's easy to be reused in different applications
 
