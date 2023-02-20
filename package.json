@@ -1,6 +1,6 @@
 {
   "name": "treedoc-viewer",
-  "version": "0.1.63",
+  "version": "0.1.64",
   "main": "./dist/lib/lib.common.js",
   "typings": "./dist/lib/lib.d.ts",
   "files": [
@@ -27,7 +27,7 @@
     "jsdom": "^20.0.0",
     "lodash": "^4.17.21",
     "msplit": "0.1.24",
-    "treedoc": "^0.3.33",
+    "treedoc": "^0.3.35",
     "ts-node": "~10.7.0",
     "vue": "^2.6.11",
     "vue-class-component": "^7.2.3",
