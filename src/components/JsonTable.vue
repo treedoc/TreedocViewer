@@ -19,7 +19,12 @@
             </span>
             <span v-b-tooltip.hover title="Copy table as JSON">
               <b-btn size='sm' variant='outline-secondary'>
-                <i class="fa fa-copy" @click='copy'></i>
+                <i class="fa fa-copy" @click='copy(false)'></i>
+              </b-btn>
+            </span>
+            <span v-b-tooltip.hover title="Copy table as CSV">
+              <b-btn size='sm' variant='outline-secondary'>
+                <i class="fa fa-copy" @click='copy(true)'></i>
               </b-btn>
             </span>
             <span v-b-tooltip.hover title="Wrap text">
@@ -291,7 +296,7 @@ export default class JsonTable extends Vue {
     DataFilter.filter(this.tableOpt);
   }
 
-  copy() {
+  copy(asCSV = false) {
     // console.log(this.tableOpt.filteredData);
     // console.log('coloumns:');
     // console.log(this.tableOpt.columns, null, ' ');
@@ -300,7 +305,7 @@ export default class JsonTable extends Vue {
         TableUtil.rowsToObject(data, this.tableOpt) : data.map(r => TableUtil.rowToObject(r, this.tableOpt));
 
     // Array to object if there's "@key"
-    this.copyBuffer = TD.stringify(exportData);
+    this.copyBuffer = asCSV ? TableUtil.toCSV(exportData) : TD.stringify(exportData);
     console.log(`this.copyBuffer=${this.copyBuffer}`);
     this.$nextTick(() => {
       const textView = this.$refs.textViewCopyBuffer as HTMLTextAreaElement;

@@ -1,4 +1,4 @@
-import { identity, ListUtil, TDNode, TDNodeType } from 'treedoc';
+import { CSVWriter, identity, ListUtil, TDNode, TDNodeType, TDObjectCoder } from 'treedoc';
 import { DataTableOptions, Column, Query } from '../components/Vue2DataTable';
 
 export class TableUtil {
@@ -27,5 +27,9 @@ export class TableUtil {
 
   static valToObject(val: any) {
     return val instanceof TDNode ? val.toObject(false, false) : val;
+  }
+
+  static toCSV(val: any) {
+    return CSVWriter.instance.writeAsString(TDObjectCoder.encode(val));
   }
 }

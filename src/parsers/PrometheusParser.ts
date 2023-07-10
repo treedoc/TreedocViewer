@@ -28,7 +28,8 @@ export class MetricValue {
   [key: string]: any;
   value?: number;
   quantiles?: {[key: string]: number};
-  bucket?: {[key: string]: number};  
+  // Use $$ prefix to avoid name conflict with a label of bucket
+  $$bucket?: {[key: string]: number};  
   count?: number;
   sum?: number;
 
@@ -37,8 +38,8 @@ export class MetricValue {
     this.quantiles[key] = value
   }
   addBucket(key: string, value: number) {
-    if (!this.bucket) this.bucket = {};
-    this.bucket[key] = value
+    if (!this.$$bucket) this.$$bucket = {};
+    this.$$bucket[key] = value
   }
 
   matchLabels(labels: {[key: string]: string}): boolean {

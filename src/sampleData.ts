@@ -164,6 +164,11 @@ http_request_duration_seconds_bucket{le="+Inf"} 144320
 http_request_duration_seconds_sum 53423
 http_request_duration_seconds_count 144320
 
+# HELP thanos_objstore_bucket_operation_duration_seconds Duration of successful operations against the bucket
+# TYPE thanos_objstore_bucket_operation_duration_seconds histogram
+thanos_objstore_bucket_operation_duration_seconds_bucket{bucket="thanos",operation="attributes",le="0.01"} 0
+thanos_objstore_bucket_operation_duration_seconds_bucket{bucket="thanos",operation="attributes",le="0.1"} 0
+
 # HELP go_gc_duration_seconds A summary of the pause duration of garbage collection cycles.
 # TYPE go_gc_duration_seconds summary
 go_gc_duration_seconds{quantile="0"} 0

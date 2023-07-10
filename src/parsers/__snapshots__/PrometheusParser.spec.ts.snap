@@ -23,7 +23,7 @@ exports[`PrometheusParser.ts > parse 1`] = `
     "help": "A histogram of the request duration.",
     "metricsValues": [
       MetricValue {
-        "bucket": {
+        "$$bucket": {
           "+Inf": 144320,
           "0.05": 24054,
           "0.1": 33444,
@@ -96,6 +96,20 @@ exports[`PrometheusParser.ts > parse 1`] = `
       },
     ],
     "type": "count",
+  },
+  "thanos_objstore_bucket_operation_duration_seconds": Metric {
+    "help": "Duration of successful operations against the bucket",
+    "metricsValues": [
+      MetricValue {
+        "$$bucket": {
+          "0.01": 0,
+          "0.1": 0,
+        },
+        "bucket": "thanos",
+        "operation": "attributes",
+      },
+    ],
+    "type": "histogram",
   },
 }
 `;
