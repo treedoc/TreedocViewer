@@ -36,11 +36,14 @@
       <span class="status-msg" :class="{error: hasError}" >{{parseResult}}</span>
     </div>
     <div class="split-container">
+      <!-- tabindex=0 make the div focusable -->
       <msplit :maxPane='tstate.maxPane' @node-mouse-enter.native.stop='nodeMouseEnter' @node-mouse-leave.native.stop='nodeMouseLeave'>
-        <div slot="source" :grow="20" style="width: 100%" :show="tstate.showSource"  class="panview">
-          <SourceView ref="sourceView" v-model="jsonStr" :syntax='selectedParser.syntax' :selection='tstate.selection' :show='tstate.showSource[0]' :useCodeView='tstate.codeView' />
+        <div slot="source" :grow="20" style="width: 100%" :show="tstate.showSource"  class="panview" 
+          @click="tstate.curPan='source'" :class="{focus: tstate.curPan==='source'}" @keypress="onKeyPress($event, 'source')" tabindex="0">
+          <SourceView ref="sourceView" v-model="jsonStr" :syntax='selectedParser.syntax' :selection='tstate.selection' :show='tstate.showSource[0]' :tstate="tstate" :useCodeView='tstate.codeView' />
         </div>
-        <div slot="tree" :grow="30" :show="tstate.showTree" class="panview">
+        <div slot="tree" :grow="30" :show="tstate.showTree" class="panview" 
+          @click="tstate.curPan='tree'"  :class="{focus: tstate.curPan==='tree'}" @keypress="onKeyPress($event, 'tree')" tabindex="0">
           <!-- tstate.selected={{tstate.selected}} -->
           <tree-view v-if="tstate.tree" 
               :tstate="tstate"
@@ -49,11 +52,12 @@
               />
           <div v-else>No Data</div>
         </div>
-        <div slot="table" :grow="50" :show="tstate.showTable" class="panview">
+        <div slot="table" :grow="50" :show="tstate.showTable" class="panview" 
+          @click="tstate.curPan='table'" :class="{focus: tstate.curPan==='table'}" @keypress="onKeyPress($event, 'table')" tabindex="0">
           <!-- <div v-if="tstate.tree"><json-table :table-data='tstate' :options="tableOpt" -->
-            <div v-if="tstate.tree"><json-table :table-data='tstate'
+          <json-table v-if="tstate.tree" :table-data='tstate' 
             @node-clicked='nodeClicked'
-            isInMuliPane="true" /></div>
+            isInMuliPane="true" />
           <div v-else>No Data</div>
         </div>
       </msplit>
@@ -129,6 +133,27 @@ export default class JsonTreeTable extends Vue {
   mounted() {
     // for devtool interaction
     (window as any).tdv = this;
+  }
+
+  onKeyPress(e: KeyboardEvent, pane: string) {
+    console.log(e);
+    // Very strange: In source page, for 'f' key it will send to div first, then to editor. But for ctrl-f, 
+    // it will send to editor first and it preventDefault(), so the hot key won't work. We disable hot key for source page for now.
+    if (pane === 'source')
+      return;  // The source pane the key event won't reach editor before the div
+    if (e.key === 'f') {
+      this.tstate.toggleMaxPane(pane);
+      // e.preventDefault();
+    } else if (e.key === 'w') {
+      this.tstate.textWrap = !this.tstate.textWrap
+      // e.preventDefault();
+    } else if (e.key === '[') {
+      this.tstate.back()
+      // e.preventDefault();
+    } else if (e.key === ']') {
+      this.tstate.forward()
+      // e.preventDefault();
+    }
   }
 
   // for devtool interaction only
@@ -309,6 +334,7 @@ export default class JsonTreeTable extends Vue {
   /* max-height: 93vh; */
   max-height: 100%;
   width: 100%;
+  height: 100%;
   /* overflow: auto; */
   background-color: white;
   display: flex;
@@ -379,5 +405,10 @@ export default class JsonTreeTable extends Vue {
   opacity: 0;
   width: 0px;
   height: 0px;
+}
+
+.focus {
+  outline: 1px solid blue;
+  margin: 1px;  /* not sure why border is not showing without this. The border is ecliped as it's out of parent border */
 }
 </style>

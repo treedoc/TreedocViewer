@@ -1,7 +1,7 @@
 <template>
-  <div class='wrapper'>
+  <div class='wrapper' @click="tstate.curPan='tree'" tabindex="0" @keypress="onKeyPress">
     <div class="tdv-toolbar">
-      <expand-control ref='expandControl' :state='expandState' style="float: right;"/>
+      <expand-control ref='expandControl' :state='expandState' :active="tstate.curPan==='tree'" style="float: right;"/>
     </div>
     <tree-view-item class='item-root'
         :tnode='tstate.tree.root'
@@ -51,6 +51,10 @@ export default class TreeView extends Vue {
   }
 
   nodeClicked(data: string[]) { this.tstate.select(data); }
+
+  onKeyPress(e: KeyboardEvent) {
+    (this.$refs.expandControl as ExpandControl).onKeyPress(e);
+  }
 }
 </script>
 

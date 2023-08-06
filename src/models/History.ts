@@ -10,14 +10,14 @@ export default class History<T> {
   canBack() { return this.pos > 0; }
   back() {
     if (!this.canBack())
-      return null;
+      return this.items[this.pos];
     return this.items[--this.pos];
   }
 
   canForward() { return this.pos < this.items.length - 1; }
   forward() {
     if (!this.canForward())
-      return null;
+      return this.items[this.pos];
     return this.items[++this.pos];
   }
 

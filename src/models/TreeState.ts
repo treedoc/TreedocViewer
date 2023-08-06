@@ -40,6 +40,7 @@ export default class TreeState {
   curState = new CurState();
 
   maxPane = '';
+  curPan = '';
   textWrap = false;
   showSource = [true];
   showTree = [true];
@@ -56,6 +57,11 @@ export default class TreeState {
       this.tree.root.freeze();
       this.select(selectedPath, true);
     }
+  }
+
+  setCurPan(pan: string) {
+    this.curPan = pan;
+    console.log('setCurPan', pan);
   }
 
   setInitSOpt(opt?: TDVOption) {

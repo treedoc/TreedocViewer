@@ -1,5 +1,5 @@
 <template>
-  <div style="height:100%;overflow: hidden;">
+  <div style="height:100%;overflow: hidden;" @click="tstate.curPan='source'">
     <template v-if="useCodeView[0]">
       <codemirror ref='codeView' class='codeView' :options="options" v-model="val" style="height:100%"></codemirror>
     </template>
@@ -26,7 +26,7 @@ import 'codemirror/addon/fold/foldgutter.css';
 import 'codemirror/addon/fold/indent-fold';
 import 'codemirror/addon/fold/brace-fold';
 import 'codemirror/addon/fold/xml-fold';
-import { Selection } from '../models/TreeState';
+import TreeState, { Selection } from '../models/TreeState';
 import { Bookmark } from 'treedoc/lib/Bookmark';
 
 @Component({
@@ -35,6 +35,7 @@ import { Bookmark } from 'treedoc/lib/Bookmark';
   },
 })
 export default class SourceView extends Vue {
+  @Prop() tstate!: TreeState;
   @Prop() value!: string;
   @Prop() syntax!: string;
   @Prop() useCodeView!: boolean[];

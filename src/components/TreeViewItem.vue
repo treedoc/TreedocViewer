@@ -4,7 +4,7 @@
       <div class='node' @click.stop='toggleOpen()'>
         <span :class='{opened: open, selected: selected}' class='key key-with-chevron'>
           <!-- VUETIP: in the event, don't emit object, serialization will take long time if object is big -->
-          <a href="#" @click.stop="$emit('node-clicked', ['', ...tnode.path])" @mouseenter="mouseEnter" @mouseleave="mouseLeave">
+          <a href="#" tabindex="0" @keydown="onKeyDown" @click.stop="$emit('node-clicked', ['', ...tnode.path])" @mouseenter="mouseEnter" @mouseleave="mouseLeave">
           <!-- <a href="#/" @click.stop="tstate.select(tnode)"> -->
             {{tnode.key}}
           </a>
@@ -151,6 +151,16 @@ export default class TreeViewItem extends Vue {
         detail: new NodeMouseEnterEvent(this.tnode.pathAsString,  e.target as Element),
         bubbles: true,
         composed: true })), 500);
+  }
+
+  onKeyDown(e: KeyboardEvent) {
+    console.log(`onKeyPress: key=${e.key}`);
+    if (e.key === 'ArrowRight') {
+      this.toggleOpen();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      e.preventDefault();
+    }
   }
 }
 </script>

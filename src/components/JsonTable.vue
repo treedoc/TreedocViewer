@@ -1,13 +1,13 @@
 <template>
-  <div class='tdv-table'>
-    <datatable v-bind="tableOpt">
+  <div class='tdv-table' tabindex="0" @keypress="onKeyPress">
+    <datatable v-bind="tableOpt" >
       <div style="display: flex column">
         <div class='tdv-tbl-top'>
           <slot name='tableTitle' v-if="hasTableTitleSlot" />
           <json-path :tree-node="tstate ? tstate.selected : null" @node-clicked='nodeClicked'/>
           <div class="tdv-tbl-toolbar">
-            <expand-control :state='expandState' v-if="tstate.hasTreeInTable" />
-            <span v-b-tooltip.hover title="Toggle fullscreen" v-if="isInMuliPane">
+            <expand-control :state='expandState' :active="tstate.curPan==='table'" v-if="tstate.hasTreeInTable" ref="expandControl"/>
+            <span v-b-tooltip.hover title="Toggle fullscreen <f>" v-if="isInMuliPane">
               <b-btn size='sm' variant='outline-secondary' :pressed='tstate.maxPane==="table"' @click='tstate.toggleMaxPane("table")'>
                 <i class="fa fa-expand"></i>
               </b-btn>
@@ -27,7 +27,7 @@
                 <i class="fa fa-copy" @click='copy(true)'></i>
               </b-btn>
             </span>
-            <span v-b-tooltip.hover title="Wrap text">
+            <span v-b-tooltip.hover title="Wrap text <w>">
               <b-btn size='sm' variant='outline-secondary' :pressed='tstate.textWrap' @click='tstate.textWrap = !tstate.textWrap'>
                 <i class="fa fa-level-down"></i>
               </b-btn>
@@ -40,12 +40,12 @@
             <b-button-group class="ml-1">
               <!-- We have to wrapper the button so that tooltip will work properly when it's disabled -->
               <!-- https://bootstrap-vue.js.org/docs/components/tooltip/ -->
-              <span v-b-tooltip.hover title="Go back">
+              <span v-b-tooltip.hover title="Go back <[>">
                 <b-btn :size="'sm'" @click='tstate.back()' :disabled='!tstate.canBack()'>
                   <i class="fa fa-arrow-left"></i>
                 </b-btn>
               </span>
-              <span v-b-tooltip.hover title="Go forward">
+              <span v-b-tooltip.hover title="Go forward <]>">
                 <b-btn :size="'sm'" @click='tstate.forward()' :disabled='!tstate.canForward()'>
                   <i class="fa fa-arrow-right"></i>
                 </b-btn>
@@ -123,6 +123,7 @@ export default class JsonTable extends Vue {
   @Prop() tableData!: TreeState | TDNode | object | string;
   @Prop() options?: DataTableOptions;
   @Prop() isInMuliPane?: boolean;  // TODO: Move to TDVTableOption
+
 
   rebuildTable(val: TDNode | null, cachedState: TableNodeState | null = null) {
     // use defTableOpt to get rid of this.options for non-initial node
@@ -369,6 +370,10 @@ export default class JsonTable extends Vue {
   get query() { return this.tableOpt.query; }
 
   get hasTableTitleSlot() { return !!this.$slots.tableTitle; }
+
+  onKeyPress(e: KeyboardEvent) {
+    (this.$refs.expandControl as ExpandControl).onKeyPress(e);
+  }
 }
 </script>
 
