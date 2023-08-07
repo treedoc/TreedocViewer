@@ -55,10 +55,10 @@
           </div>
         </div>
         <template v-if="showAdvancedQuery">
-          <div style="display: flex;"  v-b-tooltip.hover title="Advanced Query with Javascript" @keydown="onkeydownStopPropagation">
+          <div style="display: flex;"  v-b-tooltip.hover title="Advanced Query with Javascript" @keypress="onkeypressStopPropagation">
             JSQuery:<b-form-input size='sm' style="display:inline;width:100%" v-model="tableOpt.query.jsQuery" placeholder="Custom query in JS. E.g. $.name.size() > 10" debounce="500" />
           </div>
-          <div style="display: flex;"  v-b-tooltip.hover title="Extended Fields" @keydown="onkeydownStopPropagation">
+          <div style="display: flex;"  v-b-tooltip.hover title="Extended Fields" @keypress="onkeypressStopPropagation">
             ExtendedFields:<b-form-input size='sm' name="extendedFields" style="display:inline;width:100%" v-model="tableOpt.query.extendedFields" placeholder="Extends Fields. E.g. `createdName: $.created.name, createdDate: $.created.data` or spread child: `c_:created`" @blur="buildTableAndQuery(selected)" />
           </div>
           Query:{{tableOpt.query}}
@@ -194,7 +194,7 @@ export default class JsonTable extends Vue {
           try {
             const ext = extFunc(v.toObject(true, true));
             for (const k in ext)
-              if(!k.startsWith('$$'))   // internal fields (e.g. $$tdNode)
+              // if(!k.startsWith('$$'))   // internal fields (e.g. $$tdNode)
                 this.addExtObject(k, ext[k], row);
           } catch(e) {
             console.error(`Error evalute ext fields: ${this.query.extendedFields}`);
@@ -375,9 +375,9 @@ export default class JsonTable extends Vue {
     (this.$refs.expandControl as ExpandControl)?.onKeyPress(e);
   }
 
-  onkeydownStopPropagation(e: KeyboardEvent) {
-    // block keydown event from propagating to parent (trigger the full screen mode etc
-    console.log(`onkeydown-input: ${e.key}`);
+  onkeypressStopPropagation(e: KeyboardEvent) {
+    // block keypress event from propagating to parent (trigger the full screen mode etc
+    // console.log(`onkeypressStopPropagation: ${e.key}`);
     e.stopPropagation();
   }
 }
