@@ -1,6 +1,6 @@
 {
   "name": "treedoc-viewer",
-  "version": "0.1.66",
+  "version": "0.1.67",
   "main": "./dist/lib/lib.common.js",
   "typings": "./dist/lib/lib.d.ts",
   "files": [
