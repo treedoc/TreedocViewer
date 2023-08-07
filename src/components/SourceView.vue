@@ -92,6 +92,12 @@ export default class SourceView extends Vue {
       this.textView.setSelectionRange(v.start.pos, v.end.pos);
     }
   }
+
+  onkeydownStopPropagation(e: KeyboardEvent) {
+    // block keydown event from propagating to parent (trigger the full screen mode etc
+    // console.log(`onkeydown-input: ${e.key}`);
+    e.stopPropagation();
+  }
 }
 
 function toPos(bm: Bookmark): {line: number, ch: number} {

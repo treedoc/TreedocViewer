@@ -136,7 +136,7 @@ export default class JsonTreeTable extends Vue {
   }
 
   onKeyPress(e: KeyboardEvent, pane: string) {
-    console.log(e);
+    // console.log(e);
     // Very strange: In source page, for 'f' key it will send to div first, then to editor. But for ctrl-f, 
     // it will send to editor first and it preventDefault(), so the hot key won't work. We disable hot key for source page for now.
     if (pane === 'source')
