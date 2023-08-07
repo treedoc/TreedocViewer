@@ -3,7 +3,7 @@
     <template v-if="useCodeView[0]">
       <codemirror ref='codeView' class='codeView' :options="options" v-model="val" style="height:100%"></codemirror>
     </template>
-    <textarea ref='textView' v-model="val" :class="[useCodeView[0] ? 'hiddenTextArea' : 'textArea']" class='nowrap'></textarea>
+    <textarea ref='textView' v-model="val" :class="[useCodeView[0] ? 'hiddenTextArea' : 'textArea', softWrap ? '' : 'nowrap']"></textarea>
   </div>
 </template>
 
@@ -28,6 +28,7 @@ import 'codemirror/addon/fold/brace-fold';
 import 'codemirror/addon/fold/xml-fold';
 import TreeState, { Selection } from '../models/TreeState';
 import { Bookmark } from 'treedoc/lib/Bookmark';
+import { valuesIn } from 'lodash';
 
 @Component({
   components: {
@@ -42,6 +43,10 @@ export default class SourceView extends Vue {
   @Prop({required: false}) selection?: Selection;
   @Prop() show?: boolean;
   val = this.value;
+
+  get softWrap() {  // prevent rending single long line hangs the browser
+    return this.val.length > 10000 && this.val.substr(1000, 9000).indexOf('\n') < 0;
+  }
 
   get textView() {
     return this.$refs.textView as HTMLTextAreaElement;
@@ -64,7 +69,7 @@ export default class SourceView extends Vue {
       mode,
       tabSize: 2,
       lineNumbers: true,
-      // lineWrapping: true,
+      lineWrapping: this.softWrap,
       viewportMargin: 10,
       extraKeys: {'Ctrl-Space': 'autocomplete'},
       foldGutter: true,
@@ -82,7 +87,7 @@ export default class SourceView extends Vue {
   watchSelection(v: Selection) {
     if (!this.show || !v || !v.start || !v.end)
       return;
-    if (this.val.length > 5_000_000)  // Don't scroll for large file to avoid performence issue
+    if (this.val.length > 2_000_000)  // Don't scroll for large file to avoid performence issue
       return;
     if (this.useCodeView[0]) {
       this.codeView.editor.doc.setSelection(toPos(v.start), toPos(v.end), {scroll: true});

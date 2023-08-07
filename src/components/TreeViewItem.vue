@@ -155,12 +155,11 @@ export default class TreeViewItem extends Vue {
 
   onKeyDown(e: KeyboardEvent) {
     console.log(`onKeyPress: key=${e.key}`);
-    if (e.key === 'ArrowRight') {
-      this.toggleOpen();
-      e.stopPropagation();
-      e.stopImmediatePropagation();
-      e.preventDefault();
+    switch (e.key) {
+      case 'ArrowRight': this.toggleOpen(); e.preventDefault(); break;
+      case 'ArrowDown': this.toggleOpen(); e.preventDefault(); break;
     }
+
   }
 }
 </script>

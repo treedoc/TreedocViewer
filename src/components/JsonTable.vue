@@ -401,7 +401,8 @@ export default class JsonTable extends Vue {
 .tdv-table {
   margin: 0 auto;
   width: 100%;
-  height: 100%
+  height: 100%;
+  overflow: auto;
 }
 .tdv-th {
   white-space: nowrap;
