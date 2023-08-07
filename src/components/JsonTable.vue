@@ -55,10 +55,10 @@
           </div>
         </div>
         <template v-if="showAdvancedQuery">
-          <div style="display: flex;"  v-b-tooltip.hover title="Advanced Query with Javascript">
+          <div style="display: flex;"  v-b-tooltip.hover title="Advanced Query with Javascript" @keydown="onkeydownStopPropagation">
             JSQuery:<b-form-input size='sm' style="display:inline;width:100%" v-model="tableOpt.query.jsQuery" placeholder="Custom query in JS. E.g. $.name.size() > 10" debounce="500" />
           </div>
-          <div style="display: flex;"  v-b-tooltip.hover title="Extended Fields">
+          <div style="display: flex;"  v-b-tooltip.hover title="Extended Fields" @keydown="onkeydownStopPropagation">
             ExtendedFields:<b-form-input size='sm' name="extendedFields" style="display:inline;width:100%" v-model="tableOpt.query.extendedFields" placeholder="Extends Fields. E.g. `createdName: $.created.name, createdDate: $.created.data` or spread child: `c_:created`" @blur="buildTableAndQuery(selected)" />
           </div>
           Query:{{tableOpt.query}}
@@ -372,7 +372,13 @@ export default class JsonTable extends Vue {
   get hasTableTitleSlot() { return !!this.$slots.tableTitle; }
 
   onKeyPress(e: KeyboardEvent) {
-    (this.$refs.expandControl as ExpandControl).onKeyPress(e);
+    (this.$refs.expandControl as ExpandControl)?.onKeyPress(e);
+  }
+
+  onkeydownStopPropagation(e: KeyboardEvent) {
+    // block keydown event from propagating to parent (trigger the full screen mode etc
+    console.log(`onkeydown-input: ${e.key}`);
+    e.stopPropagation();
   }
 }
 </script>

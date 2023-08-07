@@ -39,11 +39,11 @@
       <!-- tabindex=0 make the div focusable -->
       <msplit :maxPane='tstate.maxPane' @node-mouse-enter.native.stop='nodeMouseEnter' @node-mouse-leave.native.stop='nodeMouseLeave'>
         <div slot="source" :grow="20" style="width: 100%" :show="tstate.showSource"  class="panview" 
-          @click="tstate.curPan='source'" :class="{focus: tstate.curPan==='source'}" @keypress="onKeyPress($event, 'source')" tabindex="0">
+          @click="tstate.curPan='source'" :class="{focus: tstate.curPan==='source'}" @keydown="onKeyPress($event, 'source')" tabindex="0">
           <SourceView ref="sourceView" v-model="jsonStr" :syntax='selectedParser.syntax' :selection='tstate.selection' :show='tstate.showSource[0]' :tstate="tstate" :useCodeView='tstate.codeView' />
         </div>
         <div slot="tree" :grow="30" :show="tstate.showTree" class="panview" 
-          @click="tstate.curPan='tree'"  :class="{focus: tstate.curPan==='tree'}" @keypress="onKeyPress($event, 'tree')" tabindex="0">
+          @click="tstate.curPan='tree'"  :class="{focus: tstate.curPan==='tree'}" @keydown="onKeyPress($event, 'tree')" tabindex="0">
           <!-- tstate.selected={{tstate.selected}} -->
           <tree-view v-if="tstate.tree" 
               :tstate="tstate"
@@ -53,7 +53,7 @@
           <div v-else>No Data</div>
         </div>
         <div slot="table" :grow="50" :show="tstate.showTable" class="panview" 
-          @click="tstate.curPan='table'" :class="{focus: tstate.curPan==='table'}" @keypress="onKeyPress($event, 'table')" tabindex="0">
+          @click="tstate.curPan='table'" :class="{focus: tstate.curPan==='table'}" @keydown="onKeyPress($event, 'table')" tabindex="0">
           <!-- <div v-if="tstate.tree"><json-table :table-data='tstate' :options="tableOpt" -->
           <json-table v-if="tstate.tree" :table-data='tstate' 
             @node-clicked='nodeClicked'

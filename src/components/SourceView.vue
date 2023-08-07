@@ -82,7 +82,7 @@ export default class SourceView extends Vue {
   watchSelection(v: Selection) {
     if (!this.show || !v || !v.start || !v.end)
       return;
-    if (this.val.length > 1_000_000)  // Don't scroll for large file to avoid performence issue
+    if (this.val.length > 5_000_000)  // Don't scroll for large file to avoid performence issue
       return;
     if (this.useCodeView[0]) {
       this.codeView.editor.doc.setSelection(toPos(v.start), toPos(v.end), {scroll: true});
