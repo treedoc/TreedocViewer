@@ -1,9 +1,7 @@
 <template>
   <div style="height:100%;overflow: hidden;" @click="tstate.curPan='source'">
-    <template v-if="useCodeView[0]">
-      <codemirror ref='codeView' class='codeView' :options="options" v-model="val" style="height:100%"></codemirror>
-    </template>
-    <textarea ref='textView' v-model="val" :class="[useCodeView[0] ? 'hiddenTextArea' : 'textArea', softWrap ? '' : 'nowrap']"></textarea>
+    <codemirror v-if="useCodeView[0]" ref='codeView' class='codeView' :options="options" v-model="val" style="height:100%"></codemirror>
+    <textarea v-if="!useCodeView[0]" ref='textView' v-model="val" :class="[useCodeView[0] ? 'hiddenTextArea' : 'textArea']"></textarea>
   </div>
 </template>
 
@@ -28,7 +26,7 @@ import 'codemirror/addon/fold/brace-fold';
 import 'codemirror/addon/fold/xml-fold';
 import TreeState, { Selection } from '../models/TreeState';
 import { Bookmark } from 'treedoc/lib/Bookmark';
-import { valuesIn } from 'lodash';
+
 
 @Component({
   components: {

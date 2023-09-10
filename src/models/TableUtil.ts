@@ -30,6 +30,7 @@ export class TableUtil {
   }
 
   static toCSV(val: any) {
-    return CSVWriter.instance.writeAsString(TDObjectCoder.encode(val));
+    const obj = TDObjectCoder.encode(val);
+    return CSVWriter.instance.writeAsString(obj);
   }
 }
