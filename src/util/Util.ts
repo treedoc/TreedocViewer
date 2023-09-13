@@ -43,4 +43,14 @@ export default class Util {
   }
 
   public static doIf(condition: boolean, action: () => void) { if (condition) action(); }
+
+  public static textLimit(text: string, limit: number, suffix = '...'): string {
+    if (typeof text !== 'string')
+      text = JSON.stringify(text);
+    if (!text || text.length <= limit)
+      return text;
+    return text.substring(0, limit) + suffix;
+  }
+
+  public static head(array: any[], n = 1) { return array.slice(0, n); }
 }

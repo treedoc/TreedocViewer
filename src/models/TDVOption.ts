@@ -44,10 +44,12 @@ export default class TDVOptions {
     columns: [],
     data: [],
     filteredData: [],
+    filteredDataAsObjectArray: [],
     rawData: [],
     total: 0,
     query: { limit: 100, offset: 0 },
     xprops: { tstate: null },
+    columnStatistic: {},
   };
 
   setParsers(parsers?: ParserPlugin<any>[]) {

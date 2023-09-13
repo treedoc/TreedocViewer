@@ -12,6 +12,7 @@ import Home from './Home.vue';
 import TableTest from './TableTest.vue';
 import TreeViewItem from './components/TreeViewItem.vue';
 import { codemirror } from 'vue-codemirror-lite';
+import Util from './util/Util';
 
 Vue.config.productionTip = false;
 Vue.use(Datatable);
@@ -20,6 +21,7 @@ Vue.use(msplit);
 Vue.use(VueRouter);
 Vue.component('tree-view-item', TreeViewItem);
 Vue.component('codemirror', codemirror);
+Vue.filter('textLimit', Util.textLimit);
 
 const router = new VueRouter({
   routes: [

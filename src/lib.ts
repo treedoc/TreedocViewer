@@ -19,6 +19,7 @@ import YAMLParserPlugin from './parsers/YAMLParserPlugin';
 import XMLParserPlugin from './parsers/XMLParserPlugin';
 import CSVParserPlugin from './parsers/CSVParserPlugin';
 import TDVOption from './models/TDVOption';
+import Util from './util/Util';
 
 
 export default {
@@ -30,6 +31,7 @@ export default {
     vue.component('json-tree-table', JsonTreeTable);
     vue.component('json-table', JsonTable);
     Vue.component('tree-view-item', TreeViewItem);
+    Vue.filter('textLimit', Util.textLimit);
   },
 };
 

@@ -47,7 +47,10 @@ export default {
 
       opt.filteredData  = _.orderBy(opt.filteredData , getFieldValue, q.order);
     }
+    opt.filteredDataAsObjectArray = opt.filteredData.map(r => TableUtil.rowToObject(r, opt, true, true));
+    opt.columnStatistic = TableUtil.collectColumnStatistics(opt.filteredDataAsObjectArray, opt.columns.filter(c => c.visible).map(c => c.field));
     const end = (q.offset === undefined || !q.limit) ? undefined : q.offset + q.limit;
     return opt.data = opt.filteredData.slice(q.offset, end);
   },
+  
 };

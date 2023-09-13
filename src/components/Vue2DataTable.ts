@@ -1,3 +1,5 @@
+import { ColumnStatistcs } from '@/models/TableUtil';
+
 export declare interface Column {
   field: string;
   visible?: boolean;
@@ -34,4 +36,6 @@ export declare interface DataTableOptions extends TableConfig {
   xprops: { [key: string]: any };
   rawData: any[];
   filteredData: any[];
+  filteredDataAsObjectArray: any[]; 
+  columnStatistic: {[key: string]: ColumnStatistcs};
 }

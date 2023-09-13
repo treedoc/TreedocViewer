@@ -31,10 +31,12 @@ export class TDVTableOption {
     columns: [],
     data: [],
     filteredData: [],
+    filteredDataAsObjectArray: [],
     rawData: [],
     total: 0,
     query: { limit: 100, offset: 0 },
-    xprops: { tstate: null },
+    xprops: { tstate: null, columnStatistic: {} },
+    columnStatistic: {},
   };
 
 }
