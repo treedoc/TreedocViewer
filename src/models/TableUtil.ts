@@ -7,6 +7,9 @@ export class ColumnStatistcs {
   max: any;
   sum: number = 0;
   avg: number = 0;
+  p50: number = 0;
+  p90: number = 0;
+  p99: number = 0;
   valueCounts: {[key: string]: number} = {}
   valueSortedByCounts: string[] = [];
 }
@@ -21,10 +24,12 @@ export class TableUtil {
   static collectColumnStatistics(rows: any[], columns: string[]): {[key: string]: ColumnStatistcs} {
     const result: {[key: string]: ColumnStatistcs} = {};
     for (const col of columns) {
-      const stat = new ColumnStatistcs(); 
+      const stat = new ColumnStatistcs();
+      const vals: any[] = [];
       for (const row of rows) { 
         stat.total++;
         let val = row[col];
+        vals.push(val);
         if (val === undefined)  // Skip undefined value   
           continue;
         if (typeof val !== 'string' && typeof val !== 'number') { 
@@ -38,11 +43,16 @@ export class TableUtil {
           stat.sum += val;
         const key = '' + val;
         stat.valueCounts[key] = (stat.valueCounts[key] || 0) + 1;
-      } 
-      stat.avg = stat.sum / rows.length;  
+      }
+      vals.sort((a,b) => a - b);
+      stat.avg = stat.sum / rows.length;
+      if (stat.avg > 0) {  // Calculate percentile only when avg is number
+        stat.p50 = vals[Math.floor(vals.length * 0.5)];
+        stat.p90 = vals[Math.floor(vals.length * 0.9)];
+        stat.p99 = vals[Math.floor(vals.length * 0.99)];        
+      }
       stat.valueSortedByCounts = Object.keys(stat.valueCounts).sort((a, b) => stat.valueCounts[b] - stat.valueCounts[a]);
       result[col] = stat;
-
     } 
     return result;
   }

@@ -8343,10 +8343,10 @@ tr46@^3.0.0:
   dependencies:
     punycode "^2.1.1"
 
-treedoc@^0.3.39:
-  version "0.3.39"
-  resolved "https://registry.yarnpkg.com/treedoc/-/treedoc-0.3.39.tgz#cb564b2e09ae74334ee756e4b4897a718cc467f7"
-  integrity sha512-0pyn7NdMXDmo22OL4yq/lzDC1mzuRVFZypkf0Esl4xNPweFYABq7wzkymboDghaYd24eD+B4Ctd7RhPZF0i7vw==
+treedoc@^0.3.41:
+  version "0.3.41"
+  resolved "https://registry.yarnpkg.com/treedoc/-/treedoc-0.3.41.tgz#06425ba9c842e22fc0135de13c3dff20e8d998a3"
+  integrity sha512-6bK/r1gOAPq1buRAeBkLb8KV/9N2J0R+egHK34rlMI83uzjsitpA3m6rMnP8ygDIAMaCBN8sUObg0If9qM+feQ==
 
 trim-repeated@^1.0.0:
   version "1.0.0"

@@ -22,10 +22,11 @@ Vue.use(VueRouter);
 Vue.component('tree-view-item', TreeViewItem);
 Vue.component('codemirror', codemirror);
 Vue.filter('textLimit', Util.textLimit);
+Vue.filter('toFixed', Util.toFixed);
 
 const router = new VueRouter({
   routes: [
-    { path: '/', component: Home },
+    { path: '/', component:   Home },
     { path: '/table', component: TableTest },
   ],
 });

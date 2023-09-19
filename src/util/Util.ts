@@ -52,5 +52,11 @@ export default class Util {
     return text.substring(0, limit) + suffix;
   }
 
+  public static toFixed(value: number, precision: number): string {
+    const power = Math.pow(10, precision || 0);
+    return String(Math.round(value * power) / power);
+  }
+
   public static head(array: any[], n = 1) { return array.slice(0, n); }
+  
 }

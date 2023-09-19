@@ -15,21 +15,25 @@
       </div>
       <div>
         <b-collapse id="my-collapse" style="font-size: small;">
-          <div>
-            # <b-badge variant="info">{{columnStatistic.total}}</b-badge>
-            #Uniq <b-badge variant="info">{{columnStatistic.valueSortedByCounts.length}}</b-badge>
-            sum <b-badge variant="info">{{columnStatistic.sum}}</b-badge>
-            Avg <b-badge variant="info">{{columnStatistic.avg.toPrecision(5)}}</b-badge>
+          <div style="display: flex; flex-wrap: wrap; flex-direction: row; overflow:visible;">
+            <div style="white-space: nowrap;"> <b>#</b> {{columnStatistic.total}}</div>
+            <div style="padding-left: 0.2em; white-space: nowrap;"><b>#Uniq</b> {{columnStatistic.valueSortedByCounts.length}}</div>
+            <div style="padding-left: 0.2em; white-space: nowrap;" v-if="columnStatistic.sum"> <b>sum</b> {{columnStatistic.sum | toFixed(2)}}</div>
+            <div style="padding-left: 0.2em; white-space: nowrap;" v-if="columnStatistic.sum"> <b>Avg</b> {{columnStatistic.avg | toFixed(2)}}</div>
+            <div style="padding-left: 0.2em; white-space: nowrap;" v-if="columnStatistic.sum"> <b>P50</b> {{columnStatistic.p50 | toFixed(2)}}</div>
+            <div style="padding-left: 0.2em; white-space: nowrap;" v-if="columnStatistic.sum"> <b>P90</b> {{columnStatistic.p90 | toFixed(2)}}</div>
+            <div style="padding-left: 0.2em; white-space: nowrap;" v-if="columnStatistic.sum"> <b>P99</b> {{columnStatistic.p99 | toFixed(2)}}</div>
+            
+            <div style="padding-left: 0.2em; white-space: nowrap;" v-if="columnStatistic.sum"> <b>Min</b> {{columnStatistic.min}}</div>
+            <div style="padding-left: 0.2em; white-space: nowrap;" v-if="columnStatistic.sum"> <b>Max</b> {{columnStatistic.max}}</div>
           </div>
-          <div>Min <b-badge variant="info">{{columnStatistic.min | textLimit(30)}}</b-badge></div>
-          <div>Max <b-badge variant="info">{{columnStatistic.max | textLimit(30)}}</b-badge></div>
-          <div>Top Values</div>
+          <div><b>Top Values</b></div>
           <div>
             <div v-for="val in columnStatistic.valueSortedByCounts.slice(0, 30)" style="height: 20px; font-size: small;">
-              <div style="display: flex; flex-direction: row;">
-                <div style="flex-grow: 1;">{{ val  | textLimit(20) }}</div>
-                <div style="flex-grow: 0;color: blue;">{{ columnStatistic.valueCounts[val]}}</div>
-                <div style="flex-grow: 0; width: 3rem;text-align: right;color: green;">{{ Math.round(columnStatistic.valueCounts[val] * 1000 / columnStatistic.total) / 10}}%</div>
+              <div style="display: flex; flex-direction: row; overflow:visible;">
+                <div style="flex-grow: 1;" class="text-container">{{ val  | textLimit(200) }}</div>
+                <div style="flex-grow: 0; background-color: white; min-width: 2rem; text-align: right; color: blue;">{{ columnStatistic.valueCounts[val]}}</div>
+                <div style="flex-grow: 0; background-color: white; min-width: 2.7rem; text-align: right;color: green;">{{ Math.round(columnStatistic.valueCounts[val] * 1000 / columnStatistic.total) / 10}}%</div>
               </div>
               <progress style="position: relative; top: -0.9em; height: 0.4rem; width: 100%;" :value="columnStatistic.valueCounts[val]" :max="columnStatistic.total"></progress>
             </div>
@@ -84,5 +88,20 @@ input[type=search]::-webkit-search-cancel-button {
 .collapsed > .when-open,
 .not-collapsed > .when-closed {
   display: none;
+}
+
+.text-container {
+
+    white-space: nowrap;
+    overflow: hidden;
+    opacity: 0.9;
+    background-color: white;
+    text-overflow: ellipsis;
+}
+
+.text-container:hover {
+    overflow: visible;
+    width: 100em;
+    white-space: nowrap;
 }
 </style>

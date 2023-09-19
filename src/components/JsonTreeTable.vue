@@ -247,7 +247,10 @@ export default class JsonTreeTable extends Vue {
 
   openUrl(dataUrl: string) {
     this.url = dataUrl;
-    window.fetch(this.url)
+    window.fetch(this.url,{
+        //mode: 'navigate' 
+      }
+      )
       .then(res => res.text())
       .then(data => this.jsonStr = data)
       .catch((err) => this.jsonStr = err);

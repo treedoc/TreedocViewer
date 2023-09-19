@@ -32,6 +32,7 @@ export default {
     vue.component('json-table', JsonTable);
     Vue.component('tree-view-item', TreeViewItem);
     Vue.filter('textLimit', Util.textLimit);
+    Vue.filter('toFixed', Util.toFixed);
   },
 };
 
