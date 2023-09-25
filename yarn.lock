@@ -8469,10 +8469,10 @@
   dependencies:
     "punycode" "^2.1.1"
 
-"treedoc@^0.3.42":
-  "integrity" "sha512-ViaJLlHy86+XOM7tCZeGkEK6UrRwOlOjG4HsjrMkctsrt4D8mc8BahMdmkMHZ18RB8nDaXPZIGCOwX1yKpSNSA=="
-  "resolved" "https://registry.npmjs.org/treedoc/-/treedoc-0.3.42.tgz"
-  "version" "0.3.42"
+"treedoc@^0.3.43":
+  "integrity" "sha512-ScQI6ztGtJIOyP4MOfDY8Ylof0vKiJlccUW+GF5a6RIXdvHl+4o5W3byTF/UIYSGedoqLxJhBZBYj7axmIiMVA=="
+  "resolved" "https://registry.npmjs.org/treedoc/-/treedoc-0.3.43.tgz"
+  "version" "0.3.43"
 
 "trim-repeated@^1.0.0":
   "integrity" "sha1-42RqLqTokTEr9+rObPsFOAvAHCE="
