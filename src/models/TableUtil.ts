@@ -12,6 +12,10 @@ export class ColumnStatistcs {
   p99: number = 0;
   valueCounts: {[key: string]: number} = {}
   valueSortedByCounts: string[] = [];
+
+  get valueCountsSorted(): {val: string, count: number, percent: number}[] {
+    return this.valueSortedByCounts.map(key => ({val: key, count: this.valueCounts[key], percent: this.valueCounts[key]/this.total}));
+  }
 }
 
 export class TableUtil {

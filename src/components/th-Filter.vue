@@ -23,34 +23,47 @@
             <div style="padding-left: 0.2em; white-space: nowrap;" v-if="columnStatistic.sum"> <b>P50</b> {{columnStatistic.p50 | toFixed(2)}}</div>
             <div style="padding-left: 0.2em; white-space: nowrap;" v-if="columnStatistic.sum"> <b>P90</b> {{columnStatistic.p90 | toFixed(2)}}</div>
             <div style="padding-left: 0.2em; white-space: nowrap;" v-if="columnStatistic.sum"> <b>P99</b> {{columnStatistic.p99 | toFixed(2)}}</div>
-            
             <div style="padding-left: 0.2em; white-space: nowrap;" v-if="columnStatistic.sum"> <b>Min</b> {{columnStatistic.min}}</div>
             <div style="padding-left: 0.2em; white-space: nowrap;" v-if="columnStatistic.sum"> <b>Max</b> {{columnStatistic.max}}</div>
           </div>
-          <div><b>Top Values</b></div>
           <div>
-            <div v-for="val in columnStatistic.valueSortedByCounts.slice(0, 30)" style="height: 20px; font-size: small;">
+            <b>Top Values</b>
+            <span v-b-tooltip.hover title="Copy">
+              <b-btn size='sm' style="padding-top: 0px;padding-bottom: 0px;" variant="light">
+                <i class="fa fa-copy" @click='copy()'></i>
+              </b-btn>
+            </span>
+          </div>
+          <div>
+            <div v-for="row in columnStatistic.valueCountsSorted.slice(0, 30)" style="height: 20px; font-size: small;">
               <div style="display: flex; flex-direction: row; overflow:visible;">
-                <div style="flex-grow: 1;" class="text-container">{{ val  | textLimit(200) }}</div>
-                <div style="flex-grow: 0; background-color: white; min-width: 2rem; text-align: right; color: blue;">{{ columnStatistic.valueCounts[val]}}</div>
-                <div style="flex-grow: 0; background-color: white; min-width: 2.7rem; text-align: right;color: green;">{{ Math.round(columnStatistic.valueCounts[val] * 1000 / columnStatistic.total) / 10}}%</div>
+                <div style="flex-grow: 1;" class="text-container">{{ row.val  | textLimit(200) }}</div>
+                <div style="flex-grow: 0; background-color: white; min-width: 2rem; text-align: right; color: blue;">{{row.count}}</div>
+                <div style="flex-grow: 0; background-color: white; min-width: 2.7rem; text-align: right;color: green;">{{ Math.round(row.percent * 1000) / 10}}%</div>
               </div>
-              <progress style="position: relative; top: -0.9em; height: 0.4rem; width: 100%;" :value="columnStatistic.valueCounts[val]" :max="columnStatistic.total"></progress>
+              <progress style="position: relative; top: -0.9em; height: 0.4rem; width: 100%;" :value="row.count" :max="columnStatistic.total"></progress>
             </div>
         </div>
         </b-collapse>
       </div>      
       <!-- {{ xprops.tstate }} -->
     </b-popover>
+    <textarea ref='textViewCopyBuffer' v-model="copyBuffer" class='hiddenTextArea nowrap'></textarea>
   </div>
 </template>
 <script>
 import Vue from 'vue';
 import _ from 'lodash';
+import { TableUtil } from '../models/TableUtil';
 
 // For some reason, DataTable doesn't support typescript class based dynamic component or Vue.extend({}) component
 export default {
   props: ['field', 'title', 'query', 'xprops'],
+  data() {
+    return {
+      copyBuffer: '',
+    };
+  },
   methods: {
     onShowPopover() {
       Vue.nextTick(() => this.$refs.input.focus({ preventScroll: true }));
@@ -58,6 +71,19 @@ export default {
     close() {
       this.$root.$emit('bv::hide::popover');
     },
+    copy() {
+      this.copyBuffer = TableUtil.toCSV(this.columnStatistic.valueCountsSorted);
+      // this.copyBuffer = JSON.stringify(this.columnStatistic.valueCountsSorted);
+      console.log(`this.copyBuffer=${this.copyBuffer}`);
+      this.$nextTick(() => {
+        const textView = this.$refs.textViewCopyBuffer;
+        textView.select();
+        textView.setSelectionRange(0, 999999999);
+        // document.execCommand('selectAll');
+        const res = document.execCommand('copy');
+        this.$bvToast.toast('Data is copied successfully', { autoHideDelay: 2000, appendToast: true, toaster: 'b-toaster-bottom-right' });
+      });
+    }    
   },
   computed: {
     filterBtnId() {

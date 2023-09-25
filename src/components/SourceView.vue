@@ -1,7 +1,8 @@
 <template>
   <div style="height:100%;overflow: hidden;" @click="tstate.curPan='source'">
     <codemirror v-if="useCodeView[0]" ref='codeView' class='codeView' :options="options" v-model="val" style="height:100%"></codemirror>
-    <textarea v-if="!useCodeView[0]" ref='textView' v-model="val" :class="[useCodeView[0] ? 'hiddenTextArea' : 'textArea']"></textarea>
+    <!-- very important to set a min-width, otherwise when hide the pannel which reduce the width to 0 and reflow will crash -->
+    <textarea style='min-width: 400px; overflow: scroll;' v-if="!useCodeView[0]" ref='textView' v-model="val" :class="[useCodeView[0] ? 'hiddenTextArea' : 'textArea']"></textarea>
   </div>
 </template>
 
