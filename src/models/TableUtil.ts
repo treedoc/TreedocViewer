@@ -1,7 +1,7 @@
 import { CSVWriter, identity, ListUtil, TDNode, TDNodeType, TDObjectCoder } from 'treedoc';
 import { DataTableOptions, Column, Query } from '../components/Vue2DataTable';
 
-export class ColumnStatistcs {
+export class ColumnStatistics {
   total: number = 0;
   min: any;
   max: any;
@@ -25,10 +25,10 @@ export class TableUtil {
     return result;
   }
 
-  static collectColumnStatistics(rows: any[], columns: string[]): {[key: string]: ColumnStatistcs} {
-    const result: {[key: string]: ColumnStatistcs} = {};
+  static collectColumnStatistics(rows: any[], columns: string[]): {[key: string]: ColumnStatistics} {
+    const result: {[key: string]: ColumnStatistics} = {};
     for (const col of columns) {
-      const stat = new ColumnStatistcs();
+      const stat = new ColumnStatistics();
       const vals: any[] = [];
       for (const row of rows) { 
         stat.total++;

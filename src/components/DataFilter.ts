@@ -2,9 +2,11 @@ import _ from 'lodash';
 import { Query, Column, DataTableOptions, JS_QUERY_DEFAULT } from './Vue2DataTable';
 import { TDNode } from 'treedoc';
 import { TableUtil } from '../models/TableUtil';
+import stopWatch from '../util/stopWatch';
 
 export default {
   filter(opt: DataTableOptions) {
+    stopWatch.logWithReset('filter start');
     opt.filteredData = opt.rawData;
     opt.columns.forEach((c) => {
       const f = c.field;
@@ -47,8 +49,11 @@ export default {
 
       opt.filteredData  = _.orderBy(opt.filteredData , getFieldValue, q.order);
     }
+    stopWatch.logWithReset('filter calling rowToObject');
     opt.filteredDataAsObjectArray = opt.filteredData.map(r => TableUtil.rowToObject(r, opt, true, true));
+    stopWatch.logWithReset('after calling rowToObject');
     opt.columnStatistic = TableUtil.collectColumnStatistics(opt.filteredDataAsObjectArray, opt.columns.filter(c => c.visible).map(c => c.field));
+    stopWatch.logWithReset('after calling collectColumnStatistics');
     const end = (q.offset === undefined || !q.limit) ? undefined : q.offset + q.limit;
     return opt.data = opt.filteredData.slice(q.offset, end);
   },

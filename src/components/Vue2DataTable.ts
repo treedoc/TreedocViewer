@@ -1,4 +1,4 @@
-import { ColumnStatistcs } from '@/models/TableUtil';
+import { ColumnStatistics } from '@/models/TableUtil';
 
 export declare interface Column {
   field: string;
@@ -38,5 +38,5 @@ export declare interface DataTableOptions extends TableConfig {
   selection?: any[];
   filteredData: any[];
   filteredDataAsObjectArray: any[]; 
-  columnStatistic: {[key: string]: ColumnStatistcs};
+  columnStatistic: {[key: string]: ColumnStatistics};
 }
