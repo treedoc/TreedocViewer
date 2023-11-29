@@ -1,5 +1,5 @@
 <template>
-  <div class="td-value" :class="{'td-value-max-width' : !isLastCol}">
+  <div class="td-value" :class="{'td-value-max-width' : true, 'td-value-max-height': true }">
     <div v-if='!value'></div>
     <div v-else-if="html" v-html="html"/>
     <div v-else-if="isRawValue">{{value}}</div>
@@ -72,7 +72,12 @@ export default {
   overflow-x: auto;
 }
 .td-value-max-width {
-  max-width: 1500px;
-  max-height: 500px;
+  widows: 100%;
+  max-width: 95vw;
 }
+
+.td-value-max-height {
+  max-height: 150px;
+}
+
 </style>>
