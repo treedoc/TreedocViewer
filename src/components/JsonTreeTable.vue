@@ -45,12 +45,12 @@
         <div slot="tree" :grow="30" :show="tstate.showTree" class="panview" 
           @click="tstate.curPan='tree'"  :class="{focus: tstate.curPan==='tree'}" @keypress="onKeyPress($event, 'tree')" tabindex="0">
           <!-- tstate.selected={{tstate.selected}} -->
-          <tree-view v-if="tstate.tree" 
+          <!-- <tree-view v-if="tstate.tree" 
               :tstate="tstate"
               :expand-level=1
               :rootObjectKey='rootObjectKey' 
               />
-          <div v-else>No Data</div>
+          <div v-else>No Data</div> -->
         </div>
         <div slot="table" :grow="50" :show="tstate.showTable" class="panview" 
           @click="tstate.curPan='table'" :class="{focus: tstate.curPan==='table'}" @keypress="onKeyPress($event, 'table')" tabindex="0">
@@ -84,6 +84,7 @@ import JSONParserPlugin from '../parsers/JSONParserPlugin';
 import { TDNode, TDJSONWriter, TDJSONWriterOption } from 'treedoc';
 import { NodeMouseEnterEvent } from './TreeViewItem.vue';
 import { nextTick } from 'vue/types/umd';
+import stopWatch  from '@/util/stopWatch';
 
 @Component({
   components: {
@@ -234,13 +235,16 @@ export default class JsonTreeTable extends Vue {
   get sourceView() { return this.$refs.sourceView as SourceView; }
 
   readFile(ef: Event) {
+    stopWatch.logWithReset('readFile start');
     const fileName = (ef.target as HTMLInputElement).files![0];
     if (!fileName)
       return;
     const reader = new FileReader();
     reader.onload = (e: Event) =>  {
       if (reader.result)
+        stopWatch.logWithReset('readFile onload start');
         this.jsonStr = reader.result as string;
+        stopWatch.logWithReset('readFile onload end');
     };
     reader.readAsText(fileName);
   }

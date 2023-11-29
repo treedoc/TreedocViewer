@@ -50,9 +50,9 @@ export default {
       opt.filteredData  = _.orderBy(opt.filteredData , getFieldValue, q.order);
     }
     stopWatch.logWithReset('filter calling rowToObject');
-    opt.filteredDataAsObjectArray = opt.filteredData.map(r => TableUtil.rowToObject(r, opt, true, true));
+    // opt.filteredDataAsObjectArray = opt.filteredData.map(r => TableUtil.rowToObject(r, opt, true, true));
     stopWatch.logWithReset('after calling rowToObject');
-    opt.columnStatistic = TableUtil.collectColumnStatistics(opt.filteredDataAsObjectArray, opt.columns.filter(c => c.visible).map(c => c.field));
+    // opt.columnStatistic = TableUtil.collectColumnStatistics(opt.filteredDataAsObjectArray, opt.columns.filter(c => c.visible).map(c => c.field));
     stopWatch.logWithReset('after calling collectColumnStatistics');
     const end = (q.offset === undefined || !q.limit) ? undefined : q.offset + q.limit;
     return opt.data = opt.filteredData.slice(q.offset, end);

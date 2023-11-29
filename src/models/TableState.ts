@@ -6,13 +6,21 @@ import { Query, Column, DataTableOptions } from '@/components/Vue2DataTable';
 import { TreeState } from '@/lib';
 import Lazy from './Lazy';
 
-// State associated with particular node
+// State associated with particular node and need to be cached during navigation
 export class TableNodeState {
   constructor(
-    public query: Query,
-    public expandedLevel: number,
-    public columns: Column[],
-    public isColumnExpanded: boolean) { }
+    public query: Query = { limit: 100, offset: 0 },
+    public expandedLevel: number = 0,
+    public columns: Column[] = [],
+    public isColumnExpanded: boolean = false) { }
+
+  public copyOf(): TableNodeState {
+    return new TableNodeState(
+      { ...this.query },
+      this.expandedLevel,
+      this.columns,
+      this.isColumnExpanded);
+  }
 }
 
 export class TableOptionRule {
@@ -38,10 +46,9 @@ export class TDVTableOption {
     xprops: { tstate: null, columnStatistic: {} },
     columnStatistic: {},
   };
-
 }
 
-export default class TableState {
+export default class TableState extends TableNodeState {
   // _rawData = new Lazy<any[]>();  // the full dataset related to current node
   filteredData: any[] | null = null; // the data after filtering
   sortedData: any[] | null = null;  // the sorted data
@@ -49,8 +56,8 @@ export default class TableState {
 
   constructor(
     public treeState: TreeState,
-    public nodeState: TableNodeState,
-    public tableOpt: TDVTableOption) {
+    public tableOpt: TDVTableOption = new TDVTableOption()) {
+      super()
     }
 
   // buildDataTableOption() {

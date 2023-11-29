@@ -36,7 +36,7 @@ export default class TDVOptions {
 
   // If pattern is string, it will use wildcard matching
   tableOptRules?: {pattern: RegExp | string, opt: DataTableOptions};
-  defaultTableOpt?: DataTableOptions = {
+  defaultTableOpt: DataTableOptions = {
     // fixHeaderAndSetBodyMaxHeight: 200,
     // tblStyle: 'table-layout: fixed', // must
     tblClass: 'table-bordered',

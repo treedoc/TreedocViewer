@@ -13,7 +13,7 @@
           </b-button>
 
       </div>
-      <div>
+      <!-- <div>
         <b-collapse id="my-collapse" style="font-size: small;">
           <div style="display: flex; flex-wrap: wrap; flex-direction: row; overflow:visible;">
             <div style="white-space: nowrap;"> <b>#</b> {{columnStatistic.total}}</div>
@@ -45,7 +45,7 @@
             </div>
         </div>
         </b-collapse>
-      </div>      
+      </div>       -->
       <!-- {{ xprops.tstate }} -->
     </b-popover>
     <textarea ref='textViewCopyBuffer' v-model="copyBuffer" class='hiddenTextArea nowrap'></textarea>

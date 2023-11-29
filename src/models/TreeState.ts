@@ -4,6 +4,7 @@ import { ParserPlugin, ParseStatus } from './TDVOption';
 import JSONParserPlugin from '../parsers/JSONParserPlugin';
 import { Query, Column } from '../components/Vue2DataTable';
 import TDVOption from './TDVOption';
+import TableState, { TDVTableOption } from './TableState';
 
 const { doIfNotNull } = LangUtil;
 
@@ -47,14 +48,19 @@ export default class TreeState {
   showTable = [true];
   codeView = [true];
 
+  tableState: TableState = new TableState(this, new TDVTableOption());
+
   constructor(treeData: TDNode | string | any, 
       public parserPlugin: ParserPlugin<any> = new JSONParserPlugin(),
       rootLabel = 'root', 
-      selectedPath: string[] = []) {
-    this.tree = this.buildTree(treeData, rootLabel)!;
+      selectedPath: string[] = [],
+      public tdvOption = new TDVOption()) {
+    this.tree = this.buildTree(treeData)!;
     if (this.tree) {
       this.tree.root.key = rootLabel;
-      this.tree.root.freeze();
+      this.tree.root.freeze();      
+      this.tableState = new TableState(this, new TDVTableOption());
+      this.tableState.tableOpt.defTableOpt = tdvOption.defaultTableOpt;
       this.select(selectedPath, true);
     }
   }
@@ -85,7 +91,7 @@ export default class TreeState {
     return this;
   }
 
-  buildTree(treeData: TDNode | string | any, rootLabel: string) {
+  buildTree(treeData: TDNode | string | any): TreeDoc | undefined {
     if (!treeData || treeData.constructor.name === 'TDNode') {
       this.parseResult = 'TreeDoc';
       return (treeData as TDNode).doc;
@@ -119,6 +125,9 @@ export default class TreeState {
     // the user won't be able to continuous editing.
     if (!initial)
       this.curState.selection = this.curState.selected!;
+
+      // Save and restore table state
+      
   }
 
   public saveTableState(node: TDNode, state: TableNodeState) {
@@ -177,4 +186,7 @@ export default class TreeState {
     else
       this.maxPane = pane;
   }
+
+
+  // Table state
 }
