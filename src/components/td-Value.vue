@@ -72,12 +72,12 @@ export default {
   overflow-x: auto;
 }
 .td-value-max-width {
-  widows: 100%;
+  width: 100%;
   max-width: 95vw;
 }
 
 .td-value-max-height {
-  max-height: 150px;
+  max-height: 25vh;
 }
 
 </style>>
