@@ -60,3 +60,26 @@ export default class Util {
   public static head(array: any[], n = 1) { return array.slice(0, n); }
   
 }
+
+export function memoize<T extends (...args:any[])=>any>(func: T): T {
+  let cachedKey: any[] | null = null;
+  let cachedValue: any = null;
+  const res = function (...args: any[]) {
+    if (isArrayEquals(args, cachedKey))
+      return cachedValue;
+    const result = func(...args);
+    cachedKey = args;
+    cachedValue = result;
+    return result
+    }
+  return res as T
+}
+
+function isArrayEquals(a1: any[] | null, a2: any[] | null) {
+  if (a1 == null && a2 == null)
+    return true;
+  if (a1 == null || a2 == null)
+    return false;
+
+  return a1.length === a2.length && a1.every((v, i) => v === a2[i]);
+}

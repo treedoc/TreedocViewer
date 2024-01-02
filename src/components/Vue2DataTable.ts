@@ -3,6 +3,7 @@ import { ColumnStatistics } from '@/models/TableUtil';
 export declare interface Column {
   field: string;
   visible?: boolean;
+  isKeyCol?: boolean;
   html?: ((value: any, row: any) => string) | string;  //
   [key: string]: any;
 }
@@ -16,7 +17,7 @@ export declare interface Query {
   jsQuery?: string;
   // In Javascript map syntax: e.g.  "{createdDate: $.created.date, nameUpper: $.name.toUpperCase()}"
   extendedFields?: string; 
-  [key: string]: any;
+  fields: {[key: string]: string | string[]};
 }
 
 export declare interface TableConfig {
@@ -30,7 +31,7 @@ export declare interface TableConfig {
 
 // https://onewaytech.github.io/vue2-datatable/doc/#/en/details/datatable-props
 export declare interface DataTableOptions extends TableConfig {
-  data: any[];
+  data: any[] | null;
   total: number;
   query: Query;
   xprops: { [key: string]: any };

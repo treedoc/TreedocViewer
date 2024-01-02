@@ -241,10 +241,11 @@ export default class JsonTreeTable extends Vue {
       return;
     const reader = new FileReader();
     reader.onload = (e: Event) =>  {
-      if (reader.result)
+      if (reader.result) {
         stopWatch.logWithReset('readFile onload start');
         this.jsonStr = reader.result as string;
         stopWatch.logWithReset('readFile onload end');
+      }
     };
     reader.readAsText(fileName);
   }

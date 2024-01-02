@@ -59,7 +59,6 @@ export default class TreeState {
     if (this.tree) {
       this.tree.root.key = rootLabel;
       this.tree.root.freeze();      
-      this.tableState = new TableState(this, new TDVTableOption());
       this.tableState.tableOpt.defTableOpt = tdvOption.defaultTableOpt;
       this.select(selectedPath, true);
     }
@@ -117,9 +116,9 @@ export default class TreeState {
     if (this.curState.selected === selectedNode)
       return;
     this.curState = new CurState(selectedNode);
-    this.curState.selected = selectedNode;
     if (selectedNode)
       this.history.append(this.curState);
+    this.tableState.setCurrentNode(selectedNode);
 
     // We don't auto select in case it's initial. If auto selected, when user edit the source
     // the user won't be able to continuous editing.
@@ -139,6 +138,7 @@ export default class TreeState {
   }
 
   get selected() { return this.curState.selected; }
+  get selectedPath () { return this.selected?.pathAsString || "";}
   get selection() { return this.curState.selection; }
 
   public findNodeByPath(path: string | string[], noNull = false): TDNode {
