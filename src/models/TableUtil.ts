@@ -35,7 +35,7 @@ export class TableUtil {
         let val = row[col];
         vals.push(val);
         if (val === undefined)  // Skip undefined value   
-          continue;
+          val = '';
         if (typeof val !== 'string' && typeof val !== 'number') { 
           val = JSON.stringify(val);
         }
@@ -51,9 +51,9 @@ export class TableUtil {
       vals.sort((a,b) => a - b);
       stat.avg = stat.sum / rows.length;
       if (stat.avg > 0) {  // Calculate percentile only when avg is number
-        stat.p50 = vals[Math.floor(vals.length * 0.5)];
-        stat.p90 = vals[Math.floor(vals.length * 0.9)];
-        stat.p99 = vals[Math.floor(vals.length * 0.99)];        
+        stat.p50 = vals[Math.floor(vals.length * 0.5)] || 0;
+        stat.p90 = vals[Math.floor(vals.length * 0.9)] || 0;
+        stat.p99 = vals[Math.floor(vals.length * 0.99)] || 0;
       }
       stat.valueSortedByCounts = Object.keys(stat.valueCounts).sort((a, b) => stat.valueCounts[b] - stat.valueCounts[a]);
       result[col] = stat;

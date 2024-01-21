@@ -43,11 +43,12 @@ export default {
       q.offset = Math.max(0, opt.total - q.limit);
     if (opt.query.sort) {
       const getFieldValue = (row: any) => {
-        const v = row[q.sort!];
-        return v instanceof TDNode && v.value !== undefined ? v.value : v;
+        let v = row[q.sort!];
+        v = v instanceof TDNode && v.value !== undefined ? v.value : v;
+        return v || '';
       };
 
-      opt.filteredData  = _.orderBy(opt.filteredData , getFieldValue, q.order);
+      opt.filteredData  =  _.orderBy(opt.filteredData , getFieldValue, q.order);
     }
     stopWatch.logWithReset('filter calling rowToObject');
     // opt.filteredDataAsObjectArray = opt.filteredData.map(r => TableUtil.rowToObject(r, opt, true, true));
