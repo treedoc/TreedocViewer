@@ -28,7 +28,7 @@ export class TableNodeState {
     return new TableNodeState(
       { ...this.query },
       this.expandedLevel,
-      this.columns,
+      this.columns, 
       this.isColumnExpanded);
   }
 }
@@ -52,7 +52,7 @@ export class TDVTableOption {
     filteredDataAsObjectArray: [],
     rawData: [],
     total: 0,
-    query: { limit: 100, offset: 0 },
+    query: { limit: 100, offset: 0, fields:{}},
     xprops: { tstate: null, columnStatistic: {} },
     columnStatistic: {},
   };
@@ -126,7 +126,7 @@ export default class TableState extends TableNodeState {
     } else if (oldQuery.fields !== newQuery.fields || oldQuery.jsQuery !== newQuery.jsQuery || oldQuery.sort !== newQuery.sort || oldQuery.order !== newQuery.order) {
       this.resetFilteredData();
     } else if (oldQuery.sort !== newQuery.sort || oldQuery.order !== newQuery.order) {
-      this.resetSortedData();
+      this.resetFilteredData();
     } else if (oldQuery.offset !== newQuery.offset || oldQuery.limit !== newQuery.limit) {
       this.pagedData = null;
     }
