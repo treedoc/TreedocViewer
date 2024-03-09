@@ -38,6 +38,11 @@ export default class SimpleValue extends Vue {
     if (_.isNumber(val) && val > 315532800000 && val < 2208988800000) {
       return `\n${new Date(val as number).toISOString()}`;
     }
+    // Numbers that are in seconds
+    if (_.isNumber(val) && val > 315532800 && val < 2208988800) {
+      return `\n${new Date((val as number) * 1000).toISOString()}`;
+    }
+    
     return null;
   }
 
