@@ -36,7 +36,6 @@ export class TDVTableOption {
     total: 0,
     query: { limit: 100, offset: 0 },
     xprops: { tstate: null, columnStatistic: {} },
-    columnStatistic: {},
   };
 
 }

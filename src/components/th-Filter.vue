@@ -14,35 +14,37 @@
 
       </div>
       <div>
-        <b-collapse id="my-collapse" style="font-size: small;">
-          <div style="display: flex; flex-wrap: wrap; flex-direction: row; overflow:visible;">
-            <div style="white-space: nowrap;"> <b>#</b> {{columnStatistic.total}}</div>
-            <div style="padding-left: 0.2em; white-space: nowrap;"><b>#Uniq</b> {{columnStatistic.valueSortedByCounts.length}}</div>
-            <div style="padding-left: 0.2em; white-space: nowrap;" v-if="columnStatistic.sum"> <b>sum</b> {{columnStatistic.sum | toFixed(2)}}</div>
-            <div style="padding-left: 0.2em; white-space: nowrap;" v-if="columnStatistic.sum"> <b>Avg</b> {{columnStatistic.avg | toFixed(2)}}</div>
-            <div style="padding-left: 0.2em; white-space: nowrap;" v-if="columnStatistic.sum"> <b>P50</b> {{columnStatistic.p50 | toFixed(2)}}</div>
-            <div style="padding-left: 0.2em; white-space: nowrap;" v-if="columnStatistic.sum"> <b>P90</b> {{columnStatistic.p90 | toFixed(2)}}</div>
-            <div style="padding-left: 0.2em; white-space: nowrap;" v-if="columnStatistic.sum"> <b>P99</b> {{columnStatistic.p99 | toFixed(2)}}</div>
-            <div style="padding-left: 0.2em; white-space: nowrap;" v-if="columnStatistic.sum"> <b>Min</b> {{columnStatistic.min}}</div>
-            <div style="padding-left: 0.2em; white-space: nowrap;" v-if="columnStatistic.sum"> <b>Max</b> {{columnStatistic.max}}</div>
-          </div>
-          <div>
-            <b>Top Values</b>
-            <span v-b-tooltip.hover title="Copy">
-              <b-btn size='sm' style="padding-top: 0px;padding-bottom: 0px;" variant="light">
-                <i class="fa fa-copy" @click='copy()'></i>
-              </b-btn>
-            </span>
-          </div>
-          <div>
-            <div v-for="row in columnStatistic.valueCountsSorted.slice(0, 30)" style="height: 20px; font-size: small;">
-              <div style="display: flex; flex-direction: row; overflow:visible;">
-                <div style="flex-grow: 1;" class="text-container">{{ row.val  | textLimit(200) }}</div>
-                <div style="flex-grow: 0; background-color: white; min-width: 2rem; text-align: right; color: blue;">{{row.count}}</div>
-                <div style="flex-grow: 0; background-color: white; min-width: 2.7rem; text-align: right;color: green;">{{ Math.round(row.percent * 1000) / 10}}%</div>
-              </div>
-              <progress style="position: relative; top: -0.9em; height: 0.4rem; width: 100%;" :value="row.count" :max="columnStatistic.total"></progress>
+        <b-collapse id="my-collapse" style="font-size: small;" @show="showStats = true">
+          <div v-if="showStats" >
+            <div style="display: flex; flex-wrap: wrap; flex-direction: row; overflow:visible;">
+              <div style="white-space: nowrap;"> <b>#</b> {{columnStatistic.total}}</div>
+              <div style="padding-left: 0.2em; white-space: nowrap;"><b>#Uniq</b> {{columnStatistic.valueSortedByCounts.length}}</div>
+              <div style="padding-left: 0.2em; white-space: nowrap;" v-if="columnStatistic.sum"> <b>sum</b> {{columnStatistic.sum | toFixed(2)}}</div>
+              <div style="padding-left: 0.2em; white-space: nowrap;" v-if="columnStatistic.sum"> <b>Avg</b> {{columnStatistic.avg | toFixed(2)}}</div>
+              <div style="padding-left: 0.2em; white-space: nowrap;" v-if="columnStatistic.sum"> <b>P50</b> {{columnStatistic.p50 | toFixed(2)}}</div>
+              <div style="padding-left: 0.2em; white-space: nowrap;" v-if="columnStatistic.sum"> <b>P90</b> {{columnStatistic.p90 | toFixed(2)}}</div>
+              <div style="padding-left: 0.2em; white-space: nowrap;" v-if="columnStatistic.sum"> <b>P99</b> {{columnStatistic.p99 | toFixed(2)}}</div>
+              <div style="padding-left: 0.2em; white-space: nowrap;" v-if="columnStatistic.sum"> <b>Min</b> {{columnStatistic.min}}</div>
+              <div style="padding-left: 0.2em; white-space: nowrap;" v-if="columnStatistic.sum"> <b>Max</b> {{columnStatistic.max}}</div>
             </div>
+            <div>
+              <b>Top Values</b>
+              <span v-b-tooltip.hover title="Copy">
+                <b-btn size='sm' style="padding-top: 0px;padding-bottom: 0px;" variant="light">
+                  <i class="fa fa-copy" @click='copy()'></i>
+                </b-btn>
+              </span>
+            </div>
+            <div>
+              <div v-for="row in columnStatistic.valueCountsSorted.slice(0, 30)" style="height: 20px; font-size: small;">
+                <div style="display: flex; flex-direction: row; overflow:visible;">
+                  <div style="flex-grow: 1;" class="text-container">{{ row.val  | textLimit(200) }}</div>
+                  <div style="flex-grow: 0; background-color: white; min-width: 2rem; text-align: right; color: blue;">{{row.count}}</div>
+                  <div style="flex-grow: 0; background-color: white; min-width: 2.7rem; text-align: right;color: green;">{{ Math.round(row.percent * 1000) / 10}}%</div>
+                </div>
+                <progress style="position: relative; top: -0.9em; height: 0.4rem; width: 100%;" :value="row.count" :max="columnStatistic.total"></progress>
+              </div>
+          </div>
         </div>
         </b-collapse>
       </div>      
@@ -62,6 +64,8 @@ export default {
   data() {
     return {
       copyBuffer: '',
+      // Make stats lazy to avoid performance issue
+      showStats: false,
     };
   },
   methods: {
@@ -90,7 +94,7 @@ export default {
       return `filterbtn-${this.field}`;
     },
     columnStatistic() {
-      return this.xprops.columnStatistic[this.field];
+      return TableUtil.collectColumnStatistic(this.xprops.filteredDataAsObjectArray, this.field);
     },
   },
 };

@@ -11,7 +11,7 @@
         </span>
         <span class='tdv-hint'>{{label}}</span>
       </div>
-      <template v-for="cn in tnode.children" >
+      <template v-for="cn in tnode.children.slice(0, limit)" >
         <keep-alive :key='cn.key'>
           <!-- 
             VUEBUG: If use TreeViewItem which will cause brokage only in prod mode, this inconsistency cause me
@@ -26,6 +26,7 @@
               @node-clicked='bubbleEvent($event, "node-clicked")' />
         </keep-alive>
       </template>
+      <a class='item' href="#" style="font-size: smaller; color: green;" v-if="open && (tnode.getChildrenSize() > limit)" @click="limit = limit + pageSize">... Load next {{ pageSize }} items</a>
     </div>
     <div v-else>
       <span class='key'>{{tnode.key}}</span>:
@@ -42,7 +43,7 @@ import SimpleValue from './SimpleValue.vue';
 import TreeUtil from '../models/TreeUtil';
 import Util from '../util/Util';
 
-
+const PAGE_SIZE = 1000;
 export class NodeMouseEnterEvent {
   constructor(
     public nodePath: string,
@@ -72,6 +73,8 @@ export default class TreeViewItem extends Vue {
   open = false;
   selected = false;
   mouseOver = false;
+  pageSize = PAGE_SIZE;
+  limit = PAGE_SIZE;
 
   toggleOpen() { this.open = !this.open; }
   // VUELIMIT: Vue $emit won't buble up the event to grand parent, so we have explicitly
@@ -82,7 +85,7 @@ export default class TreeViewItem extends Vue {
   get label() { return TreeUtil.getTypeSizeLabel(this.tnode, !this.open && this.expandState.showChildrenSummary); }
 
   @Watch('selected')
-  private watchSelected(v: boolean) {
+  watchSelected(v: boolean) {
     if (v)
       this.$el.scrollIntoView({block: 'nearest'});
   }
@@ -159,7 +162,6 @@ export default class TreeViewItem extends Vue {
       case 'ArrowRight': this.toggleOpen(); e.preventDefault(); break;
       case 'ArrowDown': this.toggleOpen(); e.preventDefault(); break;
     }
-
   }
 }
 </script>

@@ -109,8 +109,7 @@ export default class JsonTable extends Vue {
     total: 0,
     // Have to initialize all the fields to make them able to be persisted in cache. (reactivity problem by proxy?)
     query: { limit: 100, offset: 0, jsQuery: JS_QUERY_DEFAULT, extendedFields:'' },
-    xprops: { tstate: null, columnStatistic: {} },
-    columnStatistic: {},
+    xprops: { tstate: null, columnStatistic: {}, filteredDataAsObjectArray:[] },
   };
   defTableOpt!: any;
   // !! class based component, we have to initialized the data field, "undefined" won't be reactive. !!
@@ -297,7 +296,7 @@ export default class JsonTable extends Vue {
 
   queryData() {
     DataFilter.filter(this.tableOpt);
-    this.tableOpt.xprops.columnStatistic = this.tableOpt.columnStatistic;
+    this.tableOpt.xprops.filteredDataAsObjectArray = this.tableOpt.filteredDataAsObjectArray;
   }
 
   copy(asCSV = false) {

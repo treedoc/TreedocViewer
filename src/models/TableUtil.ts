@@ -1,7 +1,7 @@
 import { CSVWriter, identity, ListUtil, TDNode, TDNodeType, TDObjectCoder } from 'treedoc';
 import { DataTableOptions, Column, Query } from '../components/Vue2DataTable';
 
-export class ColumnStatistcs {
+export class ColumnStatistic {
   total: number = 0;
   min: any;
   max: any;
@@ -25,40 +25,45 @@ export class TableUtil {
     return result;
   }
 
-  static collectColumnStatistics(rows: any[], columns: string[]): {[key: string]: ColumnStatistcs} {
-    const result: {[key: string]: ColumnStatistcs} = {};
-    for (const col of columns) {
-      const stat = new ColumnStatistcs();
-      const vals: any[] = [];
-      for (const row of rows) { 
-        stat.total++;
-        let val = row[col];
-        vals.push(val);
-        if (val === undefined)  // Skip undefined value   
-          val = '';
-        if (typeof val !== 'string' && typeof val !== 'number') { 
-          val = JSON.stringify(val);
-        }
-        if (stat.min === undefined || val < stat.min)
-          stat.min = val;   
-        if (stat.max === undefined || val > stat.max)
-          stat.max = val;
-        if (typeof val === 'number')
-          stat.sum += val;
-        const key = '' + val;
-        stat.valueCounts[key] = (stat.valueCounts[key] || 0) + 1;
+  // static collectColumnStatistics(rows: any[], columns: string[]): {[key: string]: ColumnStatistic} {
+  //   const result: {[key: string]: ColumnStatistic} = {};
+  //   for (const col of columns) {
+  //     result[col] = this.collectColumnStatistic(rows, col);
+  //   } 
+  //   return result;
+  // }
+   
+  static collectColumnStatistic(rows: any[], col: string): ColumnStatistic {
+    console.log('collectColumnStatistic', col);
+    const stat = new ColumnStatistic();
+    const vals: any[] = [];
+    for (const row of rows) { 
+      stat.total++;
+      let val = row[col];
+      vals.push(val);
+      if (val === undefined)  // Skip undefined value   
+        val = '';
+      if (typeof val !== 'string' && typeof val !== 'number') { 
+        val = JSON.stringify(val);
       }
-      vals.sort((a,b) => a - b);
-      stat.avg = stat.sum / rows.length;
-      if (stat.avg > 0) {  // Calculate percentile only when avg is number
-        stat.p50 = vals[Math.floor(vals.length * 0.5)] || 0;
-        stat.p90 = vals[Math.floor(vals.length * 0.9)] || 0;
-        stat.p99 = vals[Math.floor(vals.length * 0.99)] || 0;
-      }
-      stat.valueSortedByCounts = Object.keys(stat.valueCounts).sort((a, b) => stat.valueCounts[b] - stat.valueCounts[a]);
-      result[col] = stat;
-    } 
-    return result;
+      if (stat.min === undefined || val < stat.min)
+        stat.min = val;   
+      if (stat.max === undefined || val > stat.max)
+        stat.max = val;
+      if (typeof val === 'number')
+        stat.sum += val;
+      const key = '' + val;
+      stat.valueCounts[key] = (stat.valueCounts[key] || 0) + 1;
+    }
+    vals.sort((a,b) => a - b);
+    stat.avg = stat.sum / rows.length;
+    if (stat.avg > 0) {  // Calculate percentile only when avg is number
+      stat.p50 = vals[Math.floor(vals.length * 0.5)] || 0;
+      stat.p90 = vals[Math.floor(vals.length * 0.9)] || 0;
+      stat.p99 = vals[Math.floor(vals.length * 0.99)] || 0;
+    }
+    stat.valueSortedByCounts = Object.keys(stat.valueCounts).sort((a, b) => stat.valueCounts[b] - stat.valueCounts[a]);
+    return stat;
   }
     
   static rowToObject(row: any, tableOpt: DataTableOptions, includeKey = false, includeValue = true) {

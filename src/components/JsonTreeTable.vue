@@ -187,7 +187,7 @@ export default class JsonTreeTable extends Vue {
       this.tstate.codeView[0] = true;
     // Need detected only if significant changes happens. Not accurate.
     const oldLen = old ? old.length : 0;
-    const detectNeeded = Math.abs(oldLen - str.length) > 7;
+    const detectNeeded = Math.abs(oldLen - str.length) > 7 && str.length < 1000_000;
     this.parse(str, this, detectNeeded);
   }
 
