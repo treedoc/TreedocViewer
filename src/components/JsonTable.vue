@@ -61,7 +61,7 @@
           <div style="display: flex;"  v-b-tooltip.hover title="Extended Fields" @keypress="onkeypressStopPropagation">
             ExtendedFields:<b-form-input size='sm' name="extendedFields" style="display:inline;width:100%" v-model="tableOpt.query.extendedFields" placeholder="Extends Fields. E.g. `createdName: $.created.name, createdDate: $.created.data` or spread child: `c_:created`" @blur="buildTableAndQuery(selected)" />
           </div>
-          Query:{{tableOpt.query}}
+          <!-- Query:{{tableOpt.query}} -->
         </template>
       </div>
     </datatable>
@@ -72,7 +72,7 @@
 <script lang="ts">
 import { Component, Prop, Vue, Watch } from 'vue-property-decorator';
 import _ from 'lodash';
-import { DataTableOptions, JS_QUERY_DEFAULT } from './Vue2DataTable';
+import { DataTableOptions, FieldQuery, JS_QUERY_DEFAULT, Query } from './Vue2DataTable';
 import DataFilter from './DataFilter';
 import thFilter from './th-Filter.vue';
 import tdValue from './td-Value.vue';
@@ -104,11 +104,11 @@ export default class JsonTable extends Vue {
     columns: [],
     data: [],
     filteredData: [],
-    filteredDataAsObjectArray: [],
+    // filteredDataAsObjectArray: [],
     rawData: [],
     total: 0,
     // Have to initialize all the fields to make them able to be persisted in cache. (reactivity problem by proxy?)
-    query: { limit: 100, offset: 0, jsQuery: JS_QUERY_DEFAULT, extendedFields:'' },
+    query: new Query(),
     xprops: { tstate: null, columnStatistic: {}, filteredDataAsObjectArray:[] },
   };
   defTableOpt!: any;
@@ -255,6 +255,7 @@ export default class JsonTable extends Vue {
     // be reactive
     // this.tableOpt.query[field] = '';
     this.$set(this.tableOpt.query, field, undefined);
+    this.$set(this.tableOpt.query.fieldQueries, field, new FieldQuery());
 
     col.thClass = 'tdv-th';
     col.tdClass = 'tdv-td';
@@ -296,7 +297,7 @@ export default class JsonTable extends Vue {
 
   queryData() {
     DataFilter.filter(this.tableOpt);
-    this.tableOpt.xprops.filteredDataAsObjectArray = this.tableOpt.filteredDataAsObjectArray;
+    this.tableOpt.xprops.filteredData = this.tableOpt.filteredData;
   }
 
   copy(asCSV = false) {

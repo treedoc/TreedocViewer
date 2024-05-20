@@ -24,14 +24,6 @@ export class TableUtil {
     rows.forEach(row => result[row['@key']] = this.rowToObject(row, tableOpt));
     return result;
   }
-
-  // static collectColumnStatistics(rows: any[], columns: string[]): {[key: string]: ColumnStatistic} {
-  //   const result: {[key: string]: ColumnStatistic} = {};
-  //   for (const col of columns) {
-  //     result[col] = this.collectColumnStatistic(rows, col);
-  //   } 
-  //   return result;
-  // }
    
   static collectColumnStatistic(rows: any[], col: string): ColumnStatistic {
     console.log('collectColumnStatistic', col);
@@ -39,7 +31,7 @@ export class TableUtil {
     const vals: any[] = [];
     for (const row of rows) { 
       stat.total++;
-      let val = row[col];
+      let val = TableUtil.valToObject(row[col]);
       vals.push(val);
       if (val === undefined)  // Skip undefined value   
         val = '';
@@ -79,7 +71,7 @@ export class TableUtil {
     return result;
   }
 
-  static rowToMapWithAllFields(row: any, tableOpt: DataTableOptions) {
+  static rowToMapWithAllFields(row: any) {
     return ListUtil.map(row, identity, this.valToObject);
   }
 

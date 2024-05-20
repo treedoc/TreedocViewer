@@ -77,7 +77,7 @@ export default {
 }
 
 .td-value-max-height {
-  max-height: 25vh;
+  max-height: 50vh;
 }
 
 </style>>

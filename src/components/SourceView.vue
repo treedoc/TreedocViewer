@@ -1,8 +1,12 @@
 <template>
   <div style="height:100%;overflow: hidden;" @click="tstate.curPan='source'">
     <codemirror v-if="useCodeView[0]" ref='codeView' class='codeView' :options="options" v-model="val" style="height:100%"></codemirror>
-    <!-- very important to set a min-width, otherwise when hide the pannel which reduce the width to 0 and reflow will crash -->
-    <textarea style='min-width: 400px; overflow: scroll;' v-if="!useCodeView[0]" ref='textView' v-model="val" :class="[useCodeView[0] ? 'hiddenTextArea' : 'textArea']"></textarea>
+    <!-- very important to set a min-width, otherwise when hide the panel which reduce the width to 0 and reflow will crash -->
+    <textarea v-if="!useCodeView[0] && !readonly" style='min-width: 400px; overflow: scroll;' ref='textView' v-model="val" :class="[useCodeView[0] ? 'hiddenTextArea' : 'textArea']"></textarea>
+    <div v-if="!useCodeView[0] && readonly" style="height: 100%;">
+      <div style="font-size: smaller; color: brown;">Text size is large with {{value.length}} bytes, show in readonly mode to avoid performance issue</div>
+      <textarea style='min-width: 400px; overflow: scroll;background-color: lightgray;' ref='textView-readonly' v-model="truncatedText" :class='"textArea"' readonly></textarea>
+    </div>
   </div>
 </template>
 
@@ -27,7 +31,9 @@ import 'codemirror/addon/fold/brace-fold';
 import 'codemirror/addon/fold/xml-fold';
 import TreeState, { Selection } from '../models/TreeState';
 import { Bookmark } from 'treedoc/lib/Bookmark';
+import _ from 'lodash';
 
+const SIZE_LIMIT_FOR_READONLY = 10_000_000;
 
 @Component({
   components: {
@@ -53,6 +59,14 @@ export default class SourceView extends Vue {
 
   get codeView() {
     return this.$refs.codeView as any;
+  }
+
+  get readonly() {
+    return this.value.length > SIZE_LIMIT_FOR_READONLY;
+  }
+
+  get truncatedText() {
+    return _.truncate(this.value, {length: SIZE_LIMIT_FOR_READONLY});
   }
 
   get options() {

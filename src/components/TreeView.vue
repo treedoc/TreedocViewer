@@ -9,6 +9,7 @@
         :expandState='expandState'
         @node-clicked='nodeClicked'
         ref='item' />
+    <br>
   </div>
 </template>
 

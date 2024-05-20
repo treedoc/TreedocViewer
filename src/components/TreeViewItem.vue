@@ -11,7 +11,7 @@
         </span>
         <span class='tdv-hint'>{{label}}</span>
       </div>
-      <template v-for="cn in tnode.children.slice(0, limit)" >
+      <template v-for="cn in tnode.children ? tnode.children.slice(0, limit) : []" >
         <keep-alive :key='cn.key'>
           <!-- 
             VUEBUG: If use TreeViewItem which will cause brokage only in prod mode, this inconsistency cause me
@@ -43,7 +43,7 @@ import SimpleValue from './SimpleValue.vue';
 import TreeUtil from '../models/TreeUtil';
 import Util from '../util/Util';
 
-const PAGE_SIZE = 1000;
+const PAGE_SIZE = 2000;
 export class NodeMouseEnterEvent {
   constructor(
     public nodePath: string,

@@ -1,6 +1,6 @@
 import { Component } from 'vue';
 import { TDNode } from 'treedoc';
-import { DataTableOptions } from '../components/Vue2DataTable';
+import { DataTableOptions, Query } from '../components/Vue2DataTable';
 
 export enum ParseStatus {
   SUCCESS,
@@ -44,10 +44,10 @@ export default class TDVOptions {
     columns: [],
     data: [],
     filteredData: [],
-    filteredDataAsObjectArray: [],
+    // filteredDataAsObjectArray: [],
     rawData: [],
     total: 0,
-    query: { limit: 100, offset: 0 },
+    query: new Query(),
     xprops: { tstate: null },
   };
 

@@ -1,14 +1,17 @@
 <template>
   <div class='filter-header'>
     <b-button tabindex='0' variant='link' :id="filterBtnId" style='padding: 0px;'>
-      <b class='jsontable-head' :class="{'has-keyword': query[field]}">{{ title }}</b>
+      <b class='jsontable-head' :class="{'has-keyword': fieldQuery.query}">{{ title }}</b>
       <!-- <i class="m-2 fa fa-filter" :class="{ 'text-muted': !keyword}" style='margin: 1px !important;'></i> -->
     </b-button>
     <b-popover :target="filterBtnId" triggers="focus hover" placement='top' fallback-placement='clockwise'  @show='onShowPopover' boundary='viewport' delay='300' :no-fade='true' boundary-padding='0'>
       <div class="input-group input-group-sm" >
         <b-form-input type="search" class="form-control" ref="input" @keydown.esc.prevent='close' 
-          v-model="query[field]" @keydown.enter="close" :placeholder="`Search ${field}...`" debounce="300" />
-          <b-button size='sm' class="border-0" variant='light' v-b-toggle:my-collapse>
+          v-model="fieldQuery.query" @keydown.enter="close" :placeholder="`Search ${field}...`" debounce="300" />
+          <b-button size='sm' :class="{'btn_pressed': fieldQuery.isNegate}" class="border-1" variant='light' title="Negative" :pressed.sync="fieldQuery.isNegate">!=</b-button>
+          <b-button size='sm' :class="{'btn_pressed': fieldQuery.isRegex}" class="border-1" variant='light' title="Regex matching" :pressed.sync="fieldQuery.isRegex">.*</b-button>
+          <b-button size='sm' :class="{'btn_pressed': fieldQuery.isArray}" class="border-1" variant='light' title="Array (Comma separated)" :pressed.sync="fieldQuery.isArray">A</b-button>
+          <b-button size='sm' class="border-0" variant='light' v-b-toggle:my-collapse  title="Show column statistics">
             <span class="when-open"><b>&vellip;</b></span><span class="when-closed">&vellip;</span>
           </b-button>
 
@@ -78,7 +81,7 @@ export default {
     copy() {
       this.copyBuffer = TableUtil.toCSV(this.columnStatistic.valueCountsSorted);
       // this.copyBuffer = JSON.stringify(this.columnStatistic.valueCountsSorted);
-      console.log(`this.copyBuffer=${this.copyBuffer}`);
+      // console.log(`this.copyBuffer=${this.copyBuffer}`);
       this.$nextTick(() => {
         const textView = this.$refs.textViewCopyBuffer;
         textView.select();
@@ -94,8 +97,11 @@ export default {
       return `filterbtn-${this.field}`;
     },
     columnStatistic() {
-      return TableUtil.collectColumnStatistic(this.xprops.filteredDataAsObjectArray, this.field);
+      return TableUtil.collectColumnStatistic(this.xprops.filteredData, this.field);
     },
+    fieldQuery() {
+      return this.query.fieldQueries[this.field];
+    }
   },
 };
 </script>
@@ -133,5 +139,14 @@ input[type=search]::-webkit-search-cancel-button {
     overflow: visible;
     width: 100em;
     white-space: nowrap;
+}
+
+.btn_pressed {
+  border: 1px solid #007bff !important;
+  /* background-color: black !important; */
+
+}
+.popover {
+  max-width: 350px; /* Adjust as needed */
 }
 </style>
