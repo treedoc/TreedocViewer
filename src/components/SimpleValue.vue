@@ -20,6 +20,17 @@ import TreeState from '../models/TreeState';
 import TreeUtil from '../models/TreeUtil';
 import _ from 'lodash';
 
+// number and between 1980-01-01 and 2040-01-01, maybe a Date
+const START_TIME = new Date('1980-01-01').getTime();
+const END_TIME = new Date('2040-01-01').getTime();
+
+function tryDate(val: number): Date | null{
+  if (val > START_TIME && val < END_TIME) {
+    return new Date(val);
+  }
+  return null;
+}
+
 @Component
 export default class SimpleValue extends Vue {
   @Prop() tnode!: TDNode;
@@ -33,17 +44,10 @@ export default class SimpleValue extends Vue {
   }
 
   get date() {
-    // number and between 1980-01-01 and 2040-01-01, maybe a Date
     const val = Number(this.tnode.value);
-    if (_.isNumber(val) && val > 315532800000 && val < 2208988800000) {
-      return `\n${new Date(val as number).toISOString()}`;
-    }
-    // Numbers that are in seconds
-    if (_.isNumber(val) && val > 315532800 && val < 2208988800) {
-      return `\n${new Date((val as number) * 1000).toISOString()}`;
-    }
-    
-    return null;
+    if (!_.isNumber(val)) return null;
+    const date = tryDate(val) || tryDate(val * 1000) || tryDate(val / 1000_000);
+    return date ? `\n${date.toISOString()}` : null;
   }
 
   get refAbsolute() {

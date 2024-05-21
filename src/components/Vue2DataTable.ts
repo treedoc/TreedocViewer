@@ -10,6 +10,7 @@ export declare interface Column {
 
 export class FieldQuery {
   query: string = '';
+  compiledQuery: string = '';
   isRegex: boolean = false;
   // If it's array, the query string will be parsed with JSONex Parser as array of string
   // For example: "abc,def" will be parsed as ["abc", "def"], '"ab\"c", "def"' will be parsed as ['ab"c', 'def']
@@ -19,6 +20,15 @@ export class FieldQuery {
   queryCompiled?: (string | RegExp)[];
 
   compile() {
+    // Avoid recompile if query is not changes which will cause infinite update loop from vue
+    if (this.query === this.compiledQuery)
+      return;
+    this.compiledQuery = this.query;
+
+    if (!this.query) {
+      this.queryCompiled = [];
+      return;
+    }
     const values: string[] = this.isArray ? TD.parse(this.query, {defaultRootType: TDNodeType.ARRAY}) : [this.query];
     // console.log('compile', this.query, values);
     this.queryCompiled = values.map(q => {

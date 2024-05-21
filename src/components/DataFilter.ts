@@ -1,5 +1,5 @@
 import _ from 'lodash';
-import { Query, Column, DataTableOptions, JS_QUERY_DEFAULT, FieldQuery } from './Vue2DataTable';
+import { DataTableOptions, JS_QUERY_DEFAULT } from './Vue2DataTable';
 import { TDNode } from 'treedoc';
 import { TableUtil } from '../models/TableUtil';
 
