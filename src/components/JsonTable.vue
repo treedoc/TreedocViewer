@@ -132,6 +132,7 @@ export default class JsonTable extends Vue {
       this.defTableOpt = this.tableOpt;
 
     this.defTableOpt.columns = [];
+    this.defTableOpt.query.fieldQueries = {};
     this.tableOpt = { ...this.defTableOpt, ...(this.applyCustomOpts && this.options) };
     if (cachedState) {
       this.tableOpt.query = cachedState.query;
@@ -253,8 +254,6 @@ export default class JsonTable extends Vue {
     col.processed = true;
     // VUETIP: we have to use Vue.$set, otherwise, once it's assigned with array syntax. this field will no longer
     // be reactive
-    // this.tableOpt.query[field] = '';
-    this.$set(this.tableOpt.query, field, undefined);
     this.$set(this.tableOpt.query.fieldQueries, field, new FieldQuery());
 
     col.thClass = 'tdv-th';
@@ -324,7 +323,7 @@ export default class JsonTable extends Vue {
 
   @Watch('query', {deep: true})
   watchQuery() {
-    console.log("query changed: " + JSON.stringify(this.query));
+    console.log('query changed: ' + JSON.stringify(this.query));
     this.queryData(); 
   }
 
