@@ -13,7 +13,7 @@
   "scripts": {
     "test": "vitest",
     "coverage": "vitest run --coverage",
-    "serve": "vue-cli-service serve",
+    "serve": "NODE_OPTIONS=--openssl-legacy-provider vue-cli-service serve",
     "build-app": "vue-cli-service build --dest dist/app",
     "build-lib": "vue-cli-service build --dest dist/lib --target lib --name lib src/lib.ts",
     "build": "vitest --run && yarn build-app && yarn build-lib",
@@ -35,7 +35,8 @@
     "vue-property-decorator": "9.0.0",
     "vue-router": "^3.4.6",
     "vue2-datatable-component": "https://github.com/TrueCarry/vue2-datatable",
-    "yaml": "^1.10.0"
+    "yaml": "^1.10.0",
+    "yarn": "^1.22.22"
   },
   "devDependencies": {
     "@types/lodash": "^4.14.182",
