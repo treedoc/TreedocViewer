@@ -1,0 +1,34 @@
+{
+  "name": "treedoc-viewer-v2",
+  "version": "2.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@codemirror/lang-javascript": "^6.2.2",
+    "@codemirror/lang-xml": "^6.1.0",
+    "@codemirror/lang-yaml": "^6.1.1",
+    "@primevue/themes": "^4.2.5",
+    "codemirror": "^6.0.1",
+    "lodash-es": "^4.17.21",
+    "pinia": "^2.2.8",
+    "primeicons": "^7.0.0",
+    "primevue": "^4.2.5",
+    "splitpanes": "^3.1.5",
+    "treedoc": "^0.3.44",
+    "vue": "^3.5.13",
+    "vue-codemirror": "^6.1.1",
+    "vue-router": "^4.5.0",
+    "yaml": "^2.7.0"
+  },
+  "devDependencies": {
+    "@types/lodash-es": "^4.17.12",
+    "@vitejs/plugin-vue": "^5.2.1",
+    "typescript": "~5.7.2",
+    "vite": "^6.1.0",
+    "vue-tsc": "^2.2.0"
+  }
+}
