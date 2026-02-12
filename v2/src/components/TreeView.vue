@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { ref, reactive, watch, nextTick } from 'vue'
-import type { TDNode } from 'treedoc'
+import { ref, reactive, watch, nextTick, toRaw, shallowRef, computed } from 'vue'
+import type { TDNode, TreeDoc } from 'treedoc'
 import TreeViewItem from './TreeViewItem.vue'
 import ExpandControl from './ExpandControl.vue'
 import type { ExpandState } from './ExpandControl.vue'
 import { useTreeStore } from '../stores/treeStore'
-import { storeToRefs } from 'pinia'
+import { Logger } from '@/utils/Logger'
+
+const logger = new Logger('TreeView')
 
 const props = defineProps<{
   rootObjectKey?: string
@@ -13,17 +15,24 @@ const props = defineProps<{
 }>()
 
 const store = useTreeStore()
-const { tree, selectedNode } = storeToRefs(store)
+
+const localTree = shallowRef<TreeDoc | null>(null)
+const localSelectedNode = shallowRef<TDNode | null>(null)
 
 const expandControlRef = ref<InstanceType<typeof ExpandControl>>()
 const treeItemRef = ref<InstanceType<typeof TreeViewItem>>()
 
 const expandState = reactive<ExpandState>({
-  expandLevel: props.expandLevel || 0, // Changed from 1 to 0 - don't auto-expand for large files
+  expandLevel: props.expandLevel || 1,
   minLevel: 1,
   fullyExpand: false,
   moreLevel: false,
   showChildrenSummary: true,
+})
+
+const rawTree = computed(() => {
+  const t = localTree.value
+  return t ? toRaw(t) : null
 })
 
 function nodeClicked(path: string[]) {
@@ -34,10 +43,14 @@ function onKeyPress(e: KeyboardEvent) {
   expandControlRef.value?.onKeyPress(e)
 }
 
-// Watch for selection changes to update tree view
-watch(selectedNode, (newNode, oldNode) => {
-  // Defer the expensive tree traversal to not block the UI
-  requestIdleCallback(() => {
+watch(
+  () => store.nodeVersion,
+  () => {
+    const oldNode = localSelectedNode.value
+    const newNode = store.getRawSelectedNode()
+    localSelectedNode.value = newNode
+    
+    logger.log('Selection changed, updating tree view')
     if (oldNode && treeItemRef.value) {
       treeItemRef.value.selectNode(oldNode.path, 0, (node: any) => {
         node.selected = false
@@ -48,15 +61,21 @@ watch(selectedNode, (newNode, oldNode) => {
         node.selected = true
       })
     }
-  }, { timeout: 100 }) // Force execution within 100ms if browser is busy
-})
+    logger.log(`watch: selected: end`)
+  }
+)
 
-// Reset expand state when tree changes
-watch(tree, () => {
-  expandState.expandLevel = props.expandLevel || 1
-  expandState.fullyExpand = false
-  expandState.moreLevel = false
-})
+watch(
+  () => store.tree,
+  () => {
+    localTree.value = store.getRawTree()
+    logger.log('Tree changed, resetting expand state')
+    expandState.expandLevel = props.expandLevel || 1
+    expandState.fullyExpand = false
+    expandState.moreLevel = false
+  },
+  { immediate: true }
+)
 
 defineExpose({ onKeyPress })
 </script>
@@ -70,10 +89,10 @@ defineExpose({ onKeyPress })
     
     <div class="tree-content">
       <TreeViewItem
-        v-if="tree"
+        v-if="rawTree"
         ref="treeItemRef"
         class="root-item"
-        :tnode="tree.root"
+        :tnode="rawTree.root"
         :current-level="0"
         :expand-state="expandState"
         @node-clicked="nodeClicked"

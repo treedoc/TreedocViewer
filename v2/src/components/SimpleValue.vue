@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, toRaw } from 'vue'
 import type { TDNode } from 'treedoc'
 
 const props = defineProps<{
@@ -23,30 +23,40 @@ function tryDate(val: number): Date | null {
   return null
 }
 
+const rawNode = computed(() => toRaw(props.tnode))
+const nodeValue = computed(() => rawNode.value.value)
+const nodeKey = computed(() => rawNode.value.key)
+
 const ref = computed(() => {
-  if (props.tnode.key !== KEY_REF || typeof props.tnode.value !== 'string') {
+  if (nodeKey.value !== KEY_REF || typeof nodeValue.value !== 'string') {
     return null
   }
-  return props.tnode.value
+  return nodeValue.value
 })
 
+function formatDate(d: Date): string {
+  const date = d.toLocaleDateString()
+  const time = d.toLocaleTimeString(undefined, { hour12: false })
+  return `${date},${time}`
+}
+
 const date = computed(() => {
-  const val = Number(props.tnode.value)
+  const val = Number(nodeValue.value)
   if (isNaN(val)) return null
   const d = tryDate(val) || tryDate(val * 1000) || tryDate(val / 1000_000)
-  return d ? d.toISOString() : null
+  return d ? formatDate(d) : null
 })
 
 const refAbsolute = computed(() => {
   let result = ref.value
   if (result && result.startsWith('../')) {
-    result = props.tnode.parent?.pathAsString + '/' + result
+    result = rawNode.value.parent?.pathAsString + '/' + result
   }
   return result
 })
 
 const url = computed(() => {
-  const val = props.tnode.value
+  const val = nodeValue.value
   if (typeof val === 'string' && (val.startsWith('http://') || val.startsWith('https://'))) {
     return val
   }
@@ -54,7 +64,7 @@ const url = computed(() => {
 })
 
 const valueStyle = computed(() => {
-  const val = props.tnode.value
+  const val = nodeValue.value
   if (val === null) return 'value-null'
   if (typeof val === 'string') return 'value-string'
   if (typeof val === 'boolean') return 'value-boolean'
@@ -79,11 +89,11 @@ function handleRefClick() {
       <a :href="url" target="_blank" class="url-link">{{ url }}</a>
     </template>
     <template v-else-if="isInTable">
-      <pre class="value-pre" :class="valueStyle" :style="{ whiteSpace: whiteSpaceStyle }">{{ tnode.value }}</pre>
+      <pre class="value-pre" :class="valueStyle" :style="{ whiteSpace: whiteSpaceStyle }">{{ nodeValue }}</pre>
       <span v-if="date" class="date-hint">{{ date }}</span>
     </template>
     <template v-else>
-      <span :class="valueStyle">{{ tnode.value }}</span>
+      <span :class="valueStyle">{{ nodeValue }}</span>
       <span v-if="date" class="date-hint"> ({{ date }})</span>
     </template>
   </span>

@@ -1,38 +1,46 @@
+let lastTime: number = performance.now()
+const startTime: number = performance.now()
+  
 class Logger {
-  private lastTime: number = performance.now()
-  private startTime: number = performance.now()
+  private name?: string
+
+  constructor(name?: string) {
+    this.name = name
+  }
+
+  private formatPrefix(delta: number, total: number): string {
+    const prefix = `[+${delta.toFixed(2)}ms | ${total.toFixed(2)}ms]`
+    return this.name ? `${prefix} [${this.name}]` : prefix
+  }
 
   log(message: string, ...args: any[]) {
     const now = performance.now()
-    const delta = now - this.lastTime
-    const total = now - this.startTime
+    const delta = now - lastTime
+    const total = now - startTime
     
     console.log(
-      `[+${delta}ms | ${total}ms] ${message}`,
+      `${this.formatPrefix(delta, total)} ${message}`,
       ...args
     )
     
-    this.lastTime = now
-  }
-
-  reset() {
-    this.lastTime = performance.now()
-    this.startTime = performance.now()
+    lastTime = now
   }
 
   group(label: string) {
-    console.group(`[+0.00ms] ${label}`)
-    this.lastTime = performance.now()
+    const prefix = this.name ? `[${this.name}]` : ''
+    console.group(`[+0.00ms] ${prefix} ${label}`)
+    lastTime = performance.now()
   }
 
   groupEnd() {
     const now = performance.now()
-    const delta = now - this.lastTime
-    console.log(`[Group duration: ${delta}ms]`)
+    const delta = now - lastTime
+    console.log(`[Group duration: ${delta.toFixed(2)}ms]`)
     console.groupEnd()
-    this.lastTime = now
+    lastTime = now
   }
 }
 
-export const logger = new Logger()
+export { Logger }
+export const logger = new Logger("default")
 export default logger

@@ -1,6 +1,16 @@
 import { defineStore } from 'pinia'
-import { ref, computed, shallowRef, watch } from 'vue'
+import { ref, computed, shallowRef, watch, markRaw, toRaw } from 'vue'
 import type { TDNode, TreeDoc } from 'treedoc'
+
+function markTreeRaw(node: TDNode): void {
+  markRaw(node)
+  if (node.children) {
+    markRaw(node.children)
+    for (const child of node.children) {
+      markTreeRaw(child)
+    }
+  }
+}
 import { TDObjectCoder, TDJSONWriter, TDJSONWriterOption, JSONPointer } from 'treedoc'
 import type { ParserPlugin, Selection, TableNodeState, TDVOptions } from '../models/types'
 import { ParseStatus } from '../models/types'
@@ -11,7 +21,9 @@ import XMLParserPlugin from '../parsers/XMLParserPlugin'
 import CSVParserPlugin from '../parsers/CSVParserPlugin'
 import PrometheusParserPlugin from '../parsers/PrometheusParserPlugin'
 import { debounce } from 'lodash-es'
-import logger from '@/utils/Logger'
+import { Logger } from '@/utils/Logger'
+
+const logger = new Logger('treeStore')
 
 export const useTreeStore = defineStore('tree', () => {
   // State
@@ -25,7 +37,8 @@ export const useTreeStore = defineStore('tree', () => {
   
   const selection = ref<Selection>({})
   const history = new History<TDNode>()
-  const historyVersion = ref(0) // Track history changes for reactivity
+  const historyVersion = ref(0)
+  const nodeVersion = ref(0)
   const tableStateCache = new Map<string, TableNodeState>()
   
   // View state
@@ -106,7 +119,17 @@ export const useTreeStore = defineStore('tree', () => {
     parseResult.value = result.message
     
     if (result.result) {
-      tree.value = result.result.doc
+      const doc = result.result.doc
+      // Mark the entire tree structure as raw to prevent Vue's deep reactivity
+      markRaw(doc)
+      markTreeRaw(doc.root)
+      
+      // Clear history and table state cache when loading new data
+      history.clear()
+      tableStateCache.clear()
+      historyVersion.value++
+      
+      tree.value = doc
       tree.value.root.key = 'root'
       tree.value.root.freeze()
       
@@ -115,6 +138,9 @@ export const useTreeStore = defineStore('tree', () => {
     } else {
       tree.value = null
       selectedNode.value = null
+      history.clear()
+      tableStateCache.clear()
+      historyVersion.value++
     }
   }
   
@@ -124,7 +150,7 @@ export const useTreeStore = defineStore('tree', () => {
   }
   
   function selectNode(node: TDNode | string | string[], initial = false) {
-    logger.log(`Selecting node`)
+    logger.log(`selectNode: start`)
     
     if (!tree.value) return
     
@@ -137,23 +163,22 @@ export const useTreeStore = defineStore('tree', () => {
     } else {
       targetNode = node
     }
-    logger.log(`0`)
     if (!targetNode) return
 
     if (initial) {
-      initialNode.value = targetNode
+      initialNode.value = markRaw(targetNode)
     }
     
-    logger.log(`1`)
     if (selectedNode.value === targetNode) return
     
-    logger.log(`2`)
-    selectedNode.value = targetNode
-    logger.log(`3`)
+    logger.log(`before update selectedNode`)
+    selectedNode.value = markRaw(targetNode)
+    nodeVersion.value++
+    logger.log(`after update selectedNode`)
     history.append(targetNode)
-    logger.log(`4`)
+    logger.log(`after append history`)
     historyVersion.value++
-    logger.log(`5`)
+    logger.log(`after update historyVersion`)
     
     // Update selection for source view highlighting
     if (!initial && targetNode.start && targetNode.end) {
@@ -162,9 +187,11 @@ export const useTreeStore = defineStore('tree', () => {
         end: { line: targetNode.end.line, col: targetNode.end.col, pos: targetNode.end.pos },
       }
     }
+    logger.log(`selectNode: end`)
   }
   
   function findNodeByPath(path: string | string[]): TDNode | null {
+    logger.log(`findNodeByPath: start`)
     if (!tree.value) return null
     
     const currentNode = selectedNode.value || tree.value.root
@@ -196,7 +223,8 @@ export const useTreeStore = defineStore('tree', () => {
     const node = history.back()
     if (node) {
       historyVersion.value++
-      selectedNode.value = node
+      selectedNode.value = markRaw(node)
+      nodeVersion.value++
       // Update selection for source view highlighting
       if (node.start && node.end) {
         selection.value = {
@@ -211,7 +239,8 @@ export const useTreeStore = defineStore('tree', () => {
     const node = history.forward()
     if (node) {
       historyVersion.value++
-      selectedNode.value = node
+      selectedNode.value = markRaw(node)
+      nodeVersion.value++
       // Update selection for source view highlighting
       if (node.start && node.end) {
         selection.value = {
@@ -248,6 +277,8 @@ export const useTreeStore = defineStore('tree', () => {
   }
   
   function saveTableState(node: TDNode, state: TableNodeState) {
+    // The node is not from the current tree, ignore
+    if (node.doc !== tree.value) return
     tableStateCache.set(node.pathAsString, state)
   }
   
@@ -268,6 +299,16 @@ export const useTreeStore = defineStore('tree', () => {
     if (options.showTable !== undefined) showTable.value = options.showTable
   }
   
+  function getRawTree(): TreeDoc | null {
+    const t = tree.value
+    return t ? toRaw(t) : null
+  }
+  
+  function getRawSelectedNode(): TDNode | null {
+    const n = selectedNode.value
+    return n ? toRaw(n) : null
+  }
+  
   return {
     // State
     rawText,
@@ -277,6 +318,7 @@ export const useTreeStore = defineStore('tree', () => {
     selectedNode,
     initialNode,
     selection,
+    nodeVersion,
     
     // View state
     showSource,
@@ -312,5 +354,7 @@ export const useTreeStore = defineStore('tree', () => {
     getTableState,
     isInitialNodeSelected,
     setInitialOptions,
+    getRawTree,
+    getRawSelectedNode,
   }
 })

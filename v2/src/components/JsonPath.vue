@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, toRaw } from 'vue'
 import type { TDNode } from 'treedoc'
 
 const props = defineProps<{
@@ -17,11 +17,12 @@ interface PathItem {
 
 const items = computed<PathItem[]>(() => {
   const paths: PathItem[] = []
-  if (!props.treeNode) return paths
+  const node = props.treeNode
+  if (!node) return paths
 
   // Build path from root to current node
   const nodeChain: TDNode[] = []
-  let current: TDNode | undefined = props.treeNode
+  let current: TDNode | undefined = node
   while (current) {
     nodeChain.unshift(current)
     current = current.parent as TDNode | undefined
@@ -29,10 +30,10 @@ const items = computed<PathItem[]>(() => {
 
   // Create breadcrumb items (exclude last as it will be the current)
   for (let i = 0; i < nodeChain.length - 1; i++) {
-    const node = nodeChain[i]
+    const n = nodeChain[i]
     paths.push({
-      label: node.key || 'root',
-      node,
+      label: n.key || 'root',
+      node: n,
     })
   }
 

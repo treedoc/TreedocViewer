@@ -1,12 +1,18 @@
 <script setup lang="ts">
-import { ref, computed, watch, nextTick, type ComponentPublicInstance } from 'vue'
+import { ref, computed, watch, nextTick, toRaw, type ComponentPublicInstance } from 'vue'
 import type { TDNode } from 'treedoc'
-import { TDNodeType } from 'treedoc'
+import { TDNodeType, TDJSONWriter, TDJSONWriterOption } from 'treedoc'
 import SimpleValue from './SimpleValue.vue'
 import type { ExpandState } from './ExpandControl.vue'
 import TreeUtil from '@/utils/TreeUtil'
+import { Logger } from '@/utils/Logger'
 
-const PAGE_SIZE = 2000
+const logger = new Logger('TreeViewItem')
+const PAGE_SIZE = 200
+
+function getRawNode(node: TDNode): TDNode {
+  return toRaw(node)
+}
 
 interface TreeViewItemInstance extends ComponentPublicInstance {
   tnode: TDNode
@@ -28,45 +34,24 @@ const open = ref(false)
 const selected = ref(false)
 const limit = ref(PAGE_SIZE)
 const childrenRefs = ref<TreeViewItemInstance[]>([])
+const isHovered = ref(false)
 
-const isSimpleType = computed(() => props.tnode.type === TDNodeType.SIMPLE)
+const rawNode = computed(() => getRawNode(props.tnode))
 
-const label = computed(() => TreeUtil.getTypeSizeLabel(props.tnode, !open.value && props.expandState.showChildrenSummary));
-// {
-//   const node = props.tnode
-//   if (node.type === TDNodeType.SIMPLE) return ''
-  
-//   const size = node.getChildrenSize()
-//   const typeLabel = node.type === TDNodeType.ARRAY ? '[]' : '{}'
-  
-//   if (!open.value && props.expandState.showChildrenSummary && size > 0) {
-//     // Show summary of children
-//     const children = node.children?.slice(0, 3) || []
-//     const preview = children.map(c => {
-//       if (c.type === TDNodeType.SIMPLE) {
-//         const val = c.value
-//         if (typeof val === 'string' && val.length > 20) {
-//           return `"${val.substring(0, 20)}..."`
-//         }
-//         return JSON.stringify(val)
-//       }
-//       return c.type === TDNodeType.ARRAY ? '[...]' : '{...}'
-//     }).join(', ')
-    
-//     return `${typeLabel} ${size} ${size > 3 ? `(${preview}, ...)` : `(${preview})`}`
-//   }
-  
-//   return `${typeLabel} ${size}`
-// }
-// )
+const isSimpleType = computed(() => rawNode.value.type === TDNodeType.SIMPLE)
+
+const nodeKey = computed(() => rawNode.value.key)
+
+const label = computed(() => TreeUtil.getTypeSizeLabel(rawNode.value, !open.value && props.expandState.showChildrenSummary));
 
 const visibleChildren = computed(() => {
-  if (!props.tnode.children) return []
-  return props.tnode.children.slice(0, limit.value)
+  const node = rawNode.value
+  if (!node.children) return []
+  return node.children.slice(0, limit.value)
 })
 
 const hasMoreChildren = computed(() => {
-  return (props.tnode.getChildrenSize() || 0) > limit.value
+  return (rawNode.value.getChildrenSize() || 0) > limit.value
 })
 
 function toggleOpen() {
@@ -74,14 +59,28 @@ function toggleOpen() {
 }
 
 function handleNodeClick() {
-  emit('nodeClicked', ['', ...props.tnode.path])
+  emit('nodeClicked', ['', ...rawNode.value.path])
 }
 
 function loadMore() {
   limit.value += PAGE_SIZE
 }
 
+function copyNode() {
+  const node = rawNode.value
+  let text: string
+  // For simple values, copy the raw value without JSON quoting/escaping
+  if (node.type === TDNodeType.SIMPLE) {
+    text = node.value === null ? 'null' : String(node.value)
+  } else {
+    // For complex values (objects/arrays), use JSON formatting
+    text = TDJSONWriter.get().writeAsString(node, new TDJSONWriterOption().setIndentFactor(2))
+  }
+  navigator.clipboard.writeText(text)
+}
+
 function selectNode(path: string[], start: number, action: (node: typeof props) => void) {
+  logger.log(`selectNode: start: ${path}, ${start}`)
   if (start === path.length) {
     // Call action with an object that allows modifying selected state
     const nodeController = {
@@ -104,14 +103,15 @@ function selectNode(path: string[], start: number, action: (node: typeof props) 
 }
 
 function bubbleEvent(data: string[], eventName: string) {
+  logger.log(`bubbleEvent: start: ${data}, ${eventName}`)  
   emit(eventName as 'nodeClicked', data)
 }
 
-// Watch expand state changes
 watch(
-  () => props.expandState,
+  () => [props.expandState.expandLevel, props.expandState.fullyExpand, props.expandState.moreLevel] as const,
   () => {
-    if (props.tnode.isLeaf()) return
+    logger.log(`watch: expand state: start`)
+    if (rawNode.value.isLeaf()) return
 
     const state = props.expandState
     open.value = state.fullyExpand || props.currentLevel < state.expandLevel
@@ -126,11 +126,11 @@ watch(
       }
     }
   },
-  { immediate: true, deep: true }
+  { immediate: true }
 )
 
-// Watch selected state to scroll into view
 watch(selected, (isSelected) => {
+  logger.log(`watch: selected: start`)
   if (isSelected) {
     nextTick(() => {
       const el = document.querySelector('.node-key.selected')
@@ -139,14 +139,18 @@ watch(selected, (isSelected) => {
   }
 })
 
-// Expose for parent access
-defineExpose({ selectNode, tnode: props.tnode, selected })
+defineExpose({ selectNode, tnode: rawNode, selected })
 </script>
 
 <template>
   <div class="tree-item">
     <div v-if="!isSimpleType" class="tree-node">
-      <div class="node-row" @click.stop="toggleOpen">
+      <div 
+        class="node-row" 
+        @click.stop="toggleOpen"
+        @mouseenter="isHovered = true"
+        @mouseleave="isHovered = false"
+      >
         <span class="toggle-icon" :class="{ opened: open }">
           <i class="pi pi-chevron-right"></i>
         </span>
@@ -156,9 +160,17 @@ defineExpose({ selectNode, tnode: props.tnode, selected })
           :class="{ selected }"
           @click.stop.prevent="handleNodeClick"
         >
-          {{ tnode.key }}
+          {{ nodeKey }}
         </a>
         <span class="node-label">{{ label }}</span>
+        <button 
+          v-show="isHovered"
+          class="copy-btn"
+          title="Copy node"
+          @click.stop="copyNode"
+        >
+          <i class="pi pi-copy"></i>
+        </button>
       </div>
       
       <template v-if="open">
@@ -182,9 +194,22 @@ defineExpose({ selectNode, tnode: props.tnode, selected })
       </template>
     </div>
     
-    <div v-else class="leaf-node">
-      <span class="node-key leaf-key">{{ tnode.key }}</span>:
-      <SimpleValue :tnode="tnode" @node-clicked="emit('nodeClicked', [$event])" />
+    <div 
+      v-else 
+      class="leaf-node"
+      @mouseenter="isHovered = true"
+      @mouseleave="isHovered = false"
+    >
+      <span class="node-key leaf-key">{{ nodeKey }}</span>:
+      <SimpleValue :tnode="rawNode" @node-clicked="emit('nodeClicked', [$event])" />
+      <button 
+        v-show="isHovered"
+        class="copy-btn"
+        title="Copy node"
+        @click.stop="copyNode"
+      >
+        <i class="pi pi-copy"></i>
+      </button>
     </div>
   </div>
 </template>
@@ -246,9 +271,7 @@ defineExpose({ selectNode, tnode: props.tnode, selected })
 .node-key.selected {
   background: #ffc107;
   color: #000;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .leaf-key {
@@ -277,5 +300,28 @@ defineExpose({ selectNode, tnode: props.tnode, selected })
 
 .load-more:hover {
   color: var(--tdv-primary-light);
+}
+
+.copy-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--tdv-text-muted);
+  padding: 2px 6px;
+  margin-left: 4px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  opacity: 0.7;
+  transition: opacity 0.15s, color 0.15s, background 0.15s;
+}
+
+.copy-btn:hover {
+  opacity: 1;
+  color: var(--tdv-primary);
+  background: var(--tdv-hover-bg);
+}
+
+.copy-btn i {
+  font-size: 12px;
 }
 </style>
