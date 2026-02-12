@@ -1,0 +1,80 @@
+/**
+ * Query and filter utilities
+ */
+
+import type { FieldQuery } from '../components/ColumnFilterDialog.vue'
+
+/**
+ * Match a value against a field query
+ */
+export function matchFieldQuery(value: string, fq: FieldQuery): boolean {
+  if (!fq.query) return true
+  
+  let queries: string[]
+  if (fq.isArray) {
+    // Parse as comma-separated array
+    queries = fq.query.split(',').map(q => q.trim()).filter(q => q)
+  } else {
+    queries = [fq.query]
+  }
+  
+  let matched = false
+  for (const q of queries) {
+    if (fq.isRegex) {
+      try {
+        const regex = new RegExp(q, 'i')
+        if (regex.test(value)) {
+          matched = true
+          break
+        }
+      } catch {
+        // Invalid regex, fall back to string match
+        if (value.toLowerCase().includes(q.toLowerCase())) {
+          matched = true
+          break
+        }
+      }
+    } else {
+      if (value.toLowerCase().includes(q.toLowerCase())) {
+        matched = true
+        break
+      }
+    }
+  }
+  
+  return fq.isNegate ? !matched : matched
+}
+
+/**
+ * Create an evaluator function for extended fields expression
+ */
+export function createExtendedFieldsFunc(expression: string): ((obj: any) => Record<string, any>) | null {
+  if (!expression || !expression.trim()) return null
+  
+  const exp = `
+    with($) {
+      return {${expression}}
+    }
+  `
+  try {
+    return new Function('$', exp) as (obj: any) => Record<string, any>
+  } catch (e) {
+    console.error('Error parsing extended fields:', exp)
+    console.error(e)
+    return null
+  }
+}
+
+/**
+ * Create a JS query filter function
+ */
+export function createJsQueryFunc(query: string): ((obj: any) => boolean) | null {
+  if (!query || query === '$') return null
+  
+  try {
+    return new Function('$', `return ${query}`) as (obj: any) => boolean
+  } catch (e) {
+    console.warn('Invalid JS query:', e)
+    return null
+  }
+}
