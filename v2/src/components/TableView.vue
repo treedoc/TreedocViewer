@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, computed, watch, reactive, toRaw, shallowRef, onMounted } from 'vue'
+import { ref, computed, watch, reactive, toRaw, shallowRef } from 'vue'
 import type { TDNode } from 'treedoc'
-import { TDNodeType, TD, TDJSONWriter, TDJSONWriterOption } from 'treedoc'
+import { TDNodeType } from 'treedoc'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import InputText from 'primevue/inputtext'
@@ -14,10 +14,23 @@ import ExpandControl from './ExpandControl.vue'
 import SimpleValue from './SimpleValue.vue'
 import ColumnFilterDialog from './ColumnFilterDialog.vue'
 import ColumnSelector from './ColumnSelector.vue'
+import AutoCompleteInput from './AutoCompleteInput.vue'
 import type { ExpandState } from './ExpandControl.vue'
 import type { FieldQuery } from './ColumnFilterDialog.vue'
 import type { ColumnVisibility } from './ColumnSelector.vue'
 import { Logger } from '@/utils/Logger'
+import { 
+  getCellValue, 
+  getCellNode, 
+  isComplexValue, 
+  getCellTimestampHint,
+  getComplexValueSummary,
+  copyCellValue,
+  copyAsJSON,
+  copyAsCSV,
+  shouldExpandColumns
+} from '@/utils/TableUtil'
+import { matchFieldQuery, createExtendedFieldsFunc } from '@/utils/QueryUtil'
 
 const logger = new Logger('TableView')
 const COL_VALUE = '@value'
@@ -26,7 +39,6 @@ const COL_KEY = '@key'
 
 const STORAGE_KEY_JS_QUERY = 'tdv_recent_js_queries'
 const STORAGE_KEY_EXTENDED_FIELDS = 'tdv_recent_extended_fields'
-const MAX_RECENT_ITEMS = 10
 
 const store = useTreeStore()
 const { textWrap, maxPane } = storeToRefs(store)
@@ -41,13 +53,6 @@ const extendedFields = ref('')
 const showExtendedFields = ref(false)
 const first = ref(0)
 const rows = ref(100)
-
-const recentJsQueries = ref<string[]>([])
-const recentExtendedFields = ref<string[]>([])
-const showJsQuerySuggestions = ref(false)
-const showExtendedFieldsSuggestions = ref(false)
-const selectedJsQueryIndex = ref(-1)
-const selectedExtendedFieldsIndex = ref(-1)
 
 const filterDialogVisible = ref(false)
 const activeFilterColumn = ref<TableColumn | null>(null)
@@ -120,17 +125,17 @@ const rawSelectedNode = computed(() => {
   return node ? toRaw(node) : null
 })
 
-const filteredJsQueries = computed(() => {
-  if (!jsQuery.value || jsQuery.value === '$') return recentJsQueries.value
-  const query = jsQuery.value.toLowerCase()
-  return recentJsQueries.value.filter(item => item.toLowerCase().includes(query))
-})
-
-const filteredExtendedFields = computed(() => {
-  if (!extendedFields.value) return recentExtendedFields.value
-  const query = extendedFields.value.toLowerCase()
-  return recentExtendedFields.value.filter(item => item.toLowerCase().includes(query))
-})
+function hideColumn(field: string) {
+  const col = columns.value.find(c => c.field === field)
+  if (col) {
+    col.visible = false
+    columnVisibility.value = columns.value.map(c => ({
+      field: c.field,
+      header: c.header,
+      visible: c.visible
+    }))
+  }
+}
 
 function updateColumnVisibility(cols: ColumnVisibility[]) {
   for (const col of cols) {
@@ -158,43 +163,6 @@ function updateFieldQuery(query: FieldQuery) {
   }
 }
 
-function matchFieldQuery(value: string, fq: FieldQuery): boolean {
-  if (!fq.query) return true
-  
-  let queries: string[]
-  if (fq.isArray) {
-    // Parse as comma-separated array
-    queries = fq.query.split(',').map(q => q.trim()).filter(q => q)
-  } else {
-    queries = [fq.query]
-  }
-  
-  let matched = false
-  for (const q of queries) {
-    if (fq.isRegex) {
-      try {
-        const regex = new RegExp(q, 'i')
-        if (regex.test(value)) {
-          matched = true
-          break
-        }
-      } catch {
-        // Invalid regex, fall back to string match
-        if (value.toLowerCase().includes(q.toLowerCase())) {
-          matched = true
-          break
-        }
-      }
-    } else {
-      if (value.toLowerCase().includes(q.toLowerCase())) {
-        matched = true
-        break
-      }
-    }
-  }
-  
-  return fq.isNegate ? !matched : matched
-}
 
 const filteredData = computed(() => {
   let data = [...tableData.value]
@@ -239,23 +207,6 @@ const paginatedData = computed(() => {
   return filteredData.value.slice(first.value, first.value + rows.value)
 })
 
-// Parse extended fields expression and create evaluator function
-function createExtendedFieldsFunc(): ((obj: any) => Record<string, any>) | null {
-  if (!extendedFields.value || !extendedFields.value.trim()) return null
-  
-  const exp = `
-    with($) {
-      return {${extendedFields.value}}
-    }
-  `
-  try {
-    return new Function('$', exp) as (obj: any) => Record<string, any>
-  } catch (e) {
-    console.error('Error parsing extended fields:', exp)
-    console.error(e)
-    return null
-  }
-}
 
 // Add extended object to row, handling spread notation (keys ending with _)
 function addExtObject(key: string, val: any, row: TableRow) {
@@ -334,7 +285,7 @@ function buildTableInternal(node: TDNode | null) {
   }
   
   // Create extended fields evaluator
-  const extFunc = createExtendedFieldsFunc()
+  const extFunc = createExtendedFieldsFunc(extendedFields.value)
   
   // Build rows
   for (const child of node.children) {
@@ -397,121 +348,10 @@ function buildTableInternal(node: TDNode | null) {
   }))
 }
 
-function shouldExpandColumns(node: TDNode): boolean {
-  if (!node.children || node.children.length === 0) return false
-  
-  const cols = new Set<string>()
-  let cellCount = 0
-  
-  for (const child of node.children) {
-    if (child.children) {
-      for (const grandChild of child.children) {
-        cols.add(grandChild.key!)
-        cellCount++
-        logger.log(`shouldExpandColumns: grandChild.key=${grandChild.key}, grandChild.type=${grandChild.type}, cellCount=${cellCount}`)
-      }
-    }
-  }
-  
-  // Heuristic: expand if mostly uniform structure
-  const rowCount = node.children.length
-  const colCount = cols.size
-  if (colCount === 0 || colCount > 30) {
-    return false
-  }
-  
-  // Threshold: at least 50% fill rate
-  const threshold = 0.5
-  const maxCells = rowCount * colCount
-  const result = cellCount >= maxCells * threshold
-  logger.log(`shouldExpandColumns: rowCount=${rowCount}, colCount=${colCount}, cellCount=${cellCount}, maxCells=${maxCells}, threshold=${threshold}, result=${result}`)
-  return result
-}
-
 function nodeClicked(path: string[]) {
   store.selectNode(path)
 }
 
-function copyAsJSON() {
-  const data = filteredData.value.map(row => {
-    if (row.__node) {
-      return row.__node.toObject(true)
-    }
-    return row
-  })
-  navigator.clipboard.writeText(TD.stringify(data))
-}
-
-function copyAsCSV() {
-  const visibleCols = columns.value
-  const header = visibleCols.map(c => c.header).join(',')
-  const csvRows = filteredData.value.map(row => {
-    return visibleCols.map(col => {
-      const val = row[col.field]
-      if (val === undefined || val === null) return ''
-      if (typeof val === 'object' && 'value' in val) {
-        const v = (val as TDNode).value
-        return typeof v === 'string' ? `"${v.replace(/"/g, '""')}"` : String(v)
-      }
-      return String(val)
-    }).join(',')
-  })
-  const csv = [header, ...csvRows].join('\n')
-  navigator.clipboard.writeText(csv)
-}
-
-const START_TIME = new Date('1980-01-01').getTime()
-const END_TIME = new Date('2040-01-01').getTime()
-
-function tryDate(val: number): Date | null {
-  if (val > START_TIME && val < END_TIME) {
-    return new Date(val)
-  }
-  return null
-}
-
-function formatDate(d: Date): string {
-  const date = d.toLocaleDateString()
-  const time = d.toLocaleTimeString(undefined, { hour12: false })
-  return `${date},${time}`
-}
-
-function getTimestampHint(val: unknown): string | null {
-  const num = Number(val)
-  if (isNaN(num)) return null
-  const d = tryDate(num) || tryDate(num * 1000) || tryDate(num / 1000_000)
-  return d ? formatDate(d) : null
-}
-
-function getCellTimestampHint(row: TableRow, field: string): string | null {
-  const node = getCellNode(row, field)
-  if (node) {
-    return getTimestampHint(node.value)
-  }
-  return getTimestampHint(row[field])
-}
-
-function getCellValue(row: TableRow, field: string): string {
-  const val = row[field]
-  if (val === undefined || val === null) return ''
-  if (typeof val === 'object' && 'value' in val) {
-    return String((val as TDNode).value ?? '')
-  }
-  return String(val)
-}
-
-function getCellNode(row: TableRow, field: string): TDNode | null {
-  const val = row[field]
-  if (val && typeof val === 'object' && 'type' in val) {
-    return toRaw(val) as TDNode
-  }
-  return null
-}
-
-function isComplexValue(row: TableRow, field: string): boolean {
-  const node = getCellNode(row, field)
-  return node !== null && node.type !== TDNodeType.SIMPLE
-}
 
 function isKeyColumn(field: string): boolean {
   return field === COL_NO || field === COL_KEY
@@ -520,23 +360,6 @@ function isKeyColumn(field: string): boolean {
 function getRowNodePath(row: TableRow): string[] {
   const node = row.__node
   return node ? ['', ...node.path] : []
-}
-
-// Generate a summary for complex JSON values
-function getComplexValueSummary(row: TableRow, field: string): string {
-  const node = getCellNode(row, field) as TDNode
-  return node.toStringInternal('', false, false, 100);
-}
-
-function copyCellValue(row: TableRow, field: string) {
-  const node = getCellNode(row, field)
-  let text: string
-  if (node) {
-    if (node.type === TDNodeType.SIMPLE) {
-      text = node.value === null ? 'null' : String(node.value)
-    } else text = TDJSONWriter.get().writeAsString(node, new TDJSONWriterOption().setIndentFactor(2))
-  } else text = String(getCellValue(row, field))
-  navigator.clipboard.writeText(text)
 }
 
 function onKeyPress(e: KeyboardEvent) {
@@ -555,129 +378,6 @@ function onPage(event: { first: number; rows: number }) {
 
 function clearAllFilters() {
   fieldQueries.value = {}
-}
-
-function saveRecentValue(storageKey: string, value: string) {
-  if (!value || value.trim() === '' || value === '$') return
-  
-  try {
-    const existing = JSON.parse(localStorage.getItem(storageKey) || '[]') as string[]
-    // Remove if already exists
-    const filtered = existing.filter(item => item !== value)
-    // Add to front
-    filtered.unshift(value)
-    // Keep only MAX_RECENT_ITEMS
-    const updated = filtered.slice(0, MAX_RECENT_ITEMS)
-    localStorage.setItem(storageKey, JSON.stringify(updated))
-  } catch (e) {
-    console.error('Error saving to localStorage:', e)
-  }
-}
-
-function loadRecentValues(storageKey: string): string[] {
-  try {
-    return JSON.parse(localStorage.getItem(storageKey) || '[]') as string[]
-  } catch (e) {
-    console.error('Error loading from localStorage:', e)
-    return []
-  }
-}
-
-function saveJsQueryToHistory() {
-  if (jsQuery.value && jsQuery.value !== '$') {
-    saveRecentValue(STORAGE_KEY_JS_QUERY, jsQuery.value)
-    recentJsQueries.value = loadRecentValues(STORAGE_KEY_JS_QUERY)
-  }
-}
-
-function saveExtendedFieldsToHistory() {
-  if (extendedFields.value) {
-    saveRecentValue(STORAGE_KEY_EXTENDED_FIELDS, extendedFields.value)
-    recentExtendedFields.value = loadRecentValues(STORAGE_KEY_EXTENDED_FIELDS)
-  }
-}
-
-function selectJsQuery(query: string) {
-  jsQuery.value = query
-  showJsQuerySuggestions.value = false
-}
-
-function selectExtendedFields(fields: string) {
-  extendedFields.value = fields
-  showExtendedFieldsSuggestions.value = false
-  rebuildTable()
-}
-
-function handleJsQueryBlur() {
-  saveJsQueryToHistory()
-  setTimeout(() => showJsQuerySuggestions.value = false, 200)
-}
-
-function handleExtendedFieldsBlur() {
-  saveExtendedFieldsToHistory()
-  setTimeout(() => {
-    showExtendedFieldsSuggestions.value = false
-    rebuildTable()
-  }, 200)
-}
-
-function handleJsQueryFocus() {
-  showJsQuerySuggestions.value = filteredJsQueries.value.length > 0
-  selectedJsQueryIndex.value = -1
-}
-
-function handleExtendedFieldsFocus() {
-  showExtendedFieldsSuggestions.value = filteredExtendedFields.value.length > 0
-  selectedExtendedFieldsIndex.value = -1
-}
-
-function handleJsQueryInput() {
-  showJsQuerySuggestions.value = filteredJsQueries.value.length > 0
-}
-
-function handleExtendedFieldsInput() {
-  showExtendedFieldsSuggestions.value = filteredExtendedFields.value.length > 0
-}
-
-function handleJsQueryEscape() {
-  showJsQuerySuggestions.value = false
-}
-
-function handleJsQueryKeydown(e: KeyboardEvent) {
-  if (!showJsQuerySuggestions.value || filteredJsQueries.value.length === 0) return
-  
-  if (e.key === 'ArrowDown') {
-    e.preventDefault()
-    selectedJsQueryIndex.value = Math.min(selectedJsQueryIndex.value + 1, filteredJsQueries.value.length - 1)
-  } else if (e.key === 'ArrowUp') {
-    e.preventDefault()
-    selectedJsQueryIndex.value = Math.max(selectedJsQueryIndex.value - 1, -1)
-  } else if (e.key === 'Enter' && selectedJsQueryIndex.value >= 0) {
-    e.preventDefault()
-    selectJsQuery(filteredJsQueries.value[selectedJsQueryIndex.value])
-  }
-}
-
-function handleExtendedFieldsEscape() {
-  showExtendedFieldsSuggestions.value = false
-}
-
-function handleExtendedFieldsKeydown(e: KeyboardEvent) {
-  if (!showExtendedFieldsSuggestions.value || filteredExtendedFields.value.length === 0) return
-  
-  if (e.key === 'ArrowDown') {
-    e.preventDefault()
-    selectedExtendedFieldsIndex.value = Math.min(selectedExtendedFieldsIndex.value + 1, filteredExtendedFields.value.length - 1)
-  } else if (e.key === 'ArrowUp') {
-    e.preventDefault()
-    selectedExtendedFieldsIndex.value = Math.max(selectedExtendedFieldsIndex.value - 1, -1)
-  } else if (e.key === 'Enter' && selectedExtendedFieldsIndex.value >= 0) {
-    e.preventDefault()
-    selectExtendedFields(filteredExtendedFields.value[selectedExtendedFieldsIndex.value])
-  } else if (e.key === 'Enter') {
-    // Default Enter behavior - just rebuild table
-    rebuildTable()
-  }
 }
 
 function rebuildTable() {
@@ -734,14 +434,6 @@ watch(isColumnExpanded, () => {
     buildTable(toRaw(node))
   }
   logger.log(`isColumnExpanded changed end`)
-})
-
-onMounted(() => {
-  // Load recent values on mount
-  recentJsQueries.value = loadRecentValues(STORAGE_KEY_JS_QUERY)
-  recentExtendedFields.value = loadRecentValues(STORAGE_KEY_EXTENDED_FIELDS)
-  
-  logger.log(`Loaded ${recentJsQueries.value.length} recent JS queries and ${recentExtendedFields.value.length} recent extended fields`)
 })
 
 defineExpose({ onKeyPress })
@@ -805,7 +497,7 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
           icon="pi pi-copy"
           size="small"
           text
-          @click="copyAsJSON"
+          @click="copyAsJSON(filteredData as any)"
           v-tooltip.top="'Copy as JSON'"
         />
         
@@ -813,7 +505,7 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
           icon="pi pi-file-export"
           size="small"
           text
-          @click="copyAsCSV"
+          @click="copyAsCSV(filteredData as any, columns as any)"
           v-tooltip.top="'Copy as CSV'"
         />
         
@@ -888,56 +580,26 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
     <div v-if="showAdvancedQuery" class="advanced-query">
       <label>
         JS Query:
-        <div class="input-with-suggestions">
-          <InputText
-            v-model="jsQuery"
-            placeholder="Custom query in JS. E.g. $.name.length > 10"
-            class="query-input"
-            @focus="handleJsQueryFocus"
-            @blur="handleJsQueryBlur"
-            @input="handleJsQueryInput"
-            @keydown="handleJsQueryKeydown"
-          />
-          <div v-if="showJsQuerySuggestions && filteredJsQueries.length > 0" class="suggestions-dropdown">
-            <div class="suggestion-header">Recent queries:</div>
-            <div
-              v-for="(query, idx) in filteredJsQueries"
-              :key="idx"
-              :class="['suggestion-item', { selected: idx === selectedJsQueryIndex }]"
-              @click="selectJsQuery(query)"
-            >
-              {{ query }}
-            </div>
-          </div>
-        </div>
+        <AutoCompleteInput
+          v-model="jsQuery"
+          placeholder="Custom query in JS. E.g. $.name.length > 10"
+          :storage-key="STORAGE_KEY_JS_QUERY"
+          input-class="query-input"
+        />
       </label>
     </div>
     
     <div v-if="showExtendedFields" class="extended-fields-panel">
       <label class="extended-fields-label">
         Extended Fields:
-        <div class="input-with-suggestions">
-          <InputText
-            v-model="extendedFields"
-            placeholder="Add computed columns. E.g. fullName: $.first + ' ' + $.last, tags_: $.metadata.tags"
-            class="extended-fields-input"
-            @focus="handleExtendedFieldsFocus"
-            @blur="handleExtendedFieldsBlur"
-            @input="handleExtendedFieldsInput"
-            @keydown="handleExtendedFieldsKeydown"
-          />
-          <div v-if="showExtendedFieldsSuggestions && filteredExtendedFields.length > 0" class="suggestions-dropdown">
-            <div class="suggestion-header">Recent fields:</div>
-            <div
-              v-for="(fields, idx) in filteredExtendedFields"
-              :key="idx"
-              :class="['suggestion-item', { selected: idx === selectedExtendedFieldsIndex }]"
-              @click="selectExtendedFields(fields)"
-            >
-              {{ fields }}
-            </div>
-          </div>
-        </div>
+        <AutoCompleteInput
+          v-model="extendedFields"
+          placeholder="Add computed columns. E.g. fullName: $.first + ' ' + $.last, tags_: $.metadata.tags"
+          :storage-key="STORAGE_KEY_EXTENDED_FIELDS"
+          input-class="extended-fields-input"
+          @blur="rebuildTable"
+          @enter="rebuildTable"
+        />
         <Button
           icon="pi pi-play"
           size="small"
@@ -991,6 +653,15 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
                 class="column-filter-btn"
                 @click.stop="openFilterDialog(col)"
                 v-tooltip.top="'Filter ' + col.header"
+              />
+              <Button
+                icon="pi pi-eye-slash"
+                size="small"
+                text
+                severity="secondary"
+                class="column-hide-btn"
+                @click.stop="hideColumn(col.field)"
+                v-tooltip.top="'Hide column'"
               />
             </div>
           </template>
@@ -1126,58 +797,6 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
   width: 100%;
 }
 
-.input-with-suggestions {
-  position: relative;
-  flex: 1;
-}
-
-.suggestions-dropdown {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  max-height: 200px;
-  overflow-y: auto;
-  background: var(--tdv-surface);
-  border: 1px solid var(--tdv-surface-border);
-  border-radius: 4px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  z-index: 1000;
-  margin-top: 2px;
-}
-
-.suggestion-header {
-  padding: 6px 12px;
-  font-size: 0.75rem;
-  color: var(--tdv-text-muted);
-  font-weight: 600;
-  background: var(--tdv-surface-light);
-  border-bottom: 1px solid var(--tdv-surface-border);
-}
-
-.suggestion-item {
-  padding: 8px 12px;
-  cursor: pointer;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.8rem;
-  border-bottom: 1px solid var(--tdv-surface-border);
-  transition: background 0.15s;
-}
-
-.suggestion-item:last-child {
-  border-bottom: none;
-}
-
-.suggestion-item:hover {
-  background: var(--tdv-hover-bg);
-  color: var(--tdv-primary);
-}
-
-.suggestion-item.selected {
-  background: var(--tdv-primary);
-  color: white;
-}
-
 .extended-fields-panel {
   padding: 8px 12px;
   background: var(--tdv-surface);
@@ -1246,6 +865,7 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
   gap: 4px;
   justify-content: space-between;
   width: 100%;
+  position: relative;
 }
 
 .column-title {
@@ -1256,10 +876,36 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
   color: var(--tdv-success);
 }
 
-.column-filter-btn {
+.column-filter-btn,
+.column-hide-btn {
   padding: 4px;
   width: 24px;
   height: 24px;
+  opacity: 0;
+  position: absolute;
+  transition: opacity 0.15s;
+}
+
+.column-filter-btn {
+  right: 0;
+}
+
+.column-filter-btn.p-button-success {
+  opacity: 1;
+}
+
+.column-hide-btn {
+  right: 24px;
+}
+
+.column-header:hover .column-filter-btn,
+.column-header:hover .column-hide-btn {
+  opacity: 0.7;
+}
+
+.column-filter-btn:hover,
+.column-hide-btn:hover {
+  opacity: 1 !important;
 }
 
 .key-link {
@@ -1321,7 +967,7 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
   right: 100%;
   top: 50%;
   transform: translateY(-50%);
-  margin-right: 4px;
+  margin-right: 0px;
   background: var(--tdv-surface);
   border: 1px solid var(--tdv-surface-border);
   cursor: pointer;
