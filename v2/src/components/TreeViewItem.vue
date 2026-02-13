@@ -8,7 +8,7 @@ import TreeUtil from '@/utils/TreeUtil'
 import { Logger } from '@/utils/Logger'
 
 const logger = new Logger('TreeViewItem')
-const PAGE_SIZE = 200
+const PAGE_SIZE = 1000
 
 function getRawNode(node: TDNode): TDNode {
   return toRaw(node)
@@ -77,6 +77,26 @@ function copyNode() {
     text = TDJSONWriter.get().writeAsString(node, new TDJSONWriterOption().setIndentFactor(2))
   }
   navigator.clipboard.writeText(text)
+}
+
+function getJsPath(): string {
+  const path = rawNode.value.path
+  return path.map((key, idx) => {
+    // Check if key is a valid JS identifier
+    if (/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(key)) {
+      return idx === 0 ? key : `.${key}`
+    }
+    // Use bracket notation for numeric keys or invalid identifiers
+    if (/^\d+$/.test(key)) {
+      return `[${key}]`
+    }
+    return `['${key.replace(/'/g, "\\'")}']`
+  }).join('')
+}
+
+function copyPath() {
+  const path = getJsPath()
+  navigator.clipboard.writeText(path)
 }
 
 function selectNode(path: string[], start: number, action: (node: typeof props) => void) {
@@ -166,6 +186,14 @@ defineExpose({ selectNode, tnode: rawNode, selected })
         <button 
           v-show="isHovered"
           class="copy-btn"
+          title="Copy path"
+          @click.stop="copyPath"
+        >
+          <i class="pi pi-link"></i>
+        </button>
+        <button 
+          v-show="isHovered"
+          class="copy-btn"
           title="Copy node"
           @click.stop="copyNode"
         >
@@ -202,6 +230,14 @@ defineExpose({ selectNode, tnode: rawNode, selected })
     >
       <span class="node-key leaf-key">{{ nodeKey }}</span>:
       <SimpleValue :tnode="rawNode" @node-clicked="emit('nodeClicked', [$event])" />
+      <button 
+        v-show="isHovered"
+        class="copy-btn"
+        title="Copy path"
+        @click.stop="copyPath"
+      >
+        <i class="pi pi-link"></i>
+      </button>
       <button 
         v-show="isHovered"
         class="copy-btn"

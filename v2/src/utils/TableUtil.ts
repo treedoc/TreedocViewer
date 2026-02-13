@@ -93,12 +93,21 @@ export function copyCellValue(row: TableRow, field: string): void {
 /**
  * Copy table data as JSON to clipboard
  */
-export function copyAsJSON(data: TableRow[]): void {
+export function copyAsJSON(data: TableRow[], columns: TableColumn[]): void {
+  const fields = columns.map(c => c.field)
   const jsonData = data.map(row => {
-    if (row.__node) {
-      return row.__node.toObject(true)
+    const obj: any = {}
+    for (const field of fields) {
+      if (field === '__node') continue
+      const val = row[field]
+      if (val && typeof val === 'object' && 'value' in val) {
+        const node = val as TDNode
+        obj[field] = node.type === TDNodeType.SIMPLE ? node.value : node.toObject(true)
+      } else {
+        obj[field] = val
+      }
     }
-    return row
+    return obj
   })
   navigator.clipboard.writeText(TD.stringify(jsonData))
 }

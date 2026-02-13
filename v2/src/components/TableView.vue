@@ -234,55 +234,99 @@ function addExtObject(key: string, val: any, row: TableRow) {
   row[key] = val?.$$tdNode || val
 }
 
+// Used during rebuild to preserve column visibility
+let savedColumnVisibility: Map<string, boolean> | null = null
+
 function addColumn(field: string, header: string, isExtended: boolean = false) {
   if (!columns.value.find(c => c.field === field)) {
+    // Check if we have saved visibility for this column
+    const visible = savedColumnVisibility?.get(field) ?? true
     columns.value.push({
       field,
       header: isExtended ? `⊕${header}` : header,
       sortable: true,
       filterable: true,
-      visible: true,
+      visible,
     })
   }
 }
 
 let isBuilding = false
 
-function buildTable(node: TDNode | null) {
+function buildTable(node: TDNode | null, restoreState = true) {
   isBuilding = true
   try {
-    buildTableInternal(node)
+    buildTableInternal(node, restoreState)
   } finally {
     isBuilding = false
   }
 }
 
-function buildTableInternal(node: TDNode | null) {
-  logger.log(`Building table for node: ${node?.key}, node.children=${node?.children?.length}`)
+function buildTableInternal(node: TDNode | null, restoreState = true) {
+  logger.log(`Building table for node: ${node?.key}, restoreState=${restoreState}`)
+  
+  // Save current column visibility before rebuilding (for non-restore rebuilds)
+  const currentFieldQueries = { ...fieldQueries.value }
+  if (!restoreState) {
+    savedColumnVisibility = new Map<string, boolean>()
+    for (const col of columns.value) {
+      savedColumnVisibility.set(col.field, col.visible)
+    }
+  } else {
+    savedColumnVisibility = null
+  }
+  
   columns.value = []
   tableData.value = []
-  fieldQueries.value = {}
+  if (restoreState) {
+    fieldQueries.value = {}
+  }
   if (!node || !node.children) return
+  
+  // Check if we have cached state for this node - do this BEFORE adding columns
+  const cachedState = store.getTableState(node)
+  if (cachedState && restoreState) {
+    isColumnExpanded.value = cachedState.isColumnExpanded
+    // Restore query state
+    jsQuery.value = cachedState.query.jsQuery || '$'
+    extendedFields.value = cachedState.query.extendedFields || ''
+    // Restore field queries
+    if (cachedState.query.fieldQueries) {
+      for (const [field, fq] of Object.entries(cachedState.query.fieldQueries)) {
+        fieldQueries.value[field] = { ...fq }
+      }
+    }
+    // Set up column visibility from cache for addColumn to use
+    if (cachedState.columns) {
+      savedColumnVisibility = new Map<string, boolean>()
+      for (const col of cachedState.columns) {
+        if (col.visible !== undefined) {
+          savedColumnVisibility.set(col.field, col.visible)
+        }
+      }
+    }
+  } else if (!cachedState) {
+    // First time visiting this node - auto-detect
+    isColumnExpanded.value = shouldExpandColumns(node)
+  }
+  
+  // Restore current field queries if not restoring from cache
+  if (!restoreState) {
+    fieldQueries.value = currentFieldQueries
+  }
+  
   const isArray = node.type === TDNodeType.ARRAY
   const keyCol = isArray ? COL_NO : COL_KEY
   
-  // Add key column
+  // Add key column (use saved visibility if available)
+  const keyColVisible = savedColumnVisibility?.get(keyCol) ?? true
   columns.value.push({
     field: keyCol,
     header: keyCol,
     sortable: true,
     filterable: true,
-    visible: true,
+    visible: keyColVisible,
   })
-  
-  // Check if we have cached state for this node
-  const cachedState = store.getTableState(node)
-  if (cachedState) {
-    isColumnExpanded.value = cachedState.isColumnExpanded
-  } else {
-    // First time visiting this node - auto-detect
-    isColumnExpanded.value = shouldExpandColumns(node)
-  }
   
   // Create extended fields evaluator
   const extFunc = createExtendedFieldsFunc(extendedFields.value)
@@ -299,12 +343,13 @@ function buildTableInternal(node: TDNode | null) {
       for (const grandChild of child.children) {
         const field = grandChild.key!
         if (!columns.value.find(c => c.field === field)) {
+          const visible = savedColumnVisibility?.get(field) ?? true
           columns.value.push({
             field,
             header: field,
             sortable: true,
             filterable: true,
-            visible: true,
+            visible,
           })
         }
         row[field] = grandChild
@@ -312,12 +357,13 @@ function buildTableInternal(node: TDNode | null) {
     } else {
       // Just add value column
       if (!columns.value.find(c => c.field === COL_VALUE)) {
+        const visible = savedColumnVisibility?.get(COL_VALUE) ?? true
         columns.value.push({
           field: COL_VALUE,
           header: COL_VALUE,
           sortable: true,
           filterable: true,
-          visible: true,
+          visible,
         })
       }
       row[COL_VALUE] = child
@@ -339,6 +385,9 @@ function buildTableInternal(node: TDNode | null) {
     
     tableData.value.push(row)
   }
+  
+  // Clear saved visibility after build is complete
+  savedColumnVisibility = null
   
   // Update column visibility state for selector
   columnVisibility.value = columns.value.map(c => ({
@@ -380,9 +429,49 @@ function clearAllFilters() {
   fieldQueries.value = {}
 }
 
+function filterCellValue(field: string, value: any, isNegate: boolean) {
+  const strValue = value === null || value === undefined 
+    ? '' 
+    : typeof value === 'object' && 'value' in value 
+      ? String((value as TDNode).value) 
+      : String(value)
+  
+  const currentFq = fieldQueries.value[field]
+  
+  // If existing filter has different negate mode, override it
+  if (currentFq && currentFq.isArray && currentFq.isNegate !== isNegate) {
+    fieldQueries.value[field] = {
+      query: strValue,
+      isRegex: false,
+      isNegate: isNegate,
+      isArray: true
+    }
+    return
+  }
+  
+  // Add to existing array filter or create new one
+  if (currentFq && currentFq.isArray && currentFq.query) {
+    const existingValues = currentFq.query.split(',').map(v => v.trim())
+    if (!existingValues.includes(strValue)) {
+      existingValues.push(strValue)
+      fieldQueries.value[field] = {
+        ...currentFq,
+        query: existingValues.join(',')
+      }
+    }
+  } else {
+    fieldQueries.value[field] = {
+      query: strValue,
+      isRegex: false,
+      isNegate: isNegate,
+      isArray: true
+    }
+  }
+}
+
 function rebuildTable() {
   const node = localSelectedNode.value
-  if (node) buildTable(toRaw(node))
+  if (node) buildTable(toRaw(node), false)
   first.value = 0
 }
 
@@ -431,7 +520,7 @@ watch(isColumnExpanded, () => {
   const node = localSelectedNode.value
   if (node) {
     saveCurrentTableState()
-    buildTable(toRaw(node))
+    buildTable(toRaw(node), false)
   }
   logger.log(`isColumnExpanded changed end`)
 })
@@ -497,7 +586,7 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
           icon="pi pi-copy"
           size="small"
           text
-          @click="copyAsJSON(filteredData as any)"
+          @click="copyAsJSON(filteredData as any, visibleColumns as any)"
           v-tooltip.top="'Copy as JSON'"
         />
         
@@ -505,7 +594,7 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
           icon="pi pi-file-export"
           size="small"
           text
-          @click="copyAsCSV(filteredData as any, columns as any)"
+          @click="copyAsCSV(filteredData as any, visibleColumns as any)"
           v-tooltip.top="'Copy as CSV'"
         />
         
@@ -600,13 +689,6 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
           @blur="rebuildTable"
           @enter="rebuildTable"
         />
-        <Button
-          icon="pi pi-play"
-          size="small"
-          severity="success"
-          @click="rebuildTable"
-          v-tooltip.top="'Apply extended fields'"
-        />
       </label>
       <div class="extended-fields-help">
         <small>
@@ -614,14 +696,6 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
           Spread arrays/objects: <code>items_: $.children</code> (adds items_0, items_1, ...)
         </small>
       </div>
-    </div>
-    
-    <!-- Filter Summary -->
-    <div v-if="activeFilterCount > 0" class="filter-summary">
-      <span class="filter-summary-text">
-        <i class="pi pi-filter"></i>
-        {{ filteredData.length }} / {{ tableData.length }} rows
-      </span>
     </div>
     
     <div class="table-content">
@@ -666,45 +740,63 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
             </div>
           </template>
           <template #body="{ data }">
-            <div class="cell-wrapper" v-tooltip.top="getCellTimestampHint(data, col.field)">
-              <template v-if="isKeyColumn(col.field)">
-                <a 
-                  href="#" 
-                  class="key-link"
-                  @click.prevent="nodeClicked(getRowNodePath(data))"
+            <div class="cell-wrapper">
+              <div class="cell-content" v-tooltip.top="getCellTimestampHint(data, col.field)">
+                <template v-if="isKeyColumn(col.field)">
+                  <a 
+                    href="#" 
+                    class="key-link"
+                    @click.prevent="nodeClicked(getRowNodePath(data))"
+                  >
+                    {{ getCellValue(data, col.field) }}
+                  </a>
+                </template>
+                <template v-else-if="isComplexValue(data, col.field)">
+                  <a 
+                    href="#" 
+                    class="complex-value-link"
+                    @click.prevent="nodeClicked(['', ...getCellNode(data, col.field)!.path])"
+                  >
+                    <span class="complex-value-summary" :style="{ whiteSpace: whiteSpaceStyle }">
+                      {{ getComplexValueSummary(data, col.field) }}
+                    </span>
+                  </a>
+                </template>
+                <template v-else-if="getCellNode(data, col.field)">
+                  <SimpleValue
+                    :tnode="getCellNode(data, col.field)!"
+                    :is-in-table="true"
+                    :text-wrap="textWrap"
+                    @node-clicked="nodeClicked([$event])"
+                  />
+                </template>
+                <template v-else>
+                  <span>{{ getCellValue(data, col.field) }}</span>
+                </template>
+              </div>
+              <div class="cell-button-bar">
+                <button 
+                  class="cell-action-btn cell-copy-btn"
+                  title="Copy cell"
+                  @click.stop="copyCellValue(data, col.field)"
                 >
-                  {{ getCellValue(data, col.field) }}
-                </a>
-              </template>
-              <template v-else-if="isComplexValue(data, col.field)">
-                <a 
-                  href="#" 
-                  class="complex-value-link"
-                  @click.prevent="nodeClicked(['', ...getCellNode(data, col.field)!.path])"
+                  <i class="pi pi-copy"></i>
+                </button>
+                <button 
+                  class="cell-action-btn cell-filter-in"
+                  title="Filter in this value"
+                  @click.stop="filterCellValue(col.field, data[col.field], false)"
                 >
-                  <span class="complex-value-summary" :style="{ whiteSpace: whiteSpaceStyle }">
-                    {{ getComplexValueSummary(data, col.field) }}
-                  </span>
-                </a>
-              </template>
-              <template v-else-if="getCellNode(data, col.field)">
-                <SimpleValue
-                  :tnode="getCellNode(data, col.field)!"
-                  :is-in-table="true"
-                  :text-wrap="textWrap"
-                  @node-clicked="nodeClicked([$event])"
-                />
-              </template>
-              <template v-else>
-                <span>{{ getCellValue(data, col.field) }}</span>
-              </template>
-              <button 
-                class="cell-copy-btn"
-                title="Copy cell"
-                @click.stop="copyCellValue(data, col.field)"
-              >
-                <i class="pi pi-copy"></i>
-              </button>
+                  <i class="pi pi-filter"></i>
+                </button>
+                <button 
+                  class="cell-action-btn cell-filter-out"
+                  title="Filter out this value"
+                  @click.stop="filterCellValue(col.field, data[col.field], true)"
+                >
+                  <i class="pi pi-filter-slash"></i>
+                </button>
+              </div>
             </div>
           </template>
         </Column>
@@ -724,7 +816,19 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
         :totalRecords="filteredData.length"
         :rowsPerPageOptions="[50, 100, 200, 500, 1000]"
         @page="onPage"
-      />
+      >
+        <template #end>
+          <span class="paginator-total">
+            <template v-if="activeFilterCount > 0">
+              <i class="pi pi-filter"></i>
+              {{ filteredData.length }} / {{ tableData.length }}
+            </template>
+            <template v-else>
+              Total: {{ tableData.length }}
+            </template>
+          </span>
+        </template>
+      </Paginator>
     </div>
   </div>
 </template>
@@ -832,31 +936,43 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
   font-size: 0.7rem;
 }
 
-.filter-summary {
-  padding: 6px 12px;
-  background: var(--tdv-selection-bg);
-  border-bottom: 1px solid var(--tdv-surface-border);
-  font-size: 0.85rem;
-}
-
-.filter-summary-text {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--tdv-primary);
-  font-weight: 500;
-}
-
 .table-content {
   flex: 1;
   min-height: 0;
   overflow: auto;
 }
 
+.table-content :deep(.p-datatable) {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+}
+
+.table-content :deep(.p-datatable-wrapper) {
+  overflow: auto;
+  flex: 1;
+  min-height: 0;
+}
+
 .table-content :deep(.p-paginator) {
   border-top: 1px solid var(--tdv-surface-border);
   padding: 8px;
   background: var(--tdv-surface);
+  flex-shrink: 0;
+}
+
+.paginator-total {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.85rem;
+  color: var(--tdv-text-muted);
+  margin-left: 8px;
+}
+
+.paginator-total .pi-filter {
+  color: var(--tdv-primary);
 }
 
 .column-header {
@@ -958,50 +1074,82 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
 }
 
 .cell-wrapper {
-  display: inline;
   position: relative;
+  display: inline-block;
+  width: 100%;
 }
 
-.cell-copy-btn {
+.cell-content {
+  width: 100%;
+}
+
+.cell-button-bar {
   position: absolute;
-  right: 100%;
   top: 50%;
+  right: 4px;
   transform: translateY(-50%);
-  margin-right: 0px;
-  background: var(--tdv-surface);
-  border: 1px solid var(--tdv-surface-border);
-  cursor: pointer;
-  color: var(--tdv-text-muted);
+  display: flex;
+  gap: 2px;
   padding: 2px 4px;
+  background: rgba(var(--tdv-surface-rgb, 255, 255, 255), 0.5);
+  backdrop-filter: blur(4px);
+  border: 1px solid var(--tdv-surface-border);
   border-radius: 4px;
-  font-size: 0.7rem;
   opacity: 0;
-  transition: opacity 0.15s, color 0.15s, background 0.15s;
+  transition: opacity 0.15s;
   transition-delay: 0s;
   z-index: 10;
-  white-space: nowrap;
+  pointer-events: none;
 }
 
-.cell-wrapper:hover .cell-copy-btn {
-  opacity: 0.85;
-  transition-delay: 200ms;
+/* For first column: position on left to avoid going off-screen */
+:deep(.p-datatable-tbody > tr > td:first-child) .cell-button-bar {
+  right: auto;
+  left: 4px;
 }
 
-.cell-copy-btn:hover {
-  opacity: 1 !important;
-  color: var(--tdv-primary);
+/* Show button bar when hovering cell wrapper */
+.cell-wrapper:hover .cell-button-bar {
+  opacity: 1;
+  transition-delay: 100ms;
+  pointer-events: auto;
+}
+
+.cell-action-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--tdv-text-muted);
+  padding: 3px 5px;
+  border-radius: 3px;
+  font-size: 1rem;
+  transition: color 0.15s, background 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cell-action-btn:hover {
   background: var(--tdv-hover-bg);
 }
 
-.cell-copy-btn i {
+.cell-copy-btn:hover {
+  color: var(--tdv-primary);
+}
+
+.cell-filter-in:hover {
+  color: var(--tdv-success);
+}
+
+.cell-filter-out:hover {
+  color: var(--tdv-danger);
+}
+
+.cell-action-btn i {
   font-size: 11px;
 }
 
 /* PrimeVue DataTable overrides */
-:deep(.p-datatable) {
-  width: 100%;
-}
-
 :deep(.p-datatable-thead > tr > th) {
   background: var(--tdv-surface-light);
   color: var(--tdv-text);

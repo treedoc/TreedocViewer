@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue'
+import { debounce } from 'lodash-es'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import Button from 'primevue/button'
@@ -73,12 +74,18 @@ function applyFilter() {
   })
 }
 
+// Debounced version for input changes
+const debouncedApplyFilter = debounce(() => {
+  applyFilter()
+}, 300)
+
 function close() {
   emit('update:visible', false)
 }
 
 function handleKeydown(e: KeyboardEvent) {
   if (e.key === 'Enter') {
+    debouncedApplyFilter.cancel() // Cancel pending debounced call
     applyFilter()
     close()
   } else if (e.key === 'Escape') {
@@ -193,7 +200,7 @@ function copyStats() {
           :placeholder="`Search ${field}...`"
           class="filter-input"
           @keydown="handleKeydown"
-          @input="applyFilter"
+          @input="debouncedApplyFilter"
         />
         <Button
           icon="pi pi-times"

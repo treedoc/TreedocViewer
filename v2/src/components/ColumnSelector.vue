@@ -102,14 +102,13 @@ function close() {
           v-for="col in filteredColumns"
           :key="col.field"
           class="column-item"
-          @click="toggleColumn(col)"
         >
           <Checkbox
             :modelValue="col.visible"
             :binary="true"
-            @click.stop="toggleColumn(col)"
+            @update:modelValue="toggleColumn(col)"
           />
-          <span class="column-name" :class="{ 'column-hidden': !col.visible }">
+          <span class="column-name" @click="toggleColumn(col)">
             {{ col.header }}
           </span>
           <span class="column-field">{{ col.field !== col.header ? col.field : '' }}</span>
@@ -178,11 +177,6 @@ function close() {
   flex: 1;
   font-weight: 500;
   color: var(--tdv-text);
-}
-
-.column-name.column-hidden {
-  color: var(--tdv-text-muted);
-  text-decoration: line-through;
 }
 
 .column-field {

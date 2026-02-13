@@ -64,11 +64,13 @@ const sourceVisible = computed(() => showSource.value && (maxPane.value === '' |
 const treeVisible = computed(() => showTree.value && (maxPane.value === '' || maxPane.value === 'tree'))
 const tableVisible = computed(() => showTable.value && (maxPane.value === '' || maxPane.value === 'table'))
 
-const visiblePaneCount = computed(() => 
-  [sourceVisible.value, treeVisible.value, tableVisible.value].filter(Boolean).length
-)
+// Pane size management - only set initial sizes, let splitpanes handle the rest
+const splitpanesKey = ref(0)
 
-const paneSize = computed(() => 100 / visiblePaneCount.value)
+// Force re-render splitpanes when visibility changes
+watch([showSource, showTree, showTable, maxPane], () => {
+  splitpanesKey.value++
+})
 
 function openFile() {
   fileInputRef.value?.click()
@@ -334,8 +336,8 @@ defineExpose({ openUrl })
     
     <!-- Split Panes -->
     <div class="split-container">
-      <Splitpanes class="default-theme" :horizontal="false">
-        <Pane v-if="sourceVisible" :size="maxPane === 'source' ? 100 : paneSize">
+      <Splitpanes :key="splitpanesKey" class="default-theme" :horizontal="false">
+        <Pane v-if="sourceVisible">
           <div 
             class="pane-wrapper"
             :class="{ 'pane-focused': currentPane === 'source' }"
@@ -347,7 +349,7 @@ defineExpose({ openUrl })
           </div>
         </Pane>
         
-        <Pane v-if="treeVisible" :size="maxPane === 'tree' ? 100 : paneSize">
+        <Pane v-if="treeVisible">
           <div 
             class="pane-wrapper"
             :class="{ 'pane-focused': currentPane === 'tree' }"
@@ -363,7 +365,7 @@ defineExpose({ openUrl })
           </div>
         </Pane>
         
-        <Pane v-if="tableVisible" :size="maxPane === 'table' ? 100 : paneSize">
+        <Pane v-if="tableVisible">
           <div 
             class="pane-wrapper"
             :class="{ 'pane-focused': currentPane === 'table' }"

@@ -9,11 +9,10 @@ import { EditorState, StateEffect, StateField } from '@codemirror/state'
 import { useTreeStore } from '../stores/treeStore'
 import { useThemeStore } from '../stores/themeStore'
 import { storeToRefs } from 'pinia'
-import Textarea from 'primevue/textarea'
 import ToggleButton from 'primevue/togglebutton'
 
 const SIZE_LIMIT_FOR_READONLY = 10_000_000
-const SIZE_LIMIT_FOR_CODE_VIEW = 200_000
+const SIZE_LIMIT_FOR_CODE_VIEW = 1000_000
 
 const store = useTreeStore()
 const themeStore = useThemeStore()
@@ -86,7 +85,7 @@ const extensions = computed(() => {
 const editorKey = computed(() => `editor-${isDarkMode.value ? 'dark' : 'light'}`)
 
 const isReadonly = computed(() => rawText.value.length > SIZE_LIMIT_FOR_READONLY)
-const shouldUseCodeView = computed(() => codeView.value && rawText.value.length < SIZE_LIMIT_FOR_CODE_VIEW)
+const shouldUseCodeView = computed(() => codeView.value)
 
 const truncatedText = computed(() => {
   if (rawText.value.length > SIZE_LIMIT_FOR_READONLY) {
@@ -151,8 +150,9 @@ watch(rawText, (text) => {
           offLabel="Text"
           onIcon="pi pi-code"
           offIcon="pi pi-align-left"
-          :disabled="rawText.length > SIZE_LIMIT_FOR_CODE_VIEW"
-          v-tooltip.top="'Toggle syntax highlighting'"
+          v-tooltip.top="rawText.length > SIZE_LIMIT_FOR_CODE_VIEW 
+            ? 'Large file (' + (rawText.length / 1000).toFixed(0) + 'KB) - Code view may be slow' 
+            : 'Toggle syntax highlighting'"
         />
         <span v-if="isReadonly" class="readonly-badge">
           <i class="pi pi-lock"></i> Read-only ({{ (rawText.length / 1_000_000).toFixed(1) }}MB)
@@ -171,12 +171,11 @@ watch(rawText, (text) => {
         @ready="handleReady"
       />
       
-      <Textarea
+      <textarea
         v-else-if="!isReadonly"
         v-model="localText"
         class="source-textarea"
-        autoResize
-        @update:modelValue="handleChange"
+        @input="handleChange(($event.target as HTMLTextAreaElement).value)"
       />
       
       <div v-else class="readonly-view">
@@ -227,11 +226,13 @@ watch(rawText, (text) => {
 .source-content {
   flex: 1;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .source-textarea {
+  flex: 1;
   width: 100%;
-  height: 100%;
   resize: none;
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
   font-size: 13px;
@@ -241,6 +242,7 @@ watch(rawText, (text) => {
   padding: 12px;
   outline: none;
   line-height: 1.5;
+  overflow: auto;
 }
 
 .readonly-view {

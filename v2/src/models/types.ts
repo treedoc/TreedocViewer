@@ -30,8 +30,10 @@ export interface Selection {
 }
 
 export interface FieldQuery {
-  filter: string
-  sortDir: 'asc' | 'desc' | ''
+  query: string
+  isRegex: boolean
+  isNegate: boolean
+  isArray: boolean
 }
 
 export interface Query {
@@ -82,7 +84,9 @@ export function createDefaultQuery(): Query {
 
 export function createDefaultFieldQuery(): FieldQuery {
   return {
-    filter: '',
-    sortDir: '',
+    query: '',
+    isRegex: false,
+    isNegate: false,
+    isArray: false,
   }
 }
