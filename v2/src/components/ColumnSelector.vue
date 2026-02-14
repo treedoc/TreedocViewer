@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { debounce } from 'lodash-es'
 import Dialog from 'primevue/dialog'
 import Checkbox from 'primevue/checkbox'
 import Button from 'primevue/button'
@@ -23,37 +24,55 @@ const emit = defineEmits<{
 
 const searchQuery = ref('')
 
+// Local state for immediate UI updates
+const localColumns = ref<ColumnVisibility[]>([])
+
+// Sync local columns with props
+watch(() => props.columns, (cols) => {
+  localColumns.value = cols.map(c => ({ ...c }))
+}, { immediate: true, deep: true })
+
 const filteredColumns = computed(() => {
-  if (!searchQuery.value) return props.columns
+  if (!searchQuery.value) return localColumns.value
   const query = searchQuery.value.toLowerCase()
-  return props.columns.filter(col => 
+  return localColumns.value.filter(col => 
     col.header.toLowerCase().includes(query) || 
     col.field.toLowerCase().includes(query)
   )
 })
 
-const visibleCount = computed(() => props.columns.filter(c => c.visible).length)
-const totalCount = computed(() => props.columns.length)
+const visibleCount = computed(() => localColumns.value.filter(c => c.visible).length)
+const totalCount = computed(() => localColumns.value.length)
+
+// Debounced emit to parent
+const debouncedEmit = debounce((cols: ColumnVisibility[]) => {
+  emit('update:columns', cols)
+}, 1000)
 
 function toggleColumn(col: ColumnVisibility) {
-  const updated = props.columns.map(c => 
-    c.field === col.field ? { ...c, visible: !c.visible } : c
-  )
-  emit('update:columns', updated)
+  // Update local state immediately for responsive UI
+  const found = localColumns.value.find(c => c.field === col.field)
+  if (found) {
+    found.visible = !found.visible
+  }
+  // Debounce the emit to parent
+  debouncedEmit([...localColumns.value])
 }
 
 function showAll() {
-  const updated = props.columns.map(c => ({ ...c, visible: true }))
-  emit('update:columns', updated)
+  localColumns.value.forEach(c => c.visible = true)
+  debouncedEmit([...localColumns.value])
 }
 
 function hideAll() {
   // Keep at least the first column visible
-  const updated = props.columns.map((c, i) => ({ ...c, visible: i === 0 }))
-  emit('update:columns', updated)
+  localColumns.value.forEach((c, i) => c.visible = i === 0)
+  debouncedEmit([...localColumns.value])
 }
 
 function close() {
+  // Flush any pending debounced updates
+  debouncedEmit.flush()
   emit('update:visible', false)
 }
 </script>

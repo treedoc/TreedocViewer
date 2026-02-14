@@ -34,6 +34,8 @@ export interface FieldQuery {
   isRegex: boolean
   isNegate: boolean
   isArray: boolean
+  isPattern: boolean
+  patternFields: string[]
 }
 
 export interface Query {
@@ -88,5 +90,7 @@ export function createDefaultFieldQuery(): FieldQuery {
     isRegex: false,
     isNegate: false,
     isArray: false,
+    isPattern: false,
+    patternFields: [],
   }
 }

@@ -13,6 +13,8 @@ export interface FieldQuery {
   isRegex: boolean
   isNegate: boolean
   isArray: boolean
+  isPattern: boolean
+  patternFields: string[]  // Extracted field names from pattern
 }
 
 export interface ColumnStatistic {
@@ -47,6 +49,7 @@ const localQuery = ref(props.fieldQuery.query)
 const localIsRegex = ref(props.fieldQuery.isRegex)
 const localIsNegate = ref(props.fieldQuery.isNegate)
 const localIsArray = ref(props.fieldQuery.isArray)
+const localIsPattern = ref(props.fieldQuery.isPattern || false)
 
 // Sync with props
 watch(() => props.fieldQuery, (fq) => {
@@ -54,7 +57,14 @@ watch(() => props.fieldQuery, (fq) => {
   localIsRegex.value = fq.isRegex
   localIsNegate.value = fq.isNegate
   localIsArray.value = fq.isArray
+  localIsPattern.value = fq.isPattern || false
 }, { immediate: true })
+
+// Extract field names from pattern (e.g., "Order:${orderId}" -> ["orderId"])
+function extractPatternFields(pattern: string): string[] {
+  const matches = pattern.matchAll(/\$\{(\w+)\}/g)
+  return [...matches].map(m => m[1])
+}
 
 // Auto-focus input when dialog opens
 watch(() => props.visible, (visible) => {
@@ -66,11 +76,14 @@ watch(() => props.visible, (visible) => {
 })
 
 function applyFilter() {
+  const patternFields = localIsPattern.value ? extractPatternFields(localQuery.value) : []
   emit('update:fieldQuery', {
     query: localQuery.value,
     isRegex: localIsRegex.value,
     isNegate: localIsNegate.value,
     isArray: localIsArray.value,
+    isPattern: localIsPattern.value,
+    patternFields,
   })
 }
 
@@ -98,8 +111,15 @@ function clearFilter() {
   localIsRegex.value = false
   localIsNegate.value = false
   localIsArray.value = false
+  localIsPattern.value = false
   applyFilter()
 }
+
+// Preview of extracted fields from pattern
+const previewPatternFields = computed(() => {
+  if (!localIsPattern.value || !localQuery.value) return []
+  return extractPatternFields(localQuery.value)
+})
 
 // Calculate column statistics
 const columnStats = computed<ColumnStatistic>(() => {
@@ -187,7 +207,7 @@ function copyStats() {
     @update:visible="emit('update:visible', $event)"
     :header="`Filter: ${title}`"
     :modal="true"
-    :style="{ width: '420px' }"
+    :style="{ width: '550px' }"
     :dismissableMask="true"
     class="filter-dialog"
   >
@@ -221,6 +241,7 @@ function copyStats() {
           @change="applyFilter"
           v-tooltip.top="'Negate filter (exclude matches)'"
           class="filter-option-btn"
+          :disabled="localIsPattern"
         />
         <ToggleButton
           v-model="localIsRegex"
@@ -229,6 +250,7 @@ function copyStats() {
           @change="applyFilter"
           v-tooltip.top="'Regex matching'"
           class="filter-option-btn"
+          :disabled="localIsPattern"
         />
         <ToggleButton
           v-model="localIsArray"
@@ -237,6 +259,15 @@ function copyStats() {
           @change="applyFilter"
           v-tooltip.top="'Array (comma-separated values)'"
           class="filter-option-btn"
+          :disabled="localIsPattern"
+        />
+        <ToggleButton
+          v-model="localIsPattern"
+          onLabel="${}"
+          offLabel="${}"
+          @change="applyFilter"
+          v-tooltip.top="'Pattern match with placeholders (e.g., Order:${orderId})'"
+          class="filter-option-btn pattern-btn"
         />
         <Button
           :icon="showStats ? 'pi pi-chevron-up' : 'pi pi-chart-bar'"
@@ -246,6 +277,17 @@ function copyStats() {
           @click="showStats = !showStats"
           v-tooltip.top="'Show column statistics'"
         />
+      </div>
+      
+      <!-- Pattern Fields Preview -->
+      <div v-if="localIsPattern && previewPatternFields.length > 0" class="pattern-preview">
+        <span class="pattern-preview-label">Extracted columns:</span>
+        <span v-for="field in previewPatternFields" :key="field" class="pattern-field-tag">
+          {{ field }}
+        </span>
+      </div>
+      <div v-if="localIsPattern && localQuery && previewPatternFields.length === 0" class="pattern-hint">
+        Use ${name} to extract values, e.g., "Order:${orderId}"
       </div>
       
       <!-- Statistics Panel -->
@@ -363,12 +405,48 @@ function copyStats() {
   font-weight: 600;
 }
 
+.pattern-btn {
+  min-width: 45px;
+}
+
+.pattern-preview {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px;
+  background: var(--tdv-surface-light);
+  border-radius: var(--tdv-radius-sm);
+  border: 1px solid var(--tdv-success);
+}
+
+.pattern-preview-label {
+  font-size: 0.8rem;
+  color: var(--tdv-text-muted);
+}
+
+.pattern-field-tag {
+  padding: 2px 8px;
+  background: var(--tdv-success);
+  color: white;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+}
+
+.pattern-hint {
+  font-size: 0.8rem;
+  color: var(--tdv-text-muted);
+  font-style: italic;
+}
+
 .stats-panel {
   background: var(--tdv-surface-light);
   border: 1px solid var(--tdv-surface-border);
   border-radius: var(--tdv-radius-sm);
   padding: 12px;
-  max-height: 350px;
+  max-height: 500px;
   overflow-y: auto;
 }
 

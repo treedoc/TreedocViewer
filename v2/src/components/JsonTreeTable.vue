@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { Splitpanes, Pane } from 'splitpanes'
 import 'splitpanes/dist/splitpanes.css'
 import Button from 'primevue/button'
@@ -149,10 +149,6 @@ function onKeyDown(event: KeyboardEvent, pane: string) {
   }
   
   switch (event.key) {
-    case 'f':
-      event.preventDefault()
-      store.toggleMaxPane(pane)
-      break
     case 'w':
       event.preventDefault()
       store.textWrap = !store.textWrap
@@ -189,8 +185,49 @@ watch(() => props.initialPath, (path) => {
   }
 }, { immediate: true })
 
+// Global keyboard handler for fullscreen toggle
+function handleGlobalKeydown(event: KeyboardEvent) {
+  // Ignore if typing in an input field
+  const target = event.target as HTMLElement
+  if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+    return
+  }
+  
+  // Ignore if modifier keys are pressed
+  if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) {
+    return
+  }
+  
+  // Ignore if a dialog is open (let dialog handle its own Escape)
+  if (document.querySelector('.p-dialog-mask')) {
+    return
+  }
+  
+  if (event.key === 'Escape') {
+    // Escape only exits fullscreen
+    if (maxPane.value) {
+      event.preventDefault()
+      store.toggleMaxPane(maxPane.value)
+    }
+  } else if (event.key === 'f') {
+    event.preventDefault()
+    if (maxPane.value) {
+      // Exit fullscreen
+      store.toggleMaxPane(maxPane.value)
+    } else {
+      // Enter fullscreen for current pane
+      store.toggleMaxPane(currentPane.value)
+    }
+  }
+}
+
 onMounted(() => {
   emit('ready')
+  document.addEventListener('keydown', handleGlobalKeydown)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('keydown', handleGlobalKeydown)
 })
 
 // Expose for parent access

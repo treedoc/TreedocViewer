@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, reactive, toRaw, shallowRef } from 'vue'
+import { ref, computed, watch, reactive, toRaw, shallowRef, onBeforeUnmount } from 'vue'
 import type { TDNode } from 'treedoc'
 import { TDNodeType } from 'treedoc'
 import DataTable from 'primevue/datatable'
@@ -30,7 +30,7 @@ import {
   copyAsCSV,
   shouldExpandColumns
 } from '@/utils/TableUtil'
-import { matchFieldQuery, createExtendedFieldsFunc } from '@/utils/QueryUtil'
+import { matchFieldQuery, matchPattern, createExtendedFieldsFunc } from '@/utils/QueryUtil'
 
 const logger = new Logger('TableView')
 const COL_VALUE = '@value'
@@ -93,6 +93,8 @@ function createFieldQuery(): FieldQuery {
     isRegex: false,
     isNegate: false,
     isArray: false,
+    isPattern: false,
+    patternFields: [],
   }
 }
 
@@ -164,22 +166,74 @@ function updateFieldQuery(query: FieldQuery) {
 }
 
 
+// Track pattern-extracted columns
+const patternExtractedColumns = ref<Set<string>>(new Set())
+
 const filteredData = computed(() => {
   let data = [...tableData.value]
   logger.log(`Filtering data: initial count=${data.length}`)
+  
+  // Clear and rebuild pattern extracted columns
+  const newPatternColumns = new Set<string>()
+  
   // Apply field queries
   for (const [field, fq] of Object.entries(fieldQueries.value)) {
     if (fq.query) {
-      data = data.filter(row => {
-        const value = row[field]
-        if (value === undefined || value === null) {
-          return matchFieldQuery('', fq)
+      if (fq.isPattern && fq.patternFields && fq.patternFields.length > 0) {
+        // Pattern matching with value extraction
+        const filteredRows: typeof data = []
+        for (const row of data) {
+          const value = row[field]
+          const strValue = value === undefined || value === null 
+            ? ''
+            : (typeof value === 'object' && 'value' in value 
+              ? String((value as TDNode).value) 
+              : String(value))
+          
+          const extracted = matchPattern(strValue, fq.query)
+          if (extracted) {
+            // Create a new row object with extracted values
+            const newRow = { ...row }
+            for (const [key, val] of Object.entries(extracted)) {
+              const colName = `⊛${key}`
+              newRow[colName] = val
+              newPatternColumns.add(colName)
+            }
+            filteredRows.push(newRow)
+          }
         }
-        const strValue = typeof value === 'object' && 'value' in value 
-          ? String((value as TDNode).value) 
-          : String(value)
-        return matchFieldQuery(strValue, fq)
-      })
+        data = filteredRows
+      } else {
+        // Standard filtering
+        data = data.filter(row => {
+          const value = row[field]
+          if (value === undefined || value === null) {
+            return matchFieldQuery('', fq)
+          }
+          const strValue = typeof value === 'object' && 'value' in value 
+            ? String((value as TDNode).value) 
+            : String(value)
+          return matchFieldQuery(strValue, fq)
+        })
+      }
+    }
+  }
+  
+  // Update pattern extracted columns and add to columns list
+  if (newPatternColumns.size !== patternExtractedColumns.value.size ||
+      [...newPatternColumns].some(c => !patternExtractedColumns.value.has(c))) {
+    patternExtractedColumns.value = newPatternColumns
+    // Add pattern columns to the columns list if not already present
+    for (const colName of newPatternColumns) {
+      if (!columns.value.find(c => c.field === colName)) {
+        columns.value.push({
+          field: colName,
+          header: colName,
+          sortable: true,
+          filterable: true,
+          visible: true,
+        })
+      }
     }
   }
   
@@ -444,7 +498,9 @@ function filterCellValue(field: string, value: any, isNegate: boolean) {
       query: strValue,
       isRegex: false,
       isNegate: isNegate,
-      isArray: true
+      isArray: true,
+      isPattern: false,
+      patternFields: []
     }
     return
   }
@@ -464,7 +520,9 @@ function filterCellValue(field: string, value: any, isNegate: boolean) {
       query: strValue,
       isRegex: false,
       isNegate: isNegate,
-      isArray: true
+      isArray: true,
+      isPattern: false,
+      patternFields: []
     }
   }
 }
@@ -487,7 +545,7 @@ function saveCurrentTableState() {
         sortDir,
         jsQuery: jsQuery.value,
         extendedFields: extendedFields.value,
-        fieldQueries: {}
+        fieldQueries: { ...fieldQueries.value }
       },
       expandedLevel: expandState.expandLevel,
       columns: columns.value.map(c => ({ field: c.field, visible: c.visible })),
@@ -495,6 +553,11 @@ function saveCurrentTableState() {
     })
   }
 }
+
+// Save state before component unmounts (e.g., when toggling fullscreen)
+onBeforeUnmount(() => {
+  saveCurrentTableState()
+})
 
 watch(
   () => store.nodeVersion,
@@ -1102,10 +1165,10 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
   pointer-events: none;
 }
 
-/* For first column: position on left to avoid going off-screen */
+/* For first column (key column): position to the right of text with offset to expose the link */
 :deep(.p-datatable-tbody > tr > td:first-child) .cell-button-bar {
   right: auto;
-  left: 4px;
+  left: 1.5em;  /* Leave at least 1-2 characters visible */
 }
 
 /* Show button bar when hovering cell wrapper */
