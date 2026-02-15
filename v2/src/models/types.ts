@@ -35,6 +35,7 @@ export interface FieldQuery {
   isNegate: boolean
   isArray: boolean
   isPattern: boolean
+  isDisabled: boolean
   patternFields: string[]
 }
 
@@ -91,6 +92,7 @@ export function createDefaultFieldQuery(): FieldQuery {
     isNegate: false,
     isArray: false,
     isPattern: false,
+    isDisabled: false,
     patternFields: [],
   }
 }

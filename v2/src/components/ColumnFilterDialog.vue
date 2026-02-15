@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
 import { debounce } from 'lodash-es'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
@@ -14,6 +14,7 @@ export interface FieldQuery {
   isNegate: boolean
   isArray: boolean
   isPattern: boolean
+  isDisabled: boolean  // Keep filter config but don't apply
   patternFields: string[]  // Extracted field names from pattern
 }
 
@@ -44,12 +45,53 @@ const emit = defineEmits<{
 }>()
 
 const inputRef = ref<HTMLInputElement>()
+const textareaRef = ref<HTMLTextAreaElement>()
 const showStats = ref(false)
 const localQuery = ref(props.fieldQuery.query)
 const localIsRegex = ref(props.fieldQuery.isRegex)
 const localIsNegate = ref(props.fieldQuery.isNegate)
 const localIsArray = ref(props.fieldQuery.isArray)
 const localIsPattern = ref(props.fieldQuery.isPattern || false)
+const localIsDisabled = ref(props.fieldQuery.isDisabled || false)
+
+// Resize functionality
+const dialogWidth = ref(550)
+const dialogHeight = ref(500)
+const isResizing = ref(false)
+const resizeStartX = ref(0)
+const resizeStartY = ref(0)
+const resizeStartWidth = ref(0)
+const resizeStartHeight = ref(0)
+
+function startResize(e: MouseEvent) {
+  e.preventDefault()
+  isResizing.value = true
+  resizeStartX.value = e.clientX
+  resizeStartY.value = e.clientY
+  resizeStartWidth.value = dialogWidth.value
+  resizeStartHeight.value = dialogHeight.value
+  document.addEventListener('mousemove', onResize)
+  document.addEventListener('mouseup', stopResize)
+}
+
+function onResize(e: MouseEvent) {
+  if (!isResizing.value) return
+  const deltaX = e.clientX - resizeStartX.value
+  const deltaY = e.clientY - resizeStartY.value
+  dialogWidth.value = Math.max(350, Math.min(window.innerWidth * 0.9, resizeStartWidth.value + deltaX))
+  dialogHeight.value = Math.max(300, Math.min(window.innerHeight * 0.9, resizeStartHeight.value + deltaY))
+}
+
+function stopResize() {
+  isResizing.value = false
+  document.removeEventListener('mousemove', onResize)
+  document.removeEventListener('mouseup', stopResize)
+}
+
+onBeforeUnmount(() => {
+  document.removeEventListener('mousemove', onResize)
+  document.removeEventListener('mouseup', stopResize)
+})
 
 // Sync with props
 watch(() => props.fieldQuery, (fq) => {
@@ -58,6 +100,7 @@ watch(() => props.fieldQuery, (fq) => {
   localIsNegate.value = fq.isNegate
   localIsArray.value = fq.isArray
   localIsPattern.value = fq.isPattern || false
+  localIsDisabled.value = fq.isDisabled || false
 }, { immediate: true })
 
 // Extract field names from pattern (e.g., "Order:${orderId}" -> ["orderId"])
@@ -70,7 +113,11 @@ function extractPatternFields(pattern: string): string[] {
 watch(() => props.visible, (visible) => {
   if (visible) {
     nextTick(() => {
-      inputRef.value?.focus()
+      if (localIsPattern.value) {
+        textareaRef.value?.focus()
+      } else {
+        inputRef.value?.focus()
+      }
     })
   }
 })
@@ -83,6 +130,7 @@ function applyFilter() {
     isNegate: localIsNegate.value,
     isArray: localIsArray.value,
     isPattern: localIsPattern.value,
+    isDisabled: localIsDisabled.value,
     patternFields,
   })
 }
@@ -106,12 +154,60 @@ function handleKeydown(e: KeyboardEvent) {
   }
 }
 
+// For textarea: Enter adds newline, Ctrl+Enter applies filter
+function handleTextareaKeydown(e: KeyboardEvent) {
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+    e.preventDefault()
+    debouncedApplyFilter.cancel()
+    applyFilter()
+    close()
+  } else if (e.key === 'Escape') {
+    close()
+  }
+}
+
 function clearFilter() {
   localQuery.value = ''
   localIsRegex.value = false
   localIsNegate.value = false
   localIsArray.value = false
   localIsPattern.value = false
+  localIsDisabled.value = false
+  applyFilter()
+}
+
+// Copy value to clipboard
+function copyValue(value: string) {
+  navigator.clipboard.writeText(value)
+}
+
+// Add value to filter (from statistics)
+function addValueToFilter(value: string, isNegate: boolean) {
+  // If current filter has different negate mode, override it
+  if (localIsArray.value && localIsNegate.value !== isNegate) {
+    localQuery.value = value
+    localIsNegate.value = isNegate
+    localIsArray.value = true
+    localIsRegex.value = false
+    localIsPattern.value = false
+    applyFilter()
+    return
+  }
+  
+  // Add to existing array filter or create new one
+  if (localIsArray.value && localQuery.value) {
+    const existingValues = localQuery.value.split(',').map(v => v.trim())
+    if (!existingValues.includes(value)) {
+      existingValues.push(value)
+      localQuery.value = existingValues.join(', ')
+    }
+  } else {
+    localQuery.value = value
+    localIsArray.value = true
+    localIsNegate.value = isNegate
+    localIsRegex.value = false
+    localIsPattern.value = false
+  }
   applyFilter()
 }
 
@@ -207,14 +303,26 @@ function copyStats() {
     @update:visible="emit('update:visible', $event)"
     :header="`Filter: ${title}`"
     :modal="true"
-    :style="{ width: '550px' }"
+    :style="{ width: dialogWidth + 'px', height: dialogHeight + 'px', minWidth: '350px', minHeight: '300px' }"
     :dismissableMask="true"
-    class="filter-dialog"
+    class="filter-dialog resizable-dialog"
   >
     <div class="filter-content">
       <!-- Filter Input -->
       <div class="filter-input-row">
+        <!-- Use textarea for pattern mode to support multi-line text -->
+        <textarea
+          v-if="localIsPattern"
+          ref="textareaRef"
+          v-model="localQuery"
+          :placeholder="`Paste multi-line pattern for ${field}...`"
+          class="filter-input filter-textarea"
+          @keydown="handleTextareaKeydown"
+          @input="debouncedApplyFilter"
+          rows="3"
+        />
         <InputText
+          v-else
           ref="inputRef"
           v-model="localQuery"
           :placeholder="`Search ${field}...`"
@@ -269,6 +377,18 @@ function copyStats() {
           v-tooltip.top="'Pattern match with placeholders (e.g., Order:${orderId})'"
           class="filter-option-btn pattern-btn"
         />
+        <div class="filter-options-separator"></div>
+        <ToggleButton
+          v-model="localIsDisabled"
+          onIcon="pi pi-pause"
+          offIcon="pi pi-pause"
+          onLabel=""
+          offLabel=""
+          @change="applyFilter"
+          v-tooltip.top="'Disable filter (keep config but don\'t apply)'"
+          class="filter-option-btn disable-btn"
+          :class="{ 'is-disabled-active': localIsDisabled }"
+        />
         <Button
           :icon="showStats ? 'pi pi-chevron-up' : 'pi pi-chart-bar'"
           size="small"
@@ -286,8 +406,11 @@ function copyStats() {
           {{ field }}
         </span>
       </div>
-      <div v-if="localIsPattern && localQuery && previewPatternFields.length === 0" class="pattern-hint">
-        Use ${name} to extract values, e.g., "Order:${orderId}"
+      <div v-if="localIsPattern" class="pattern-hint">
+        <span v-if="localQuery && previewPatternFields.length === 0">
+          Use ${name} to extract values, e.g., "Order:${orderId}"
+        </span>
+        <span>Ctrl+Enter to apply filter</span>
       </div>
       
       <!-- Statistics Panel -->
@@ -356,6 +479,29 @@ function copyStats() {
             >
               <div class="top-value-row">
                 <span class="top-value-text" :title="item.val">{{ item.val || '(empty)' }}</span>
+                <div class="top-value-actions">
+                  <button 
+                    class="stat-action-btn stat-copy-btn"
+                    title="Copy value"
+                    @click="copyValue(item.val)"
+                  >
+                    <i class="pi pi-copy"></i>
+                  </button>
+                  <button 
+                    class="stat-action-btn stat-filter-in"
+                    title="Filter in this value"
+                    @click="addValueToFilter(item.val, false)"
+                  >
+                    <i class="pi pi-filter"></i>
+                  </button>
+                  <button 
+                    class="stat-action-btn stat-filter-out"
+                    title="Filter out this value"
+                    @click="addValueToFilter(item.val, true)"
+                  >
+                    <i class="pi pi-filter-slash"></i>
+                  </button>
+                </div>
                 <span class="top-value-count">{{ item.count }}</span>
                 <span class="top-value-percent">{{ item.percent.toFixed(1) }}%</span>
               </div>
@@ -369,18 +515,59 @@ function copyStats() {
         </div>
       </div>
     </div>
-    
-    <template #footer>
-      <Button label="Close" severity="secondary" @click="close" />
-    </template>
+    <!-- Resize handle at dialog corner -->
+    <div class="resize-handle" @mousedown="startResize"></div>
   </Dialog>
 </template>
 
 <style scoped>
+/* Make dialog resizable */
+:deep(.resizable-dialog) {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+:deep(.resizable-dialog .p-dialog-content) {
+  flex: 1;
+  overflow: auto;
+  min-height: 0;
+}
+
 .filter-content {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  height: 100%;
+}
+
+/* Resize handle at bottom-right corner of dialog */
+.resize-handle {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 16px;
+  height: 16px;
+  cursor: nwse-resize;
+  z-index: 100;
+}
+
+/* Resize grip visual indicator */
+.resize-handle::after {
+  content: '';
+  position: absolute;
+  bottom: 3px;
+  right: 3px;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--tdv-text-secondary);
+  border-bottom: 2px solid var(--tdv-text-secondary);
+  opacity: 0.4;
+  transition: opacity 0.2s;
+}
+
+.resize-handle:hover::after {
+  opacity: 0.8;
 }
 
 .filter-input-row {
@@ -391,6 +578,24 @@ function copyStats() {
 
 .filter-input {
   flex: 1;
+}
+
+.filter-textarea {
+  flex: 1;
+  font-family: 'JetBrains Mono', 'Consolas', monospace;
+  font-size: 13px;
+  padding: 8px;
+  border: 1px solid var(--tdv-surface-border);
+  border-radius: var(--tdv-radius-sm);
+  resize: vertical;
+  min-height: 60px;
+  background: var(--tdv-surface-light);
+  color: var(--tdv-text-primary);
+}
+
+.filter-textarea:focus {
+  outline: none;
+  border-color: var(--tdv-primary);
 }
 
 .filter-options {
@@ -407,6 +612,23 @@ function copyStats() {
 
 .pattern-btn {
   min-width: 45px;
+}
+
+.filter-options-separator {
+  width: 1px;
+  height: 24px;
+  background: var(--tdv-surface-border);
+  margin: 0 4px;
+}
+
+.disable-btn {
+  min-width: 36px;
+}
+
+.disable-btn.is-disabled-active {
+  background: var(--tdv-warning, #f59e0b) !important;
+  border-color: var(--tdv-warning, #f59e0b) !important;
+  color: white !important;
 }
 
 .pattern-preview {
@@ -439,6 +661,9 @@ function copyStats() {
   font-size: 0.8rem;
   color: var(--tdv-text-muted);
   font-style: italic;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .stats-panel {
@@ -446,7 +671,8 @@ function copyStats() {
   border: 1px solid var(--tdv-surface-border);
   border-radius: var(--tdv-radius-sm);
   padding: 12px;
-  max-height: 500px;
+  flex: 1;
+  min-height: 150px;
   overflow-y: auto;
 }
 
@@ -513,6 +739,51 @@ function copyStats() {
   align-items: center;
   gap: 8px;
   font-size: 0.8rem;
+}
+
+.top-value-row:hover .top-value-actions {
+  opacity: 1;
+}
+
+.top-value-actions {
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.stat-action-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--tdv-text-muted);
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-size: 0.75rem;
+  transition: color 0.15s, background 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stat-action-btn:hover {
+  background: var(--tdv-hover-bg);
+}
+
+.stat-copy-btn:hover {
+  color: var(--tdv-primary);
+}
+
+.stat-filter-in:hover {
+  color: var(--tdv-success);
+}
+
+.stat-filter-out:hover {
+  color: var(--tdv-danger);
+}
+
+.stat-action-btn i {
+  font-size: 10px;
 }
 
 .top-value-text {

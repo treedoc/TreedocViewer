@@ -94,6 +94,7 @@ function createFieldQuery(): FieldQuery {
     isNegate: false,
     isArray: false,
     isPattern: false,
+    isDisabled: false,
     patternFields: [],
   }
 }
@@ -107,11 +108,16 @@ function getFieldQuery(field: string): FieldQuery {
 
 function hasActiveFilter(field: string): boolean {
   const fq = fieldQueries.value[field]
-  return fq?.query?.length > 0
+  return fq?.query?.length > 0 && !fq.isDisabled
+}
+
+function hasDisabledFilter(field: string): boolean {
+  const fq = fieldQueries.value[field]
+  return fq?.query?.length > 0 && fq.isDisabled
 }
 
 const activeFilterCount = computed(() => {
-  return Object.values(fieldQueries.value).filter(fq => fq.query?.length > 0).length
+  return Object.values(fieldQueries.value).filter(fq => fq.query?.length > 0 && !fq.isDisabled).length
 })
 
 const visibleColumns = computed(() => {
@@ -178,6 +184,9 @@ const filteredData = computed(() => {
   
   // Apply field queries
   for (const [field, fq] of Object.entries(fieldQueries.value)) {
+    // Skip disabled filters
+    if (fq.isDisabled) continue
+    
     if (fq.query) {
       if (fq.isPattern && fq.patternFields && fq.patternFields.length > 0) {
         // Pattern matching with value extraction
@@ -500,6 +509,7 @@ function filterCellValue(field: string, value: any, isNegate: boolean) {
       isNegate: isNegate,
       isArray: true,
       isPattern: false,
+      isDisabled: false,
       patternFields: []
     }
     return
@@ -522,6 +532,7 @@ function filterCellValue(field: string, value: any, isNegate: boolean) {
       isNegate: isNegate,
       isArray: true,
       isPattern: false,
+      isDisabled: false,
       patternFields: []
     }
   }
@@ -779,17 +790,18 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
         >
           <template #header="{ column }">
             <div class="column-header">
-              <span class="column-title" :class="{ 'has-filter': hasActiveFilter(col.field) }">
+              <span class="column-title" :class="{ 'has-filter': hasActiveFilter(col.field), 'has-disabled-filter': hasDisabledFilter(col.field) }">
                 {{ col.header }}
               </span>
               <Button
-                :icon="hasActiveFilter(col.field) ? 'pi pi-filter-fill' : 'pi pi-filter'"
+                :icon="hasActiveFilter(col.field) ? 'pi pi-filter-fill' : (hasDisabledFilter(col.field) ? 'pi pi-pause' : 'pi pi-filter')"
                 size="small"
                 text
-                :severity="hasActiveFilter(col.field) ? 'success' : 'secondary'"
+                :severity="hasActiveFilter(col.field) ? 'success' : (hasDisabledFilter(col.field) ? 'warning' : 'secondary')"
                 class="column-filter-btn"
+                :class="{ 'filter-disabled': hasDisabledFilter(col.field) }"
                 @click.stop="openFilterDialog(col)"
-                v-tooltip.top="'Filter ' + col.header"
+                v-tooltip.top="hasDisabledFilter(col.field) ? 'Filter disabled - ' + col.header : 'Filter ' + col.header"
               />
               <Button
                 icon="pi pi-eye-slash"
@@ -1055,6 +1067,11 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
   color: var(--tdv-success);
 }
 
+.column-title.has-disabled-filter {
+  color: var(--tdv-warning, #f59e0b);
+  font-style: italic;
+}
+
 .column-filter-btn,
 .column-hide-btn {
   padding: 4px;
@@ -1071,6 +1088,10 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
 
 .column-filter-btn.p-button-success {
   opacity: 1;
+}
+
+.column-filter-btn.filter-disabled {
+  opacity: 0.7;
 }
 
 .column-hide-btn {
