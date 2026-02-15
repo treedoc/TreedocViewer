@@ -295,6 +295,28 @@ function copyStats() {
     .join('\n')
   navigator.clipboard.writeText(`Value,Count,Percent\n${csv}`)
 }
+
+// Import shared value color service
+import { 
+  PRESET_COLORS, 
+  getValueColor, 
+  setValueColor as setValueColorService 
+} from '@/utils/ValueColorService'
+
+const colorPickerValue = ref<string | null>(null)
+
+function setValueColor(value: string, color: { bg: string; text: string } | null) {
+  setValueColorService(value, color)
+  colorPickerValue.value = null
+}
+
+function toggleColorPicker(value: string) {
+  if (colorPickerValue.value === value) {
+    colorPickerValue.value = null
+  } else {
+    colorPickerValue.value = value
+  }
+}
 </script>
 
 <template>
@@ -476,10 +498,24 @@ function copyStats() {
               v-for="(item, idx) in columnStats.topValues"
               :key="idx"
               class="top-value-item"
+              :class="{ 'has-highlight': getValueColor(item.val) }"
+              :style="getValueColor(item.val) ? { 
+                backgroundColor: getValueColor(item.val)!.bg,
+                color: getValueColor(item.val)!.text 
+              } : {}"
             >
               <div class="top-value-row">
                 <span class="top-value-text" :title="item.val">{{ item.val || '(empty)' }}</span>
                 <div class="top-value-actions">
+                  <button 
+                    class="stat-action-btn stat-color-btn"
+                    :class="{ 'has-color': getValueColor(item.val) }"
+                    :style="getValueColor(item.val) ? { backgroundColor: getValueColor(item.val)!.bg } : {}"
+                    title="Set highlight color"
+                    @click.stop="toggleColorPicker(item.val)"
+                  >
+                    <i class="pi pi-palette"></i>
+                  </button>
                   <button 
                     class="stat-action-btn stat-copy-btn"
                     title="Copy value"
@@ -504,6 +540,22 @@ function copyStats() {
                 </div>
                 <span class="top-value-count">{{ item.count }}</span>
                 <span class="top-value-percent">{{ item.percent.toFixed(1) }}%</span>
+              </div>
+              <!-- Color picker popup -->
+              <div v-if="colorPickerValue === item.val" class="color-picker-popup" @click.stop>
+                <div class="color-picker-grid">
+                  <button
+                    v-for="color in PRESET_COLORS"
+                    :key="color.name"
+                    class="color-option"
+                    :class="{ 'is-none': !color.bg }"
+                    :style="color.bg ? { backgroundColor: color.bg, color: color.text } : {}"
+                    :title="color.name"
+                    @click="setValueColor(item.val, color.bg ? { bg: color.bg, text: color.text } : null)"
+                  >
+                    {{ color.bg ? color.name.charAt(0) : '✕' }}
+                  </button>
+                </div>
               </div>
               <ProgressBar
                 :value="item.percent"
@@ -732,6 +784,11 @@ function copyStats() {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  position: relative;
+  padding: 4px 6px;
+  border-radius: 4px;
+  margin: 0 -6px;
+  transition: background-color 0.15s;
 }
 
 .top-value-row {
@@ -782,8 +839,60 @@ function copyStats() {
   color: var(--tdv-danger);
 }
 
+.stat-color-btn:hover {
+  color: var(--tdv-primary);
+}
+
+.stat-color-btn.has-color {
+  border: 1px solid var(--tdv-surface-border);
+}
+
 .stat-action-btn i {
   font-size: 10px;
+}
+
+/* Color picker popup */
+.color-picker-popup {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 100;
+  background: var(--tdv-surface);
+  border: 1px solid var(--tdv-surface-border);
+  border-radius: var(--tdv-radius-sm);
+  padding: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  margin-top: 4px;
+}
+
+.color-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+}
+
+.color-option {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--tdv-surface-border);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+
+.color-option:hover {
+  transform: scale(1.1);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.color-option.is-none {
+  background: var(--tdv-surface-light);
+  color: var(--tdv-text-muted);
 }
 
 .top-value-text {
@@ -791,22 +900,30 @@ function copyStats() {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--tdv-text);
+  color: inherit;
   font-family: 'JetBrains Mono', monospace;
 }
 
 .top-value-count {
-  color: var(--tdv-primary);
   font-weight: 600;
   min-width: 30px;
   text-align: right;
+  color: inherit;
+}
+
+.top-value-item:not(.has-highlight) .top-value-count {
+  color: var(--tdv-primary);
 }
 
 .top-value-percent {
-  color: var(--tdv-success);
   font-weight: 500;
   min-width: 45px;
   text-align: right;
+  color: inherit;
+}
+
+.top-value-item:not(.has-highlight) .top-value-percent {
+  color: var(--tdv-success);
 }
 
 .top-value-bar {

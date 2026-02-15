@@ -15,6 +15,8 @@ import SimpleValue from './SimpleValue.vue'
 import ColumnFilterDialog from './ColumnFilterDialog.vue'
 import ColumnSelector from './ColumnSelector.vue'
 import AutoCompleteInput from './AutoCompleteInput.vue'
+import PresetSelector from './PresetSelector.vue'
+import type { QueryPreset } from '@/models/types'
 import type { ExpandState } from './ExpandControl.vue'
 import type { FieldQuery } from './ColumnFilterDialog.vue'
 import type { ColumnVisibility } from './ColumnSelector.vue'
@@ -31,6 +33,7 @@ import {
   shouldExpandColumns
 } from '@/utils/TableUtil'
 import { matchFieldQuery, matchPattern, createExtendedFieldsFunc } from '@/utils/QueryUtil'
+import { getValueColorStyle } from '@/utils/ValueColorService'
 
 const logger = new Logger('TableView')
 const COL_VALUE = '@value'
@@ -127,6 +130,38 @@ const visibleColumns = computed(() => {
 const hiddenColumnCount = computed(() => {
   return columns.value.filter(col => !col.visible).length
 })
+
+// Current state for preset selector
+const currentPresetState = computed(() => ({
+  columns: columns.value.map(c => ({ field: c.field, visible: c.visible })),
+  extendedFields: extendedFields.value,
+  fieldQueries: { ...fieldQueries.value },
+  jsQuery: jsQuery.value,
+  expandLevel: expandControlRef.value?.state?.expandLevel,
+}))
+
+// Apply a loaded preset
+function applyPreset(preset: QueryPreset) {
+  // Apply column visibility
+  const visibilityMap = new Map(preset.columns.map(c => [c.field, c.visible]))
+  columns.value.forEach(col => {
+    if (visibilityMap.has(col.field)) {
+      col.visible = visibilityMap.get(col.field)!
+    }
+  })
+  
+  // Apply extended fields
+  extendedFields.value = preset.extendedFields || ''
+  
+  // Apply field queries
+  fieldQueries.value = { ...preset.fieldQueries }
+  
+  // Apply JS query
+  jsQuery.value = preset.jsQuery || '$'
+  
+  // Rebuild table to apply changes
+  rebuildTable()
+}
 
 const rawSelectedNode = computed(() => {
   const node = localSelectedNode.value
@@ -469,6 +504,11 @@ function isKeyColumn(field: string): boolean {
   return field === COL_NO || field === COL_KEY
 }
 
+function getCellColorStyle(data: any, field: string): Record<string, string> | null {
+  const value = getCellValue(data, field)
+  return getValueColorStyle(String(value))
+}
+
 function getRowNodePath(row: TableRow): string[] {
   const node = row.__node
   return node ? ['', ...node.path] : []
@@ -656,6 +696,15 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
           v-tooltip.top="'Select columns (' + visibleColumns.length + '/' + columns.length + ')'"
         />
         
+        <div class="toolbar-separator" />
+        
+        <PresetSelector
+          :currentState="currentPresetState"
+          @load="applyPreset"
+        />
+        
+        <div class="toolbar-separator" />
+        
         <Button
           icon="pi pi-copy"
           size="small"
@@ -815,7 +864,7 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
             </div>
           </template>
           <template #body="{ data }">
-            <div class="cell-wrapper">
+            <div class="cell-wrapper" :style="getCellColorStyle(data, col.field)">
               <div class="cell-content" v-tooltip.top="getCellTimestampHint(data, col.field)">
                 <template v-if="isKeyColumn(col.field)">
                   <a 
@@ -934,6 +983,13 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
   align-items: center;
   gap: 4px;
   flex-wrap: wrap;
+}
+
+.toolbar-separator {
+  width: 1px;
+  height: 20px;
+  background: var(--tdv-surface-border);
+  margin: 0 4px;
 }
 
 .nav-buttons {
@@ -1161,6 +1217,9 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
   position: relative;
   display: inline-block;
   width: 100%;
+  padding: 2px 4px;
+  margin: -2px -4px;
+  border-radius: 3px;
 }
 
 .cell-content {

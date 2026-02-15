@@ -73,6 +73,23 @@ export interface TDVOptions {
   parsers?: ParserPlugin[]
 }
 
+/**
+ * A named preset for table query settings
+ */
+export interface QueryPreset {
+  id: string
+  name: string
+  description?: string
+  createdAt: number
+  updatedAt: number
+  // Settings to save
+  columns: { field: string; visible: boolean }[]
+  extendedFields: string
+  fieldQueries: Record<string, FieldQuery>
+  jsQuery: string
+  expandLevel?: number
+}
+
 export function createDefaultQuery(): Query {
   return {
     limit: 100,
