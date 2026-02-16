@@ -7,13 +7,14 @@ import { TDNodeType, TDJSONWriter, TDJSONWriterOption, TD } from 'treedoc'
 import { toRaw } from 'vue'
 import { getTimestampHint, tryDate } from './DateUtil'
 
-export type TimeBucket = 'minute' | 'hour' | 'day' | 'week' | 'month'
+export type TimeBucket = 'minute' | '5min' | '10min' | '30min' | 'hour' | 'day' | 'week' | 'month'
 
 export interface TimeSeriesDataPoint {
   time: Date
   label: string
   count: number
   avgValue?: number
+  groups?: Record<string, number>  // counts by group value
 }
 
 export interface TableRow {
@@ -256,6 +257,52 @@ export function detectNumericColumns(data: TableRow[], columns: TableColumn[]): 
 }
 
 /**
+ * Detect columns suitable for grouping (with limited unique values)
+ */
+export function detectGroupableColumns(
+  data: TableRow[], 
+  columns: TableColumn[], 
+  maxUniqueValues: number = 100
+): string[] {
+  const groupableColumns: string[] = []
+  
+  for (const col of columns) {
+    if (col.field === '__node') continue
+    
+    const uniqueValues = new Set<string>()
+    let exceededLimit = false
+    
+    for (const row of data) {
+      const node = getCellNode(row, col.field)
+      let val: string
+      if (node && node.type === TDNodeType.SIMPLE) {
+        val = String(node.value ?? '')
+      } else {
+        const rawVal = row[col.field]
+        if (rawVal === undefined || rawVal === null) {
+          val = ''
+        } else {
+          val = String(rawVal)
+        }
+      }
+      
+      uniqueValues.add(val)
+      
+      if (uniqueValues.size > maxUniqueValues) {
+        exceededLimit = true
+        break
+      }
+    }
+    
+    if (!exceededLimit) {
+      groupableColumns.push(col.field)
+    }
+  }
+  
+  return groupableColumns
+}
+
+/**
  * Auto-detect appropriate time bucket size based on data range
  */
 export function detectBucketSize(data: TableRow[], timeColumn: string): TimeBucket {
@@ -285,7 +332,10 @@ export function detectBucketSize(data: TableRow[], timeColumn: string): TimeBuck
   const weekMs = 7 * dayMs
   const monthMs = 30 * dayMs
   
-  if (rangeMs < 2 * hourMs) return 'minute'
+  if (rangeMs < 30 * minuteMs) return 'minute'
+  if (rangeMs < 2 * hourMs) return '5min'
+  if (rangeMs < 6 * hourMs) return '10min'
+  if (rangeMs < 12 * hourMs) return '30min'
   if (rangeMs < 2 * dayMs) return 'hour'
   if (rangeMs < 2 * weekMs) return 'day'
   if (rangeMs < 3 * monthMs) return 'week'
@@ -300,11 +350,23 @@ function getBucketKey(date: Date, bucket: TimeBucket): string {
   const month = String(date.getMonth() + 1).padStart(2, '0')
   const day = String(date.getDate()).padStart(2, '0')
   const hour = String(date.getHours()).padStart(2, '0')
-  const minute = String(date.getMinutes()).padStart(2, '0')
+  const minute = date.getMinutes()
   
   switch (bucket) {
     case 'minute':
-      return `${year}-${month}-${day} ${hour}:${minute}`
+      return `${year}-${month}-${day} ${hour}:${String(minute).padStart(2, '0')}`
+    case '5min': {
+      const bucket5 = Math.floor(minute / 5) * 5
+      return `${year}-${month}-${day} ${hour}:${String(bucket5).padStart(2, '0')}`
+    }
+    case '10min': {
+      const bucket10 = Math.floor(minute / 10) * 10
+      return `${year}-${month}-${day} ${hour}:${String(bucket10).padStart(2, '0')}`
+    }
+    case '30min': {
+      const bucket30 = Math.floor(minute / 30) * 30
+      return `${year}-${month}-${day} ${hour}:${String(bucket30).padStart(2, '0')}`
+    }
     case 'hour':
       return `${year}-${month}-${day} ${hour}:00`
     case 'day':
@@ -329,7 +391,10 @@ function getBucketKey(date: Date, bucket: TimeBucket): string {
  */
 function getBucketStartDate(key: string, bucket: TimeBucket): Date {
   switch (bucket) {
-    case 'minute': {
+    case 'minute':
+    case '5min':
+    case '10min':
+    case '30min': {
       const [datePart, timePart] = key.split(' ')
       const [year, month, day] = datePart.split('-').map(Number)
       const [hour, minute] = timePart.split(':').map(Number)
@@ -356,13 +421,30 @@ function getBucketStartDate(key: string, bucket: TimeBucket): Date {
 /**
  * Aggregate table data by time bucket
  */
+/**
+ * Get string value from a cell for grouping
+ */
+function getStringValue(row: TableRow, field: string): string {
+  const node = getCellNode(row, field)
+  if (node && node.type === TDNodeType.SIMPLE) {
+    return String(node.value ?? '')
+  }
+  const val = row[field]
+  if (val === undefined || val === null) return ''
+  return String(val)
+}
+
+/**
+ * Aggregate table data by time bucket with optional grouping
+ */
 export function aggregateByTime(
   data: TableRow[],
   timeColumn: string,
   bucket: TimeBucket,
-  valueColumn?: string
+  valueColumn?: string,
+  groupColumn?: string
 ): TimeSeriesDataPoint[] {
-  const buckets = new Map<string, { count: number; sum: number; valueCount: number }>()
+  const buckets = new Map<string, { count: number; sum: number; valueCount: number; groups: Record<string, number> }>()
   
   for (const row of data) {
     const num = getNumericValue(row, timeColumn)
@@ -374,11 +456,17 @@ export function aggregateByTime(
     const key = getBucketKey(date, bucket)
     
     if (!buckets.has(key)) {
-      buckets.set(key, { count: 0, sum: 0, valueCount: 0 })
+      buckets.set(key, { count: 0, sum: 0, valueCount: 0, groups: {} })
     }
     
     const bucketData = buckets.get(key)!
     bucketData.count++
+    
+    // Track group counts
+    if (groupColumn) {
+      const groupValue = getStringValue(row, groupColumn) || '(empty)'
+      bucketData.groups[groupValue] = (bucketData.groups[groupValue] || 0) + 1
+    }
     
     if (valueColumn) {
       const val = getNumericValue(row, valueColumn)
@@ -396,7 +484,8 @@ export function aggregateByTime(
       time: getBucketStartDate(key, bucket),
       label: key,
       count: data.count,
-      avgValue: data.valueCount > 0 ? data.sum / data.valueCount : undefined
+      avgValue: data.valueCount > 0 ? data.sum / data.valueCount : undefined,
+      groups: groupColumn ? data.groups : undefined
     })
   }
   

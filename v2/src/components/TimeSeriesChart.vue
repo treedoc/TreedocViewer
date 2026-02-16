@@ -15,7 +15,7 @@ import {
   type ChartOptions
 } from 'chart.js'
 import type { TableRow, TableColumn, TimeBucket, TimeSeriesDataPoint } from '@/utils/TableUtil'
-import { detectTimeColumns, detectNumericColumns, detectBucketSize, aggregateByTime } from '@/utils/TableUtil'
+import { detectTimeColumns, detectNumericColumns, detectGroupableColumns, detectBucketSize, aggregateByTime } from '@/utils/TableUtil'
 import Select from 'primevue/select'
 import Button from 'primevue/button'
 
@@ -43,12 +43,15 @@ const emit = defineEmits<{
 // State
 const timeColumn = ref<string>('')
 const valueColumn = ref<string>('')
+const groupColumn = ref<string>('')
 const bucketSize = ref<TimeBucket>('day')
 const autoDetectBucket = ref(true)
+const isMaximized = ref(false)
 
 // Detect columns
 const timeColumns = computed(() => detectTimeColumns(props.data, props.columns))
 const numericColumns = computed(() => detectNumericColumns(props.data, props.columns))
+const groupableColumns = computed(() => detectGroupableColumns(props.data, props.columns, 100))
 
 // Auto-select first time column
 watch(timeColumns, (cols) => {
@@ -71,25 +74,70 @@ const chartData = computed<TimeSeriesDataPoint[]>(() => {
     props.data,
     timeColumn.value,
     bucketSize.value,
-    valueColumn.value || undefined
+    valueColumn.value || undefined,
+    groupColumn.value || undefined
   )
 })
+
+// Get all unique group values across all data points
+const uniqueGroups = computed<string[]>(() => {
+  if (!groupColumn.value) return []
+  const groups = new Set<string>()
+  for (const point of chartData.value) {
+    if (point.groups) {
+      for (const g of Object.keys(point.groups)) {
+        groups.add(g)
+      }
+    }
+  }
+  return Array.from(groups).sort()
+})
+
+// Color palette for stacked bars
+const colorPalette = [
+  { bg: 'rgba(54, 162, 235, 0.6)', border: 'rgba(54, 162, 235, 1)' },
+  { bg: 'rgba(255, 99, 132, 0.6)', border: 'rgba(255, 99, 132, 1)' },
+  { bg: 'rgba(75, 192, 192, 0.6)', border: 'rgba(75, 192, 192, 1)' },
+  { bg: 'rgba(255, 206, 86, 0.6)', border: 'rgba(255, 206, 86, 1)' },
+  { bg: 'rgba(153, 102, 255, 0.6)', border: 'rgba(153, 102, 255, 1)' },
+  { bg: 'rgba(255, 159, 64, 0.6)', border: 'rgba(255, 159, 64, 1)' },
+  { bg: 'rgba(199, 199, 199, 0.6)', border: 'rgba(199, 199, 199, 1)' },
+  { bg: 'rgba(83, 102, 255, 0.6)', border: 'rgba(83, 102, 255, 1)' },
+  { bg: 'rgba(255, 99, 255, 0.6)', border: 'rgba(255, 99, 255, 1)' },
+  { bg: 'rgba(99, 255, 132, 0.6)', border: 'rgba(99, 255, 132, 1)' },
+]
 
 // Chart.js data
 const chartJsData = computed<ChartData<'bar'>>(() => {
   const labels = chartData.value.map(d => d.label)
-  const counts = chartData.value.map(d => d.count)
+  const datasets: any[] = []
   
-  const datasets: any[] = [
-    {
+  if (groupColumn.value && uniqueGroups.value.length > 0) {
+    // Create stacked datasets for each group
+    uniqueGroups.value.forEach((group, index) => {
+      const color = colorPalette[index % colorPalette.length]
+      datasets.push({
+        label: group,
+        data: chartData.value.map(d => d.groups?.[group] || 0),
+        backgroundColor: color.bg,
+        borderColor: color.border,
+        borderWidth: 1,
+        yAxisID: 'y',
+        stack: 'stack0'
+      })
+    })
+  } else {
+    // Single dataset for row counts
+    const counts = chartData.value.map(d => d.count)
+    datasets.push({
       label: 'Row Count',
       data: counts,
       backgroundColor: 'rgba(54, 162, 235, 0.6)',
       borderColor: 'rgba(54, 162, 235, 1)',
       borderWidth: 1,
       yAxisID: 'y'
-    }
-  ]
+    })
+  }
   
   // Add value column as line if selected
   if (valueColumn.value) {
@@ -112,6 +160,8 @@ const chartJsData = computed<ChartData<'bar'>>(() => {
 
 // Chart.js options
 const chartOptions = computed<ChartOptions<'bar'>>(() => {
+  const isStacked = !!(groupColumn.value && uniqueGroups.value.length > 0)
+  
   const options: ChartOptions<'bar'> = {
     responsive: true,
     maintainAspectRatio: false,
@@ -128,6 +178,9 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => {
       }
     },
     scales: {
+      x: {
+        stacked: isStacked
+      },
       y: {
         type: 'linear',
         display: true,
@@ -136,7 +189,8 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => {
           display: true,
           text: 'Row Count'
         },
-        beginAtZero: true
+        beginAtZero: true,
+        stacked: isStacked
       }
     }
   }
@@ -163,6 +217,9 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => {
 // Bucket options for dropdown
 const bucketOptions = [
   { label: 'Minute', value: 'minute' },
+  { label: '5 Minutes', value: '5min' },
+  { label: '10 Minutes', value: '10min' },
+  { label: '30 Minutes', value: '30min' },
   { label: 'Hour', value: 'hour' },
   { label: 'Day', value: 'day' },
   { label: 'Week', value: 'week' },
@@ -200,7 +257,17 @@ function onBucketChange() {
       </div>
       
       <div class="control-group">
-        <label>Value Column (optional):</label>
+        <label>Group By:</label>
+        <Select
+          v-model="groupColumn"
+          :options="['', ...groupableColumns]"
+          placeholder="None"
+          class="control-select"
+        />
+      </div>
+      
+      <div class="control-group">
+        <label>Value (avg):</label>
         <Select
           v-model="valueColumn"
           :options="['', ...numericColumns]"
@@ -209,17 +276,25 @@ function onBucketChange() {
         />
       </div>
       
-      <Button
-        icon="pi pi-times"
-        text
-        severity="secondary"
-        @click="emit('close')"
-        v-tooltip.top="'Close chart'"
-        class="close-btn"
-      />
+      <div class="chart-actions">
+        <Button
+          :icon="isMaximized ? 'pi pi-window-minimize' : 'pi pi-window-maximize'"
+          text
+          severity="secondary"
+          @click="isMaximized = !isMaximized"
+          v-tooltip.top="isMaximized ? 'Minimize chart' : 'Maximize chart'"
+        />
+        <Button
+          icon="pi pi-times"
+          text
+          severity="secondary"
+          @click="emit('close')"
+          v-tooltip.top="'Close chart'"
+        />
+      </div>
     </div>
     
-    <div class="chart-container" v-if="timeColumn && chartData.length > 0">
+    <div class="chart-container" :class="{ maximized: isMaximized }" v-if="timeColumn && chartData.length > 0">
       <Bar :data="chartJsData" :options="chartOptions" />
     </div>
     
@@ -270,13 +345,21 @@ function onBucketChange() {
   min-width: 120px;
 }
 
-.close-btn {
+.chart-actions {
   margin-left: auto;
+  display: flex;
+  gap: 4px;
 }
 
 .chart-container {
   height: 250px;
   padding: 12px;
+  transition: height 0.2s ease;
+}
+
+.chart-container.maximized {
+  height: calc(100vh - 300px);
+  min-height: 400px;
 }
 
 .no-data {
