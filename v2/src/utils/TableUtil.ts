@@ -5,7 +5,16 @@
 import type { TDNode } from 'treedoc'
 import { TDNodeType, TDJSONWriter, TDJSONWriterOption, TD } from 'treedoc'
 import { toRaw } from 'vue'
-import { getTimestampHint } from './DateUtil'
+import { getTimestampHint, tryDate } from './DateUtil'
+
+export type TimeBucket = 'minute' | 'hour' | 'day' | 'week' | 'month'
+
+export interface TimeSeriesDataPoint {
+  time: Date
+  label: string
+  count: number
+  avgValue?: number
+}
 
 export interface TableRow {
   [key: string]: TDNode | string | number | undefined
@@ -160,4 +169,237 @@ export function shouldExpandColumns(node: TDNode): boolean {
   const threshold = 0.5
   const maxCells = rowCount * colCount
   return cellCount >= maxCells * threshold
+}
+
+/**
+ * Get numeric value from a cell for aggregation
+ */
+function getNumericValue(row: TableRow, field: string): number | null {
+  const node = getCellNode(row, field)
+  if (node && node.type === TDNodeType.SIMPLE) {
+    const val = Number(node.value)
+    return isNaN(val) ? null : val
+  }
+  const val = row[field]
+  if (typeof val === 'number') return val
+  const num = Number(val)
+  return isNaN(num) ? null : num
+}
+
+/**
+ * Parse a timestamp value to Date, handling ms, seconds, and microseconds
+ */
+function parseTimestamp(val: number): Date | null {
+  return tryDate(val) || tryDate(val * 1000) || tryDate(val / 1000_000)
+}
+
+/**
+ * Detect columns that appear to contain timestamp values
+ */
+export function detectTimeColumns(data: TableRow[], columns: TableColumn[]): string[] {
+  const timeColumns: string[] = []
+  const sampleSize = Math.min(data.length, 20)
+  
+  for (const col of columns) {
+    if (col.field === '__node') continue
+    
+    let validCount = 0
+    let totalSampled = 0
+    
+    for (let i = 0; i < sampleSize && i < data.length; i++) {
+      const num = getNumericValue(data[i], col.field)
+      if (num !== null) {
+        totalSampled++
+        const date = parseTimestamp(num)
+        if (date) validCount++
+      }
+    }
+    
+    // If at least 80% of sampled numeric values are valid timestamps
+    if (totalSampled > 0 && validCount / totalSampled >= 0.8) {
+      timeColumns.push(col.field)
+    }
+  }
+  
+  return timeColumns
+}
+
+/**
+ * Detect columns that contain numeric values (for value axis)
+ */
+export function detectNumericColumns(data: TableRow[], columns: TableColumn[]): string[] {
+  const numericColumns: string[] = []
+  const sampleSize = Math.min(data.length, 20)
+  
+  for (const col of columns) {
+    if (col.field === '__node') continue
+    
+    let numericCount = 0
+    let totalSampled = 0
+    
+    for (let i = 0; i < sampleSize && i < data.length; i++) {
+      const val = data[i][col.field]
+      if (val !== undefined && val !== null && val !== '') {
+        totalSampled++
+        const num = getNumericValue(data[i], col.field)
+        if (num !== null) numericCount++
+      }
+    }
+    
+    // If at least 80% of sampled values are numeric
+    if (totalSampled > 0 && numericCount / totalSampled >= 0.8) {
+      numericColumns.push(col.field)
+    }
+  }
+  
+  return numericColumns
+}
+
+/**
+ * Auto-detect appropriate time bucket size based on data range
+ */
+export function detectBucketSize(data: TableRow[], timeColumn: string): TimeBucket {
+  let minTime = Infinity
+  let maxTime = -Infinity
+  
+  for (const row of data) {
+    const num = getNumericValue(row, timeColumn)
+    if (num !== null) {
+      const date = parseTimestamp(num)
+      if (date) {
+        const time = date.getTime()
+        if (time < minTime) minTime = time
+        if (time > maxTime) maxTime = time
+      }
+    }
+  }
+  
+  if (minTime === Infinity || maxTime === -Infinity) {
+    return 'day'
+  }
+  
+  const rangeMs = maxTime - minTime
+  const minuteMs = 60 * 1000
+  const hourMs = 60 * minuteMs
+  const dayMs = 24 * hourMs
+  const weekMs = 7 * dayMs
+  const monthMs = 30 * dayMs
+  
+  if (rangeMs < 2 * hourMs) return 'minute'
+  if (rangeMs < 2 * dayMs) return 'hour'
+  if (rangeMs < 2 * weekMs) return 'day'
+  if (rangeMs < 3 * monthMs) return 'week'
+  return 'month'
+}
+
+/**
+ * Get the bucket key for a given date and bucket size
+ */
+function getBucketKey(date: Date, bucket: TimeBucket): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  const hour = String(date.getHours()).padStart(2, '0')
+  const minute = String(date.getMinutes()).padStart(2, '0')
+  
+  switch (bucket) {
+    case 'minute':
+      return `${year}-${month}-${day} ${hour}:${minute}`
+    case 'hour':
+      return `${year}-${month}-${day} ${hour}:00`
+    case 'day':
+      return `${year}-${month}-${day}`
+    case 'week': {
+      // Get Monday of the week
+      const d = new Date(date)
+      const dayOfWeek = d.getDay()
+      const diff = d.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1)
+      d.setDate(diff)
+      const wMonth = String(d.getMonth() + 1).padStart(2, '0')
+      const wDay = String(d.getDate()).padStart(2, '0')
+      return `${d.getFullYear()}-${wMonth}-${wDay}`
+    }
+    case 'month':
+      return `${year}-${month}`
+  }
+}
+
+/**
+ * Get the start date for a bucket key
+ */
+function getBucketStartDate(key: string, bucket: TimeBucket): Date {
+  switch (bucket) {
+    case 'minute': {
+      const [datePart, timePart] = key.split(' ')
+      const [year, month, day] = datePart.split('-').map(Number)
+      const [hour, minute] = timePart.split(':').map(Number)
+      return new Date(year, month - 1, day, hour, minute, 0)
+    }
+    case 'hour': {
+      const [datePart, timePart] = key.split(' ')
+      const [year, month, day] = datePart.split('-').map(Number)
+      const hour = parseInt(timePart.split(':')[0])
+      return new Date(year, month - 1, day, hour, 0, 0)
+    }
+    case 'day':
+    case 'week': {
+      const [year, month, day] = key.split('-').map(Number)
+      return new Date(year, month - 1, day)
+    }
+    case 'month': {
+      const [year, month] = key.split('-').map(Number)
+      return new Date(year, month - 1, 1)
+    }
+  }
+}
+
+/**
+ * Aggregate table data by time bucket
+ */
+export function aggregateByTime(
+  data: TableRow[],
+  timeColumn: string,
+  bucket: TimeBucket,
+  valueColumn?: string
+): TimeSeriesDataPoint[] {
+  const buckets = new Map<string, { count: number; sum: number; valueCount: number }>()
+  
+  for (const row of data) {
+    const num = getNumericValue(row, timeColumn)
+    if (num === null) continue
+    
+    const date = parseTimestamp(num)
+    if (!date) continue
+    
+    const key = getBucketKey(date, bucket)
+    
+    if (!buckets.has(key)) {
+      buckets.set(key, { count: 0, sum: 0, valueCount: 0 })
+    }
+    
+    const bucketData = buckets.get(key)!
+    bucketData.count++
+    
+    if (valueColumn) {
+      const val = getNumericValue(row, valueColumn)
+      if (val !== null) {
+        bucketData.sum += val
+        bucketData.valueCount++
+      }
+    }
+  }
+  
+  // Convert to array and sort by time
+  const result: TimeSeriesDataPoint[] = []
+  for (const [key, data] of buckets) {
+    result.push({
+      time: getBucketStartDate(key, bucket),
+      label: key,
+      count: data.count,
+      avgValue: data.valueCount > 0 ? data.sum / data.valueCount : undefined
+    })
+  }
+  
+  result.sort((a, b) => a.time.getTime() - b.time.getTime())
+  return result
 }

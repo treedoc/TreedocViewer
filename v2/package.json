@@ -14,6 +14,7 @@
     "@codemirror/lang-xml": "^6.1.0",
     "@codemirror/lang-yaml": "^6.1.1",
     "@primevue/themes": "^4.2.5",
+    "chart.js": "^4.5.1",
     "codemirror": "^6.0.1",
     "lodash-es": "^4.17.21",
     "pinia": "^2.2.8",
@@ -22,6 +23,7 @@
     "splitpanes": "^3.1.5",
     "treedoc": "^0.3.44",
     "vue": "^3.5.13",
+    "vue-chartjs": "^5.3.3",
     "vue-codemirror": "^6.1.1",
     "vue-router": "^4.5.0",
     "yaml": "^2.7.0"

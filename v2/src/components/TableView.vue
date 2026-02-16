@@ -16,6 +16,7 @@ import ColumnFilterDialog from './ColumnFilterDialog.vue'
 import ColumnSelector from './ColumnSelector.vue'
 import AutoCompleteInput from './AutoCompleteInput.vue'
 import PresetSelector from './PresetSelector.vue'
+import TimeSeriesChart from './TimeSeriesChart.vue'
 import type { QueryPreset } from '@/models/types'
 import type { ExpandState } from './ExpandControl.vue'
 import type { FieldQuery } from './ColumnFilterDialog.vue'
@@ -30,7 +31,8 @@ import {
   copyCellValue,
   copyAsJSON,
   copyAsCSV,
-  shouldExpandColumns
+  shouldExpandColumns,
+  detectTimeColumns
 } from '@/utils/TableUtil'
 import { matchFieldQuery, matchPattern, createExtendedFieldsFunc } from '@/utils/QueryUtil'
 import { getValueColorStyle, applyValueColorsFromFieldQueries } from '@/utils/ValueColorService'
@@ -54,6 +56,7 @@ const showAdvancedQuery = ref(false)
 const jsQuery = ref('$')
 const extendedFields = ref('')
 const showExtendedFields = ref(false)
+const showChart = ref(false)
 const first = ref(0)
 const rows = ref(100)
 
@@ -129,6 +132,11 @@ const visibleColumns = computed(() => {
 
 const hiddenColumnCount = computed(() => {
   return columns.value.filter(col => !col.visible).length
+})
+
+// Check if there are any timestamp columns for chart feature
+const hasTimeColumns = computed(() => {
+  return detectTimeColumns(tableData.value as any, columns.value as any).length > 0
 })
 
 // Current state for preset selector
@@ -734,6 +742,16 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
         />
         
         <Button
+          v-if="hasTimeColumns"
+          icon="pi pi-chart-bar"
+          size="small"
+          :severity="showChart ? 'primary' : 'secondary'"
+          text
+          @click="showChart = !showChart"
+          v-tooltip.top="'Time series chart'"
+        />
+        
+        <Button
           icon="pi pi-code"
           size="small"
           :severity="showAdvancedQuery ? 'primary' : 'secondary'"
@@ -847,6 +865,13 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
         </small>
       </div>
     </div>
+    
+    <TimeSeriesChart
+      v-if="showChart && hasTimeColumns"
+      :data="filteredData as any"
+      :columns="columns as any"
+      @close="showChart = false"
+    />
     
     <div class="table-content">
       <DataTable
