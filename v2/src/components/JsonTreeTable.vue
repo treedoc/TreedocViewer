@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import { debounce } from 'lodash-es'
 import { Splitpanes, Pane } from 'splitpanes'
 import 'splitpanes/dist/splitpanes.css'
 import Button from 'primevue/button'
@@ -119,6 +120,30 @@ const tableVisible = computed(() => showTable.value && (maxPane.value === '' || 
 
 // Pane size management - only set initial sizes, let splitpanes handle the rest
 const splitpanesKey = ref(0)
+const isResizing = ref(false)
+
+// Only apply resize optimization for large files (> 10MB)
+const LARGE_FILE_THRESHOLD = 10 * 1024 * 1024 // 10MB
+const isLargeFile = computed(() => rawText.value.length > LARGE_FILE_THRESHOLD)
+
+// Debounced function to end resizing state
+const endResizing = debounce(() => {
+  isResizing.value = false
+}, 300)
+
+function onPaneResize() {
+  // Only hide content during resize for large files to prevent lag
+  if (isLargeFile.value) {
+    isResizing.value = true
+    endResizing()
+  }
+}
+
+function onPaneResized() {
+  if (isLargeFile.value) {
+    endResizing()
+  }
+}
 
 // Force re-render splitpanes when visibility changes
 watch([showSource, showTree, showTable, maxPane], () => {
@@ -362,11 +387,17 @@ defineExpose({ openUrl })
     
     <!-- Split Panes -->
     <div class="split-container">
-      <Splitpanes :key="splitpanesKey" class="default-theme" :horizontal="false">
+      <Splitpanes 
+        :key="splitpanesKey" 
+        class="default-theme" 
+        :horizontal="false"
+        @resize="onPaneResize"
+        @resized="onPaneResized"
+      >
         <Pane v-if="sourceVisible">
           <div 
             class="pane-wrapper"
-            :class="{ 'pane-focused': currentPane === 'source' }"
+            :class="{ 'pane-focused': currentPane === 'source', 'resizing': isResizing }"
             @click="currentPane = 'source'"
             @keydown="onKeyDown($event, 'source')"
             tabindex="0"
@@ -378,7 +409,7 @@ defineExpose({ openUrl })
         <Pane v-if="treeVisible">
           <div 
             class="pane-wrapper"
-            :class="{ 'pane-focused': currentPane === 'tree' }"
+            :class="{ 'pane-focused': currentPane === 'tree', 'resizing': isResizing }"
             @click="currentPane = 'tree'"
             @keydown="onKeyDown($event, 'tree')"
             tabindex="0"
@@ -394,7 +425,7 @@ defineExpose({ openUrl })
         <Pane v-if="tableVisible">
           <div 
             class="pane-wrapper"
-            :class="{ 'pane-focused': currentPane === 'table' }"
+            :class="{ 'pane-focused': currentPane === 'table', 'resizing': isResizing }"
             @click="currentPane = 'table'"
             @keydown="onKeyDown($event, 'table')"
             tabindex="0"
@@ -480,6 +511,7 @@ defineExpose({ openUrl })
 }
 
 .pane-wrapper {
+  position: relative;
   height: 100%;
   background: var(--tdv-surface);
   border-radius: var(--tdv-radius);
@@ -503,11 +535,11 @@ defineExpose({ openUrl })
   width: 100%;
 }
 
-/* Splitpanes theme overrides */
+/* Splitpanes theme overrides - compact splitter */
 :deep(.splitpanes__splitter) {
   background: transparent;
-  min-width: 8px;
-  min-height: 8px;
+  min-width: 4px;
+  min-height: 4px;
 }
 
 :deep(.splitpanes__splitter::before) {
@@ -516,23 +548,51 @@ defineExpose({ openUrl })
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 4px;
-  height: 40px;
+  width: 2px;
+  height: 24px;
   background: var(--tdv-surface-border);
-  border-radius: 2px;
+  border-radius: 1px;
   transition: background 0.2s;
 }
 
 :deep(.splitpanes--horizontal > .splitpanes__splitter::before) {
-  width: 40px;
-  height: 4px;
+  width: 24px;
+  height: 2px;
 }
 
 :deep(.splitpanes__splitter:hover::before) {
   background: var(--tdv-accent);
+  width: 3px;
+  height: 32px;
+}
+
+:deep(.splitpanes--horizontal > .splitpanes__splitter:hover::before) {
+  width: 32px;
+  height: 3px;
 }
 
 :deep(.splitpanes__pane) {
   background: transparent;
+}
+
+/* During resize, reduce rendering complexity by hiding all heavy content */
+.pane-wrapper.resizing {
+  pointer-events: none;
+}
+
+.pane-wrapper.resizing > * {
+  visibility: hidden;
+}
+
+/* Show a simple placeholder during resize */
+.pane-wrapper.resizing::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--tdv-surface);
+  visibility: visible;
 }
 </style>

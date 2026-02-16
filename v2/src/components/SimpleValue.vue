@@ -35,17 +35,27 @@ const ref = computed(() => {
   return nodeValue.value
 })
 
-function formatDate(d: Date): string {
-  const date = d.toLocaleDateString()
-  const time = d.toLocaleTimeString(undefined, { hour12: false })
-  return `${date},${time}`
+function formatDate(d: Date, compact = false): string {
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  const hours = String(d.getHours()).padStart(2, '0')
+  const minutes = String(d.getMinutes()).padStart(2, '0')
+  const seconds = String(d.getSeconds()).padStart(2, '0')
+  
+  if (compact) {
+    // Compact: MM-DD HH:MM:SS (15 chars)
+    return `${month}-${day} ${hours}:${minutes}:${seconds}`
+  }
+  // Full: YYYY-MM-DD HH:MM:SS (19 chars)
+  return `${d.getFullYear()}-${month}-${day} ${hours}:${minutes}:${seconds}`
 }
 
 const date = computed(() => {
   const val = Number(nodeValue.value)
   if (isNaN(val)) return null
   const d = tryDate(val) || tryDate(val * 1000) || tryDate(val / 1000_000)
-  return d ? formatDate(d) : null
+  // Use compact format for table cells
+  return d ? formatDate(d, props.isInTable) : null
 })
 
 const refAbsolute = computed(() => {
@@ -155,7 +165,7 @@ function handleRefClick() {
 
 .url-link {
   color: var(--tdv-primary);
-  word-break: break-all;
+  overflow-wrap: anywhere;
 }
 
 .url-link:hover {
@@ -174,6 +184,7 @@ function handleRefClick() {
   font-style: italic;
   display: block;
   margin-top: 2px;
+  white-space: nowrap;
 }
 
 /* Highlight for matched filter text - use :deep() since v-html content is not affected by scoped styles */

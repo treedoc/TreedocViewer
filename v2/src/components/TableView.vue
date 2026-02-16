@@ -1240,7 +1240,7 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
 .simple-cell-value {
   display: inline-block;
   max-width: 100%;
-  word-break: break-word;
+  overflow-wrap: anywhere;
   /* white-space is controlled by inline style via whiteSpaceStyle computed property */
 }
 
@@ -1264,10 +1264,33 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
   width: 100%;
   max-width: 80vw;
   max-height: 50vh;
-  overflow: auto;
-  padding: 2px 4px;
-  margin: -2px -4px;
+  overflow: hidden;
   border-radius: 3px;
+  scrollbar-width: thin;
+}
+
+/* Webkit/Chrome scrollbar - minimal 4px size */
+.cell-wrapper::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+.cell-wrapper::-webkit-scrollbar-thumb {
+  background: var(--tdv-surface-border);
+  border-radius: 2px;
+}
+
+.cell-wrapper::-webkit-scrollbar-thumb:hover {
+  background: var(--tdv-text-muted);
+}
+
+.cell-wrapper::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.cell-wrapper:hover {
+  overflow: auto;
+  overflow: overlay; /* Chromium overlay scrollbars */
 }
 
 .cell-content {
@@ -1346,7 +1369,7 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
   color: var(--tdv-text);
   font-weight: 600;
   font-size: 0.85rem;
-  padding: 8px 10px;
+  padding: 4px 4px;
   border-right: 1px solid var(--tdv-surface-border);
 }
 
@@ -1355,7 +1378,7 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
 }
 
 :deep(.p-datatable-tbody > tr > td) {
-  padding: 6px 10px;
+  padding: 3px 4px;
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.85rem;
   border-right: 1px solid var(--tdv-surface-border);

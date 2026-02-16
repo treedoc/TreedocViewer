@@ -317,7 +317,7 @@ function format() {
   font-size: 13px;
   color: var(--tdv-text);
   white-space: pre-wrap;
-  word-break: break-all;
+  overflow-wrap: anywhere;
   background: var(--tdv-surface);
   line-height: 1.5;
 }
