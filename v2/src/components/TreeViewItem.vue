@@ -24,6 +24,7 @@ const props = defineProps<{
   tnode: TDNode
   currentLevel: number
   expandState: ExpandState
+  filterQuery?: string
 }>()
 
 const emit = defineEmits<{
@@ -35,10 +36,81 @@ const selected = ref(false)
 const limit = ref(PAGE_SIZE)
 const childrenRefs = ref<TreeViewItemInstance[]>([])
 const isHovered = ref(false)
+const nodeRowRef = ref<HTMLElement | null>(null)
 
 const rawNode = computed(() => getRawNode(props.tnode))
 
 const isSimpleType = computed(() => rawNode.value.type === TDNodeType.SIMPLE)
+
+// Check if this node or any descendant matches the filter
+function nodeMatchesFilter(node: TDNode, query: string): boolean {
+  if (!query) return true
+  
+  const queryLower = query.toLowerCase()
+  
+  // Check if key matches
+  if (node.key?.toLowerCase().includes(queryLower)) {
+    return true
+  }
+  
+  // Check if value matches (for simple types)
+  if (node.type === TDNodeType.SIMPLE && node.value !== null) {
+    if (String(node.value).toLowerCase().includes(queryLower)) {
+      return true
+    }
+  }
+  
+  // Check children recursively
+  if (node.children) {
+    for (const child of node.children) {
+      if (nodeMatchesFilter(child, query)) {
+        return true
+      }
+    }
+  }
+  
+  return false
+}
+
+const isVisible = computed(() => {
+  if (!props.filterQuery) return true
+  return nodeMatchesFilter(rawNode.value, props.filterQuery)
+})
+
+// Escape HTML to prevent XSS
+function escapeHtml(text: string): string {
+  if (!text) return text
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+}
+
+// Highlight matched text by wrapping in <mark> tags
+function highlightText(text: string, query: string): string {
+  if (!query || !text) return escapeHtml(text)
+  
+  const queryLower = query.toLowerCase()
+  const textLower = text.toLowerCase()
+  const index = textLower.indexOf(queryLower)
+  
+  if (index === -1) return escapeHtml(text)
+  
+  const before = text.substring(0, index)
+  const match = text.substring(index, index + query.length)
+  const after = text.substring(index + query.length)
+  
+  // Recursively highlight remaining text
+  return escapeHtml(before) + '<mark class="highlight">' + escapeHtml(match) + '</mark>' + highlightText(after, query)
+}
+
+const highlightedKey = computed(() => {
+  const key = rawNode.value.key
+  if (!key || !props.filterQuery) return key
+  return highlightText(key, props.filterQuery)
+})
 
 const nodeKey = computed(() => rawNode.value.key)
 
@@ -102,11 +174,17 @@ function copyPath() {
 function selectNode(path: string[], start: number, action: (node: typeof props) => void) {
   logger.log(`selectNode: start: ${path}, ${start}`)
   if (start === path.length) {
-    // Call action with an object that allows modifying selected state
+    // Call action with an object that allows modifying selected state and accessing DOM element
     const nodeController = {
       ...props,
       get selected() { return selected.value },
-      set selected(val: boolean) { selected.value = val }
+      set selected(val: boolean) { selected.value = val },
+      get element() { return nodeRowRef.value },
+      scrollIntoView() {
+        nextTick(() => {
+          nodeRowRef.value?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+        })
+      }
     }
     action(nodeController as any)
     return
@@ -163,9 +241,10 @@ defineExpose({ selectNode, tnode: rawNode, selected })
 </script>
 
 <template>
-  <div class="tree-item">
+  <div class="tree-item" v-show="isVisible">
     <div v-if="!isSimpleType" class="tree-node">
       <div 
+        ref="nodeRowRef"
         class="node-row" 
         @click.stop="toggleOpen"
         @mouseenter="isHovered = true"
@@ -179,9 +258,8 @@ defineExpose({ selectNode, tnode: rawNode, selected })
           class="node-key" 
           :class="{ selected }"
           @click.stop.prevent="handleNodeClick"
-        >
-          {{ nodeKey }}
-        </a>
+          v-html="highlightedKey"
+        ></a>
         <span class="node-label">{{ label }}</span>
         <button 
           v-show="isHovered"
@@ -209,6 +287,7 @@ defineExpose({ selectNode, tnode: rawNode, selected })
           :tnode="cn"
           :current-level="currentLevel + 1"
           :expand-state="expandState"
+          :filter-query="filterQuery"
           @node-clicked="bubbleEvent($event, 'nodeClicked')"
         />
         <a 
@@ -224,12 +303,13 @@ defineExpose({ selectNode, tnode: rawNode, selected })
     
     <div 
       v-else 
+      ref="nodeRowRef"
       class="leaf-node"
       @mouseenter="isHovered = true"
       @mouseleave="isHovered = false"
     >
-      <span class="node-key leaf-key">{{ nodeKey }}</span>:
-      <SimpleValue :tnode="rawNode" @node-clicked="emit('nodeClicked', [$event])" />
+      <span class="node-key leaf-key" v-html="highlightedKey"></span>:
+      <SimpleValue :tnode="rawNode" :filter-query="filterQuery" @node-clicked="emit('nodeClicked', [$event])" />
       <button 
         v-show="isHovered"
         class="copy-btn"
@@ -359,5 +439,13 @@ defineExpose({ selectNode, tnode: rawNode, selected })
 
 .copy-btn i {
   font-size: 12px;
+}
+
+/* Highlight for matched filter text - use :deep() since v-html content is not affected by scoped styles */
+:deep(.highlight) {
+  background-color: #ffc107;
+  color: #000;
+  padding: 0 1px;
+  border-radius: 2px;
 }
 </style>

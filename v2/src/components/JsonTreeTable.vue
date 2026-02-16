@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { Splitpanes, Pane } from 'splitpanes'
 import 'splitpanes/dist/splitpanes.css'
 import Button from 'primevue/button'
-import ToggleButton from 'primevue/togglebutton'
 import Select from 'primevue/select'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
+import Menu from 'primevue/menu'
 import { useToast } from 'primevue/usetoast'
 import { useTreeStore } from '../stores/treeStore'
 import { useThemeStore } from '../stores/themeStore'
@@ -38,7 +38,6 @@ const {
   showTable, 
   maxPane,
   currentPane,
-  codeView,
   selectedParser,
   availableParsers
 } = storeToRefs(store)
@@ -53,6 +52,60 @@ const defaultUrl = 'https://www.googleapis.com/discovery/v1/apis/vision/v1p1beta
 const sourceViewRef = ref<InstanceType<typeof SourceView>>()
 const treeViewRef = ref<InstanceType<typeof TreeView>>()
 const tableViewRef = ref<InstanceType<typeof TableView>>()
+const viewMenuRef = ref<InstanceType<typeof Menu>>()
+const viewMenuButtonRef = ref<HTMLElement>()
+
+// View menu items - use checkbox icons for consistent spacing
+const viewMenuItems = computed(() => [
+  {
+    label: 'Source',
+    icon: showSource.value ? 'pi pi-check-square' : 'pi pi-stop',
+    command: (event: any) => { 
+      event.originalEvent?.stopPropagation()
+      event.originalEvent?.preventDefault()
+      showSource.value = !showSource.value
+      // Re-show menu after toggle using nextTick to ensure state is updated
+      nextTick(() => {
+        if (viewMenuButtonRef.value) {
+          viewMenuRef.value?.show({ currentTarget: viewMenuButtonRef.value } as any)
+        }
+      })
+    }
+  },
+  {
+    label: 'Tree',
+    icon: showTree.value ? 'pi pi-check-square' : 'pi pi-stop',
+    command: (event: any) => { 
+      event.originalEvent?.stopPropagation()
+      event.originalEvent?.preventDefault()
+      showTree.value = !showTree.value
+      nextTick(() => {
+        if (viewMenuButtonRef.value) {
+          viewMenuRef.value?.show({ currentTarget: viewMenuButtonRef.value } as any)
+        }
+      })
+    }
+  },
+  {
+    label: 'Table',
+    icon: showTable.value ? 'pi pi-check-square' : 'pi pi-stop',
+    command: (event: any) => { 
+      event.originalEvent?.stopPropagation()
+      event.originalEvent?.preventDefault()
+      showTable.value = !showTable.value
+      nextTick(() => {
+        if (viewMenuButtonRef.value) {
+          viewMenuRef.value?.show({ currentTarget: viewMenuButtonRef.value } as any)
+        }
+      })
+    }
+  }
+])
+
+function toggleViewMenu(e: Event) {
+  viewMenuButtonRef.value = e.currentTarget as HTMLElement
+  viewMenuRef.value?.toggle(e)
+}
 
 // Parser options for select
 const parserOptions = computed(() => 
@@ -107,30 +160,6 @@ async function openUrl(url?: string) {
     store.setTextImmediate(JSON.stringify({ error: (error as Error).message, url: targetUrl }, null, 2))
     toast.add({ severity: 'error', summary: 'Failed to load URL', detail: (error as Error).message, life: 5000 })
   }
-}
-
-async function paste() {
-  try {
-    const text = await navigator.clipboard.readText()
-    store.setTextImmediate(text)
-    toast.add({ severity: 'success', summary: 'Pasted from clipboard', life: 2000 })
-  } catch (error) {
-    toast.add({ severity: 'error', summary: 'Failed to paste', detail: 'Clipboard access denied', life: 3000 })
-  }
-}
-
-async function copy() {
-  try {
-    await navigator.clipboard.writeText(rawText.value)
-    toast.add({ severity: 'success', summary: 'Copied to clipboard', life: 2000 })
-  } catch (error) {
-    toast.add({ severity: 'error', summary: 'Failed to copy', life: 3000 })
-  }
-}
-
-function format() {
-  store.format()
-  toast.add({ severity: 'success', summary: 'Formatted', life: 2000 })
 }
 
 function onKeyDown(event: KeyboardEvent, pane: string) {
@@ -286,57 +315,17 @@ defineExpose({ openUrl })
             @click="urlDialogVisible = true"
             v-tooltip.bottom="'Open URL'"
           />
-          <Button
-            icon="pi pi-copy"
-            size="small"
-            text
-            :disabled="!rawText"
-            @click="copy"
-            v-tooltip.bottom="'Copy'"
-          />
-          <Button
-            icon="pi pi-clipboard"
-            size="small"
-            text
-            @click="paste"
-            v-tooltip.bottom="'Paste'"
-          />
-          <Button
-            icon="pi pi-code"
-            size="small"
-            :severity="codeView ? 'primary' : 'secondary'"
-            :text="!codeView"
-            @click="codeView = !codeView"
-            v-tooltip.bottom="'Toggle syntax highlighting'"
-          />
-          <Button
-            icon="pi pi-align-justify"
-            size="small"
-            text
-            @click="format"
-            v-tooltip.bottom="'Format'"
-          />
         </div>
         
         <div class="tdv-toolbar-group">
-          <ToggleButton
-            v-model="showSource"
-            onLabel="Source"
-            offLabel="Source"
-            :pt="{ root: { class: 'view-toggle' } }"
+          <Button
+            icon="pi pi-th-large"
+            size="small"
+            text
+            @click="toggleViewMenu"
+            v-tooltip.bottom="'Toggle Views'"
           />
-          <ToggleButton
-            v-model="showTree"
-            onLabel="Tree"
-            offLabel="Tree"
-            :pt="{ root: { class: 'view-toggle' } }"
-          />
-          <ToggleButton
-            v-model="showTable"
-            onLabel="Table"
-            offLabel="Table"
-            :pt="{ root: { class: 'view-toggle' } }"
-          />
+          <Menu ref="viewMenuRef" :model="viewMenuItems" :popup="true" />
         </div>
         
         <div class="tdv-toolbar-group" v-if="availableParsers.length > 1">
@@ -482,11 +471,6 @@ defineExpose({ openUrl })
 
 .parser-select {
   min-width: 140px;
-}
-
-.view-toggle {
-  padding: 6px 12px;
-  font-size: 0.85rem;
 }
 
 .split-container {

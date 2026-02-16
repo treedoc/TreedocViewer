@@ -299,14 +299,18 @@ function copyStats() {
 // Import shared value color service
 import { 
   PRESET_COLORS, 
-  getValueColor, 
+  getValueColor as getValueColorService, 
   setValueColor as setValueColorService 
 } from '@/utils/ValueColorService'
 
 const colorPickerValue = ref<string | null>(null)
 
+function getValueColor(value: string) {
+  return getValueColorService(props.field, value)
+}
+
 function setValueColor(value: string, color: { bg: string; text: string } | null) {
-  setValueColorService(value, color)
+  setValueColorService(props.field, value, color)
   colorPickerValue.value = null
 }
 
@@ -430,7 +434,7 @@ function toggleColorPicker(value: string) {
       </div>
       <div v-if="localIsPattern" class="pattern-hint">
         <span v-if="localQuery && previewPatternFields.length === 0">
-          Use ${name} to extract values, e.g., "Order:${orderId}"
+          Use ${name}, $name to extract values, * for wildcard
         </span>
         <span>Ctrl+Enter to apply filter</span>
       </div>
@@ -796,17 +800,32 @@ function toggleColorPicker(value: string) {
   align-items: center;
   gap: 8px;
   font-size: 0.8rem;
+  position: relative;
 }
 
 .top-value-row:hover .top-value-actions {
   opacity: 1;
+  transition-delay: 100ms;
+  pointer-events: auto;
 }
 
 .top-value-actions {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
   display: flex;
   gap: 2px;
+  padding: 2px 4px;
+  background: rgba(var(--tdv-surface-rgb, 255, 255, 255), 0.5);
+  backdrop-filter: blur(4px);
+  border: 1px solid var(--tdv-surface-border);
+  border-radius: 4px;
   opacity: 0;
   transition: opacity 0.15s;
+  transition-delay: 0s;
+  z-index: 10;
+  pointer-events: none;
 }
 
 .stat-action-btn {
@@ -906,9 +925,9 @@ function toggleColorPicker(value: string) {
 
 .top-value-count {
   font-weight: 600;
-  min-width: 30px;
   text-align: right;
   color: inherit;
+  white-space: nowrap;
 }
 
 .top-value-item:not(.has-highlight) .top-value-count {
@@ -917,9 +936,9 @@ function toggleColorPicker(value: string) {
 
 .top-value-percent {
   font-weight: 500;
-  min-width: 45px;
   text-align: right;
   color: inherit;
+  white-space: nowrap;
 }
 
 .top-value-item:not(.has-highlight) .top-value-percent {

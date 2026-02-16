@@ -51,6 +51,10 @@ export const useTreeStore = defineStore('tree', () => {
   const codeView = ref(true)
   const hasTreeInTable = ref(false)
   
+  // Tree filter state
+  const showTreeFilter = ref(false)
+  const treeFilterQuery = ref('')
+  
   // Parser state
   const defaultParser: ParserPlugin = new JSONParserPlugin()
   const selectedParser = ref<ParserPlugin>(defaultParser)
@@ -329,6 +333,10 @@ export const useTreeStore = defineStore('tree', () => {
     textWrap,
     codeView,
     hasTreeInTable,
+    
+    // Tree filter state
+    showTreeFilter,
+    treeFilterQuery,
     
     // Parser
     selectedParser,

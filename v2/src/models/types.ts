@@ -29,6 +29,11 @@ export interface Selection {
   end?: { line: number; col: number; pos: number }
 }
 
+export interface ValueColor {
+  bg: string
+  text: string
+}
+
 export interface FieldQuery {
   query: string
   isRegex: boolean
@@ -37,6 +42,7 @@ export interface FieldQuery {
   isPattern: boolean
   isDisabled: boolean
   patternFields: string[]
+  valueColors?: Record<string, ValueColor>
 }
 
 export interface Query {

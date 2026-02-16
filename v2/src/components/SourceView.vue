@@ -9,13 +9,16 @@ import { EditorState, StateEffect, StateField } from '@codemirror/state'
 import { useTreeStore } from '../stores/treeStore'
 import { useThemeStore } from '../stores/themeStore'
 import { storeToRefs } from 'pinia'
+import { useToast } from 'primevue/usetoast'
 import ToggleButton from 'primevue/togglebutton'
+import Button from 'primevue/button'
 
 const SIZE_LIMIT_FOR_READONLY = 10_000_000
 const SIZE_LIMIT_FOR_CODE_VIEW = 1000_000
 
 const store = useTreeStore()
 const themeStore = useThemeStore()
+const toast = useToast()
 const { rawText, selection, selectedParser, codeView } = storeToRefs(store)
 const { isDarkMode } = storeToRefs(themeStore)
 
@@ -137,6 +140,30 @@ watch(rawText, (text) => {
     codeView.value = true
   }
 })
+
+async function paste() {
+  try {
+    const text = await navigator.clipboard.readText()
+    store.setTextImmediate(text)
+    toast.add({ severity: 'success', summary: 'Pasted from clipboard', life: 2000 })
+  } catch (error) {
+    toast.add({ severity: 'error', summary: 'Failed to paste', detail: 'Clipboard access denied', life: 3000 })
+  }
+}
+
+async function copy() {
+  try {
+    await navigator.clipboard.writeText(rawText.value)
+    toast.add({ severity: 'success', summary: 'Copied to clipboard', life: 2000 })
+  } catch (error) {
+    toast.add({ severity: 'error', summary: 'Failed to copy', life: 3000 })
+  }
+}
+
+function format() {
+  store.format()
+  toast.add({ severity: 'success', summary: 'Formatted', life: 2000 })
+}
 </script>
 
 <template>
@@ -144,6 +171,29 @@ watch(rawText, (text) => {
     <div class="source-header">
       <span class="panel-title">Source View</span>
       <div class="source-controls">
+        <Button
+          icon="pi pi-copy"
+          size="small"
+          text
+          :disabled="!rawText"
+          @click="copy"
+          v-tooltip.top="'Copy'"
+        />
+        <Button
+          icon="pi pi-clipboard"
+          size="small"
+          text
+          @click="paste"
+          v-tooltip.top="'Paste'"
+        />
+        <Button
+          icon="pi pi-align-justify"
+          size="small"
+          text
+          :disabled="!rawText"
+          @click="format"
+          v-tooltip.top="'Format'"
+        />
         <ToggleButton
           v-model="codeView"
           onLabel="Code"

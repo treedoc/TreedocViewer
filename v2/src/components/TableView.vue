@@ -33,7 +33,7 @@ import {
   shouldExpandColumns
 } from '@/utils/TableUtil'
 import { matchFieldQuery, matchPattern, createExtendedFieldsFunc } from '@/utils/QueryUtil'
-import { getValueColorStyle } from '@/utils/ValueColorService'
+import { getValueColorStyle, applyValueColorsFromFieldQueries } from '@/utils/ValueColorService'
 
 const logger = new Logger('TableView')
 const COL_VALUE = '@value'
@@ -158,6 +158,9 @@ function applyPreset(preset: QueryPreset) {
   
   // Apply JS query
   jsQuery.value = preset.jsQuery || '$'
+  
+  // Apply value colors from field queries
+  applyValueColorsFromFieldQueries(preset.fieldQueries)
   
   // Rebuild table to apply changes
   rebuildTable()
@@ -506,7 +509,7 @@ function isKeyColumn(field: string): boolean {
 
 function getCellColorStyle(data: any, field: string): Record<string, string> | null {
   const value = getCellValue(data, field)
-  return getValueColorStyle(String(value))
+  return getValueColorStyle(field, String(value))
 }
 
 function getRowNodePath(row: TableRow): string[] {
@@ -792,26 +795,50 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
     <div v-if="showAdvancedQuery" class="advanced-query">
       <label>
         JS Query:
-        <AutoCompleteInput
-          v-model="jsQuery"
-          placeholder="Custom query in JS. E.g. $.name.length > 10"
-          :storage-key="STORAGE_KEY_JS_QUERY"
-          input-class="query-input"
-        />
+        <div class="input-with-clear">
+          <AutoCompleteInput
+            v-model="jsQuery"
+            placeholder="Custom query in JS. E.g. $.name.length > 10"
+            :storage-key="STORAGE_KEY_JS_QUERY"
+            input-class="query-input"
+          />
+          <Button
+            v-if="jsQuery && jsQuery !== '$'"
+            icon="pi pi-times"
+            size="small"
+            severity="secondary"
+            text
+            class="clear-btn"
+            @click="jsQuery = '$'"
+            v-tooltip.top="'Clear JS Query'"
+          />
+        </div>
       </label>
     </div>
     
     <div v-if="showExtendedFields" class="extended-fields-panel">
       <label class="extended-fields-label">
         Extended Fields:
-        <AutoCompleteInput
-          v-model="extendedFields"
-          placeholder="Add computed columns. E.g. fullName: $.first + ' ' + $.last, tags_: $.metadata.tags"
-          :storage-key="STORAGE_KEY_EXTENDED_FIELDS"
-          input-class="extended-fields-input"
-          @blur="rebuildTable"
-          @enter="rebuildTable"
-        />
+        <div class="input-with-clear">
+          <AutoCompleteInput
+            v-model="extendedFields"
+            placeholder="Add computed columns. E.g. fullName: $.first + ' ' + $.last, tags_: $.metadata.tags"
+            :storage-key="STORAGE_KEY_EXTENDED_FIELDS"
+            input-class="extended-fields-input"
+            @blur="rebuildTable"
+            @enter="rebuildTable"
+          />
+          <Button
+            v-if="extendedFields"
+            icon="pi pi-times"
+            size="small"
+            severity="secondary"
+            text
+            class="clear-btn"
+            @click="extendedFields = ''; rebuildTable()"
+            v-tooltip.top="'Clear Extended Fields'"
+          />
+        </div>
       </label>
       <div class="extended-fields-help">
         <small>
@@ -895,7 +922,7 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
                   />
                 </template>
                 <template v-else>
-                  <span>{{ getCellValue(data, col.field) }}</span>
+                  <span class="simple-cell-value" :style="{ whiteSpace: whiteSpaceStyle }">{{ getCellValue(data, col.field) }}</span>
                 </template>
               </div>
               <div class="cell-button-bar">
@@ -1025,6 +1052,17 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
   gap: 8px;
   font-size: 0.85rem;
   color: var(--tdv-text-muted);
+}
+
+.input-with-clear {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+}
+
+.clear-btn {
+  flex-shrink: 0;
 }
 
 .query-input {
@@ -1196,7 +1234,14 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  /* white-space is controlled by inline style via whiteSpaceStyle computed property */
+}
+
+.simple-cell-value {
+  display: inline-block;
+  max-width: 100%;
+  word-break: break-word;
+  /* white-space is controlled by inline style via whiteSpaceStyle computed property */
 }
 
 .empty-table {
@@ -1215,8 +1260,11 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
 
 .cell-wrapper {
   position: relative;
-  display: inline-block;
+  display: block;
   width: 100%;
+  max-width: 80vw;
+  max-height: 50vh;
+  overflow: auto;
   padding: 2px 4px;
   margin: -2px -4px;
   border-radius: 3px;

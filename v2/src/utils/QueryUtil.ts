@@ -5,19 +5,35 @@
 import type { FieldQuery } from '../components/ColumnFilterDialog.vue'
 
 /**
- * Convert a pattern string with ${placeholder} syntax to a regex with named capture groups
- * e.g., "Order:${orderId}" -> /Order:(?<orderId>.+?)/
+ * Convert a pattern string to a regex with named capture groups
+ * Supported syntax:
+ * - ${name}: captures until next literal text (greedy for last, non-greedy otherwise)
+ * - $name: captures word characters only (alphanumeric + underscore)
+ * - asterisk (*): matches any characters (like glob wildcard)
  */
 export function patternToRegex(pattern: string): RegExp | null {
   if (!pattern) return null
   
   try {
+    // Track placeholders and their types: 'braced' for ${name}, 'simple' for $name
+    const placeholders: { name: string; type: 'braced' | 'simple' }[] = []
+    
     // First, temporarily replace ${...} placeholders with a unique marker
-    const placeholders: string[] = []
     let tempPattern = pattern.replace(/\$\{(\w+)\}/g, (match, name) => {
-      placeholders.push(name)
+      placeholders.push({ name, type: 'braced' })
       return `\x00PLACEHOLDER_${placeholders.length - 1}\x00`
     })
+    
+    // Then, replace $name placeholders (not followed by { which would be ${)
+    // $name is terminated by non-word character or end of string
+    tempPattern = tempPattern.replace(/\$(\w+)/g, (match, name) => {
+      placeholders.push({ name, type: 'simple' })
+      return `\x00PLACEHOLDER_${placeholders.length - 1}\x00`
+    })
+    
+    // Replace * wildcard with a unique marker before escaping
+    const WILDCARD_MARKER = '\x00WILDCARD\x00'
+    tempPattern = tempPattern.replace(/\*/g, WILDCARD_MARKER)
     
     // Normalize escape sequences so pattern matches JSON-parsed values
     // e.g. user types \n -> match actual newline (from JSON "\n")
@@ -30,15 +46,24 @@ export function patternToRegex(pattern: string): RegExp | null {
     tempPattern = tempPattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
     tempPattern = tempPattern.replace(/\u0001\u0002\u0003/g, '\\\\')
     
+    // Restore wildcard markers as .*
+    tempPattern = tempPattern.replace(/\x00WILDCARD\x00/g, '.*')
+    
     // Restore placeholders as named capture groups
-    const endsWithPlaceholder = /\$\{\w+\}$/.test(pattern)
+    const endsWithPlaceholder = /(\$\{\w+\}|\$\w+)$/.test(pattern)
     let placeholderIndex = 0
     let regexStr = tempPattern.replace(/\x00PLACEHOLDER_(\d+)\x00/g, (match, idx) => {
-      const name = placeholders[parseInt(idx)]
+      const placeholder = placeholders[parseInt(idx)]
       const isLast = placeholderIndex === placeholders.length - 1
       placeholderIndex++
-      // Use greedy .+ for last placeholder, non-greedy .+? for others
-      return isLast && endsWithPlaceholder ? `(?<${name}>.+)` : `(?<${name}>.+?)`
+      
+      if (placeholder.type === 'simple') {
+        // $name captures word characters only (\w+)
+        return `(?<${placeholder.name}>\\w+)`
+      } else {
+        // ${name} uses greedy .+ for last placeholder, non-greedy .+? for others
+        return isLast && endsWithPlaceholder ? `(?<${placeholder.name}>.+)` : `(?<${placeholder.name}>.+?)`
+      }
     })
     
     // Make it match the entire string or as a substring

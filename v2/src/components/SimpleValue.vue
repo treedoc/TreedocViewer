@@ -6,6 +6,7 @@ const props = defineProps<{
   tnode: TDNode
   isInTable?: boolean
   textWrap?: boolean
+  filterQuery?: string
 }>()
 
 const emit = defineEmits<{
@@ -73,6 +74,42 @@ const valueStyle = computed(() => {
 
 const whiteSpaceStyle = computed(() => (props.textWrap ? 'pre-wrap' : 'pre'))
 
+// Highlight matched text by wrapping in <mark> tags
+function highlightText(text: string, query: string): string {
+  if (!query || !text) return escapeHtml(text)
+  
+  const queryLower = query.toLowerCase()
+  const textLower = text.toLowerCase()
+  const index = textLower.indexOf(queryLower)
+  
+  if (index === -1) return escapeHtml(text)
+  
+  const before = text.substring(0, index)
+  const match = text.substring(index, index + query.length)
+  const after = text.substring(index + query.length)
+  
+  // Recursively highlight remaining text
+  return escapeHtml(before) + '<mark class="highlight">' + escapeHtml(match) + '</mark>' + highlightText(after, query)
+}
+
+function escapeHtml(text: string): string {
+  if (!text) return text
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+}
+
+const highlightedValue = computed(() => {
+  const val = nodeValue.value
+  if (val === null) return 'null'
+  const text = String(val)
+  if (!props.filterQuery) return escapeHtml(text)
+  return highlightText(text, props.filterQuery)
+})
+
 function handleRefClick() {
   if (refAbsolute.value) {
     emit('nodeClicked', refAbsolute.value)
@@ -93,7 +130,7 @@ function handleRefClick() {
       <span v-if="date" class="date-hint">{{ date }}</span>
     </template>
     <template v-else>
-      <span :class="valueStyle">{{ nodeValue }}</span>
+      <span :class="valueStyle" v-html="highlightedValue"></span>
       <span v-if="date" class="date-hint"> ({{ date }})</span>
     </template>
   </span>
@@ -137,5 +174,13 @@ function handleRefClick() {
   font-style: italic;
   display: block;
   margin-top: 2px;
+}
+
+/* Highlight for matched filter text - use :deep() since v-html content is not affected by scoped styles */
+:deep(.highlight) {
+  background-color: #ffc107;
+  color: #000;
+  padding: 0 1px;
+  border-radius: 2px;
 }
 </style>
