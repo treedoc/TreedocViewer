@@ -254,28 +254,39 @@ describe('matchFieldQuery', () => {
 
   it('should use pattern matching when isPattern is true', () => {
     const fq = createFieldQuery({ 
-      query: 'ScheduledOrdersRule: shadow verification mismatch for order ${order} Legacy issues: [], New issues: [issue_type: SCHEDULING_NOT_ALLOWED ]', 
+      query: "Verification ${matches} for order '$order' Legacy issues: [], New issues: [issue_type: ${issue_type} ]", 
       isPattern: true,
       patternFields: []
     })
-    expect(matchFieldQuery('ScheduledOrdersRule: shadow verification mismatch for order ${order} Legacy issues: [], New issues: [issue_type: SCHEDULING_NOT_ALLOWED ]', fq)).toBe(true)
+    expect(matchFieldQuery("Verification mismatch for order '121212' Legacy issues: [], New issues: [issue_type: NOT_ALLOWED ]", fq)).toBe(true)
     expect(matchFieldQuery('Something else', fq)).toBe(false)
   })
+
+    it('should use pattern matching there is single quote around the pattern variable without curly braces', () => {
+    const fq = createFieldQuery({ 
+      query: "API: $name Request: '$request' Response: '${response}'", 
+      isPattern: true,
+      patternFields: []
+    })
+    expect(matchFieldQuery("API: SomeAPIName Request: '{}' Response: '{}'", fq)).toBe(true)
+    expect(matchFieldQuery('Something else', fq)).toBe(false)
+  })
+
 
   // Debug: pattern matching with exact value copy - newline representation mismatch
   it('should match when pattern is exact copy of value with newline', () => {
     // Value as stored after JSON parse: \n becomes actual newline character (U+000A)
-    const valueWithNewline = "ScheduledOrdersRule: shadow verification mismatch for order 2c0bbc01-ca34-46c0-ac13-ef863f31495b. Legacy issues: [], New issues: [issue_type: SCHEDULING_EXCEEDS_LIMIT\nentity_id"
+    const valueWithNewline = "Verification mismatch for order Order123456. Legacy issues: [], New issues: [issue_type: SCHEDULING_EXCEEDS_LIMIT\nentity_id"
     // When user copies from UI or types, they get backslash-n as two chars - regex then matches \ + n, not newline
-    const patternAsTyped = "ScheduledOrdersRule: shadow verification mismatch for order 2c0bbc01-ca34-46c0-ac13-ef863f31495b. Legacy issues: [], New issues: [issue_type: SCHEDULING_EXCEEDS_LIMIT\\nentity_id"
+    const patternAsTyped = "Verification mismatch for order Order123456. Legacy issues: [], New issues: [issue_type: SCHEDULING_EXCEEDS_LIMIT\\nentity_id"
     const fq = createFieldQuery({ query: patternAsTyped, isPattern: true })
     const result = matchFieldQuery(valueWithNewline, fq)
     expect(result).toBe(true)
   })
 
   it('should match when both value and pattern have actual newline', () => {
-    const valueWithNewline = "ScheduledOrdersRule: shadow verification mismatch for order 2c0bbc01-ca34-46c0-ac13-ef863f31495b. Legacy issues: [], New issues: [issue_type: SCHEDULING_EXCEEDS_LIMIT\nentity_id"
-    const patternWithNewline = "ScheduledOrdersRule: shadow verification mismatch for order 2c0bbc01-ca34-46c0-ac13-ef863f31495b. Legacy issues: [], New issues: [issue_type: SCHEDULING_EXCEEDS_LIMIT\nentity_id"
+    const valueWithNewline = "Verification mismatch for order Order123456. Legacy issues: [], New issues: [issue_type: SCHEDULING_EXCEEDS_LIMIT\nentity_id"
+    const patternWithNewline = "Verification mismatch for order Order123456. Legacy issues: [], New issues: [issue_type: SCHEDULING_EXCEEDS_LIMIT\nentity_id"
     const fq = createFieldQuery({ query: patternWithNewline, isPattern: true })
     expect(matchFieldQuery(valueWithNewline, fq)).toBe(true)
   })

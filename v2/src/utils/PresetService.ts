@@ -38,6 +38,15 @@ export function getPreset(id: string): QueryPreset | null {
 }
 
 /**
+ * Get a preset by name (case-insensitive)
+ */
+export function getPresetByName(name: string): QueryPreset | null {
+  const presets = getAllPresets()
+  const lowerName = name.toLowerCase().trim()
+  return presets.find(p => p.name.toLowerCase().trim() === lowerName) || null
+}
+
+/**
  * Save a new preset
  */
 export function savePreset(preset: Omit<QueryPreset, 'id' | 'createdAt' | 'updatedAt'>): QueryPreset {

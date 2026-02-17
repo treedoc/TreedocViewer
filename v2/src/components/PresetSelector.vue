@@ -12,7 +12,9 @@ import {
   deletePreset,
   exportPreset,
   importPreset,
+  getPresetByName,
 } from '@/utils/PresetService'
+import { useToast } from 'primevue/usetoast'
 import { getFieldValueColors } from '@/utils/ValueColorService'
 
 export interface CurrentState {
@@ -31,6 +33,8 @@ const emit = defineEmits<{
   'load': [preset: QueryPreset]
 }>()
 
+const toast = useToast()
+
 // State
 const presets = ref<QueryPreset[]>(getAllPresets())
 const selectedPresetId = ref<string | null>(null)
@@ -39,6 +43,8 @@ const showManageDialog = ref(false)
 const newPresetName = ref('')
 const newPresetDescription = ref('')
 const editingPreset = ref<QueryPreset | null>(null)
+const showOverwriteConfirm = ref(false)
+const existingPresetToOverwrite = ref<QueryPreset | null>(null)
 
 // Computed
 const selectedPreset = computed(() => {
@@ -95,19 +101,75 @@ function buildFieldQueriesWithColors() {
 function saveCurrentAsPreset() {
   if (!newPresetName.value.trim()) return
   
-  const preset = savePreset({
-    name: newPresetName.value.trim(),
-    description: newPresetDescription.value.trim() || undefined,
-    columns: props.currentState.columns,
-    extendedFields: props.currentState.extendedFields,
-    fieldQueries: buildFieldQueriesWithColors(),
-    jsQuery: props.currentState.jsQuery,
-    expandLevel: props.currentState.expandLevel,
-  })
+  // Check if a preset with the same name already exists
+  const existingPreset = getPresetByName(newPresetName.value.trim())
+  if (existingPreset) {
+    existingPresetToOverwrite.value = existingPreset
+    showOverwriteConfirm.value = true
+    return
+  }
+  
+  doSavePreset(false)
+}
+
+function doSavePreset(overwrite: boolean) {
+  const name = newPresetName.value.trim()
+  const description = newPresetDescription.value.trim() || undefined
+  
+  let preset: QueryPreset
+  
+  if (overwrite && existingPresetToOverwrite.value) {
+    // Update the existing preset
+    const updated = updatePreset(existingPresetToOverwrite.value.id, {
+      name,
+      description,
+      columns: props.currentState.columns,
+      extendedFields: props.currentState.extendedFields,
+      fieldQueries: buildFieldQueriesWithColors(),
+      jsQuery: props.currentState.jsQuery,
+      expandLevel: props.currentState.expandLevel,
+    })
+    
+    if (updated) {
+      preset = updated
+      toast.add({
+        severity: 'warn',
+        summary: 'Preset Overwritten',
+        detail: `Preset "${name}" has been updated`,
+        life: 3000,
+      })
+    } else {
+      toast.add({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to overwrite preset',
+        life: 3000,
+      })
+      return
+    }
+  } else {
+    // Create new preset
+    preset = savePreset({
+      name,
+      description,
+      columns: props.currentState.columns,
+      extendedFields: props.currentState.extendedFields,
+      fieldQueries: buildFieldQueriesWithColors(),
+      jsQuery: props.currentState.jsQuery,
+      expandLevel: props.currentState.expandLevel,
+    })
+  }
   
   refreshPresets()
   selectedPresetId.value = preset.id
   showSaveDialog.value = false
+  showOverwriteConfirm.value = false
+  existingPresetToOverwrite.value = null
+}
+
+function cancelOverwrite() {
+  showOverwriteConfirm.value = false
+  existingPresetToOverwrite.value = null
 }
 
 function updateCurrentPreset() {
@@ -279,6 +341,26 @@ function formatDate(timestamp: number): string {
     <template #footer>
       <Button label="Cancel" severity="secondary" text @click="showSaveDialog = false" />
       <Button label="Save" :disabled="!newPresetName.trim()" @click="saveCurrentAsPreset" />
+    </template>
+  </Dialog>
+  
+  <!-- Overwrite Confirmation Dialog -->
+  <Dialog
+    v-model:visible="showOverwriteConfirm"
+    header="Overwrite Preset?"
+    :modal="true"
+    :style="{ width: '400px' }"
+  >
+    <div class="overwrite-confirm-content">
+      <i class="pi pi-exclamation-triangle" style="font-size: 2rem; color: var(--orange-500);"></i>
+      <p>
+        A preset named <strong>"{{ existingPresetToOverwrite?.name }}"</strong> already exists.
+        Do you want to overwrite it with the current settings?
+      </p>
+    </div>
+    <template #footer>
+      <Button label="Cancel" severity="secondary" text @click="cancelOverwrite" />
+      <Button label="Overwrite" severity="warning" @click="doSavePreset(true)" />
     </template>
   </Dialog>
   
@@ -477,5 +559,21 @@ function formatDate(timestamp: number): string {
 
 .edit-desc {
   flex: 2;
+}
+
+.overwrite-confirm-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 8px 0;
+}
+
+.overwrite-confirm-content p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.overwrite-confirm-content strong {
+  color: var(--tdv-text-primary);
 }
 </style>

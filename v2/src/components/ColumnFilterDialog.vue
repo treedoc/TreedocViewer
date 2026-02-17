@@ -16,6 +16,7 @@ export interface FieldQuery {
   isPattern: boolean
   isDisabled: boolean  // Keep filter config but don't apply
   patternFields: string[]  // Extracted field names from pattern
+  extendedFields?: string  // Field-level extended fields expression (e.g., "name: $.user.name, id: $.id")
 }
 
 export interface ColumnStatistic {
@@ -53,10 +54,22 @@ const localIsNegate = ref(props.fieldQuery.isNegate)
 const localIsArray = ref(props.fieldQuery.isArray)
 const localIsPattern = ref(props.fieldQuery.isPattern || false)
 const localIsDisabled = ref(props.fieldQuery.isDisabled || false)
+const localExtendedFields = ref(props.fieldQuery.extendedFields || '')
+const showExtendedFields = ref(false)
 
 // Resize functionality
 const dialogWidth = ref(550)
-const dialogHeight = ref(500)
+// Base height when both sections are collapsed
+const baseDialogHeight = ref(220)
+// Additional height for each expanded section
+const extendedFieldsHeight = 100
+const statsHeight = 220
+const dialogHeight = computed(() => {
+  let height = baseDialogHeight.value
+  if (showExtendedFields.value) height += extendedFieldsHeight
+  if (showStats.value) height += statsHeight
+  return height
+})
 const isResizing = ref(false)
 const resizeStartX = ref(0)
 const resizeStartY = ref(0)
@@ -79,7 +92,12 @@ function onResize(e: MouseEvent) {
   const deltaX = e.clientX - resizeStartX.value
   const deltaY = e.clientY - resizeStartY.value
   dialogWidth.value = Math.max(350, Math.min(window.innerWidth * 0.9, resizeStartWidth.value + deltaX))
-  dialogHeight.value = Math.max(300, Math.min(window.innerHeight * 0.9, resizeStartHeight.value + deltaY))
+  const newHeight = Math.max(200, Math.min(window.innerHeight * 0.9, resizeStartHeight.value + deltaY))
+  // Calculate the base height by subtracting the expanded section heights
+  let newBaseHeight = newHeight
+  if (showExtendedFields.value) newBaseHeight -= extendedFieldsHeight
+  if (showStats.value) newBaseHeight -= statsHeight
+  baseDialogHeight.value = Math.max(200, newBaseHeight)
 }
 
 function stopResize() {
@@ -101,12 +119,32 @@ watch(() => props.fieldQuery, (fq) => {
   localIsArray.value = fq.isArray
   localIsPattern.value = fq.isPattern || false
   localIsDisabled.value = fq.isDisabled || false
+  localExtendedFields.value = fq.extendedFields || ''
+  // Auto-show extended fields section if there's content
+  if (fq.extendedFields) {
+    showExtendedFields.value = true
+  }
 }, { immediate: true })
 
-// Extract field names from pattern (e.g., "Order:${orderId}" -> ["orderId"])
+// Extract field names from pattern (e.g., "Order:${orderId}" -> ["orderId"], "user:$name" -> ["name"])
 function extractPatternFields(pattern: string): string[] {
-  const matches = pattern.matchAll(/\$\{(\w+)\}/g)
-  return [...matches].map(m => m[1])
+  const fields: string[] = []
+  
+  // First extract ${name} patterns
+  const bracedMatches = pattern.matchAll(/\$\{(\w+)\}/g)
+  for (const m of bracedMatches) {
+    fields.push(m[1])
+  }
+  
+  // Then extract $name patterns (not followed by {, and not already captured as ${name})
+  // Remove ${...} first to avoid double-matching
+  const withoutBraced = pattern.replace(/\$\{(\w+)\}/g, '')
+  const simpleMatches = withoutBraced.matchAll(/\$(\w+)/g)
+  for (const m of simpleMatches) {
+    fields.push(m[1])
+  }
+  
+  return fields
 }
 
 // Auto-focus input when dialog opens
@@ -132,6 +170,7 @@ function applyFilter() {
     isPattern: localIsPattern.value,
     isDisabled: localIsDisabled.value,
     patternFields,
+    extendedFields: localExtendedFields.value || undefined,
   })
 }
 
@@ -173,6 +212,7 @@ function clearFilter() {
   localIsArray.value = false
   localIsPattern.value = false
   localIsDisabled.value = false
+  localExtendedFields.value = ''
   applyFilter()
 }
 
@@ -329,7 +369,7 @@ function toggleColorPicker(value: string) {
     @update:visible="emit('update:visible', $event)"
     :header="`Filter: ${title}`"
     :modal="true"
-    :style="{ width: dialogWidth + 'px', height: dialogHeight + 'px', minWidth: '350px', minHeight: '300px' }"
+    :style="{ width: dialogWidth + 'px', height: dialogHeight + 'px', minWidth: '350px', minHeight: '200px' }"
     :dismissableMask="true"
     class="filter-dialog resizable-dialog"
   >
@@ -415,14 +455,6 @@ function toggleColorPicker(value: string) {
           class="filter-option-btn disable-btn"
           :class="{ 'is-disabled-active': localIsDisabled }"
         />
-        <Button
-          :icon="showStats ? 'pi pi-chevron-up' : 'pi pi-chart-bar'"
-          size="small"
-          :severity="showStats ? 'primary' : 'secondary'"
-          text
-          @click="showStats = !showStats"
-          v-tooltip.top="'Show column statistics'"
-        />
       </div>
       
       <!-- Pattern Fields Preview -->
@@ -439,19 +471,60 @@ function toggleColorPicker(value: string) {
         <span>Ctrl+Enter to apply filter</span>
       </div>
       
-      <!-- Statistics Panel -->
-      <div v-if="showStats" class="stats-panel">
-        <div class="stats-header">
-          <span class="stats-title">Column Statistics</span>
+      <!-- Extended Fields Section -->
+      <div class="extended-fields-section">
+        <div class="extended-fields-header" @click="showExtendedFields = !showExtendedFields">
           <Button
+            :icon="showExtendedFields ? 'pi pi-chevron-down' : 'pi pi-chevron-right'"
+            size="small"
+            text
+            severity="secondary"
+          />
+          <span class="extended-fields-title">
+            Extended Fields
+            <span v-if="localExtendedFields" class="has-value-indicator">●</span>
+          </span>
+        </div>
+        <div v-if="showExtendedFields" class="extended-fields-content">
+          <textarea
+            v-model="localExtendedFields"
+            placeholder="Extract fields from this column. E.g.: name: $.user.name, id: $.id"
+            class="extended-fields-input"
+            rows="2"
+            @input="debouncedApplyFilter"
+          />
+          <div class="extended-fields-hint">
+            <small>
+              If column is a JSON string, it will be auto-parsed. Syntax: <code>fieldName: $.path</code>
+            </small>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Statistics Panel -->
+      <div class="stats-section">
+        <div class="stats-section-header" @click="showStats = !showStats">
+          <Button
+            :icon="showStats ? 'pi pi-chevron-down' : 'pi pi-chevron-right'"
+            size="small"
+            text
+            severity="secondary"
+          />
+          <span class="stats-section-title">
+            Column Statistics
+          </span>
+          <Button
+            v-if="showStats"
             icon="pi pi-copy"
             size="small"
             text
-            @click="copyStats"
+            severity="secondary"
+            @click.stop="copyStats"
             v-tooltip.top="'Copy statistics'"
+            class="stats-copy-btn"
           />
         </div>
-        
+        <div v-if="showStats" class="stats-panel">
         <!-- Summary Stats -->
         <div class="stats-summary">
           <div class="stat-item">
@@ -569,6 +642,7 @@ function toggleColorPicker(value: string) {
             </div>
           </div>
         </div>
+        </div>
       </div>
     </div>
     <!-- Resize handle at dialog corner -->
@@ -577,6 +651,15 @@ function toggleColorPicker(value: string) {
 </template>
 
 <style scoped>
+/* Reduce dialog header height */
+:deep(.resizable-dialog .p-dialog-header) {
+  padding: 0.5rem 1rem;
+}
+
+:deep(.resizable-dialog .p-dialog-title) {
+  font-size: 0.95rem;
+}
+
 /* Make dialog resizable */
 :deep(.resizable-dialog) {
   display: flex;
@@ -586,14 +669,16 @@ function toggleColorPicker(value: string) {
 
 :deep(.resizable-dialog .p-dialog-content) {
   flex: 1;
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
   min-height: 0;
+  padding: 0.75rem 1rem;
 }
 
 .filter-content {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
   height: 100%;
 }
 
@@ -722,10 +807,105 @@ function toggleColorPicker(value: string) {
   flex-wrap: wrap;
 }
 
+.extended-fields-section {
+  margin-top: 4px;
+  border: 1px solid var(--tdv-surface-border);
+  border-radius: var(--tdv-radius);
+}
+
+.extended-fields-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.extended-fields-header:hover {
+  background: var(--tdv-surface-light);
+}
+
+.extended-fields-title {
+  font-size: 0.85rem;
+  color: var(--tdv-text-muted);
+}
+
+.has-value-indicator {
+  color: var(--tdv-success);
+  margin-left: 4px;
+}
+
+.extended-fields-content {
+  padding: 8px;
+  border-top: 1px solid var(--tdv-surface-border);
+}
+
+.extended-fields-input {
+  width: 100%;
+  font-family: var(--tdv-font-mono);
+  font-size: 0.85rem;
+  padding: 8px;
+  border: 1px solid var(--tdv-surface-border);
+  border-radius: var(--tdv-radius);
+  background: var(--tdv-surface);
+  color: var(--tdv-text);
+  resize: vertical;
+}
+
+.extended-fields-input:focus {
+  outline: none;
+  border-color: var(--tdv-primary);
+}
+
+.extended-fields-hint {
+  margin-top: 4px;
+  color: var(--tdv-text-muted);
+}
+
+.extended-fields-hint code {
+  background: var(--tdv-surface-light);
+  padding: 1px 4px;
+  border-radius: 2px;
+  font-size: 0.8rem;
+}
+
+.stats-section {
+  margin-top: 4px;
+  border: 1px solid var(--tdv-surface-border);
+  border-radius: var(--tdv-radius);
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.stats-section-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.stats-section-header:hover {
+  background: var(--tdv-surface-light);
+}
+
+.stats-section-title {
+  font-size: 0.85rem;
+  color: var(--tdv-text-muted);
+  flex: 1;
+}
+
+.stats-copy-btn {
+  margin-left: auto;
+}
+
 .stats-panel {
   background: var(--tdv-surface-light);
-  border: 1px solid var(--tdv-surface-border);
-  border-radius: var(--tdv-radius-sm);
+  border-top: 1px solid var(--tdv-surface-border);
   padding: 12px;
   flex: 1;
   min-height: 150px;

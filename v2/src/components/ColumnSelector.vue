@@ -142,6 +142,19 @@ function close() {
 </template>
 
 <style scoped>
+/* Reduce dialog header height */
+:deep(.p-dialog-header) {
+  padding: 0.5rem 1rem;
+}
+
+:deep(.p-dialog-title) {
+  font-size: 0.95rem;
+}
+
+:deep(.p-dialog-content) {
+  padding: 0.75rem 1rem;
+}
+
 .selector-content {
   display: flex;
   flex-direction: column;

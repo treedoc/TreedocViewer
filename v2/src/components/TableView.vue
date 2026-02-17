@@ -292,6 +292,68 @@ const filteredData = computed(() => {
     }
   }
   
+  // Apply field-level extended fields
+  const newFieldExtendedColumns = new Set<string>()
+  for (const [field, fq] of Object.entries(fieldQueries.value)) {
+    if (!fq.extendedFields) continue
+    
+    const extFunc = createExtendedFieldsFunc(fq.extendedFields)
+    if (!extFunc) continue
+    
+    data = data.map(row => {
+      const cellValue = row[field]
+      let obj: any = null
+      
+      // Get the object to apply extended fields to
+      if (cellValue && typeof cellValue === 'object' && 'type' in cellValue) {
+        // It's a TDNode - convert to object
+        obj = (cellValue as TDNode).toObject(true)
+      } else if (typeof cellValue === 'string') {
+        // Try to parse as JSON if it looks like JSON
+        const trimmed = cellValue.trim()
+        if ((trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+            (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+          try {
+            obj = JSON.parse(trimmed)
+          } catch {
+            // Not valid JSON, skip
+          }
+        }
+      }
+      
+      if (!obj) return row
+      
+      try {
+        const extracted = extFunc(obj)
+        if (extracted && Object.keys(extracted).length > 0) {
+          const newRow = { ...row }
+          for (const [key, val] of Object.entries(extracted)) {
+            newRow[key] = val
+            newFieldExtendedColumns.add(key)
+          }
+          return newRow
+        }
+      } catch (e) {
+        // Ignore errors for individual rows
+      }
+      
+      return row
+    })
+  }
+  
+  // Add field extended columns to columns list
+  for (const colName of newFieldExtendedColumns) {
+    if (!columns.value.find(c => c.field === colName)) {
+      columns.value.push({
+        field: colName,
+        header: colName,
+        sortable: true,
+        filterable: true,
+        visible: true,
+      })
+    }
+  }
+  
   // Apply JS query if specified
   if (jsQuery.value && jsQuery.value !== '$') {
     try {

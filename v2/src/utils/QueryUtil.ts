@@ -8,26 +8,26 @@ import type { FieldQuery } from '../components/ColumnFilterDialog.vue'
  * Convert a pattern string to a regex with named capture groups
  * Supported syntax:
  * - ${name}: captures until next literal text (greedy for last, non-greedy otherwise)
- * - $name: captures word characters only (alphanumeric + underscore)
+ * - $name: same as ${name}, just shorter syntax
  * - asterisk (*): matches any characters (like glob wildcard)
  */
 export function patternToRegex(pattern: string): RegExp | null {
   if (!pattern) return null
   
   try {
-    // Track placeholders and their types: 'braced' for ${name}, 'simple' for $name
-    const placeholders: { name: string; type: 'braced' | 'simple' }[] = []
+    // Track placeholder names
+    const placeholders: string[] = []
     
     // First, temporarily replace ${...} placeholders with a unique marker
     let tempPattern = pattern.replace(/\$\{(\w+)\}/g, (match, name) => {
-      placeholders.push({ name, type: 'braced' })
+      placeholders.push(name)
       return `\x00PLACEHOLDER_${placeholders.length - 1}\x00`
     })
     
     // Then, replace $name placeholders (not followed by { which would be ${)
     // $name is terminated by non-word character or end of string
     tempPattern = tempPattern.replace(/\$(\w+)/g, (match, name) => {
-      placeholders.push({ name, type: 'simple' })
+      placeholders.push(name)
       return `\x00PLACEHOLDER_${placeholders.length - 1}\x00`
     })
     
@@ -53,17 +53,12 @@ export function patternToRegex(pattern: string): RegExp | null {
     const endsWithPlaceholder = /(\$\{\w+\}|\$\w+)$/.test(pattern)
     let placeholderIndex = 0
     let regexStr = tempPattern.replace(/\x00PLACEHOLDER_(\d+)\x00/g, (match, idx) => {
-      const placeholder = placeholders[parseInt(idx)]
+      const name = placeholders[parseInt(idx)]
       const isLast = placeholderIndex === placeholders.length - 1
       placeholderIndex++
       
-      if (placeholder.type === 'simple') {
-        // $name captures word characters only (\w+)
-        return `(?<${placeholder.name}>\\w+)`
-      } else {
-        // ${name} uses greedy .+ for last placeholder, non-greedy .+? for others
-        return isLast && endsWithPlaceholder ? `(?<${placeholder.name}>.+)` : `(?<${placeholder.name}>.+?)`
-      }
+      // Use greedy .+ for last placeholder if pattern ends with placeholder, non-greedy .+? otherwise
+      return isLast && endsWithPlaceholder ? `(?<${name}>.+)` : `(?<${name}>.+?)`
     })
     
     // Make it match the entire string or as a substring

@@ -170,20 +170,91 @@ function handleFileSelect(event: Event) {
   input.value = '' // Reset for same file selection
 }
 
+/**
+ * Extract Google Drive file ID from various URL formats
+ */
+function extractGoogleDriveFileId(url: string): string | null {
+  // Format: https://drive.google.com/file/d/FILE_ID/view?usp=sharing
+  let match = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/)
+  if (match) return match[1]
+  
+  // Format: https://drive.google.com/open?id=FILE_ID
+  match = url.match(/drive\.google\.com\/open\?id=([a-zA-Z0-9_-]+)/)
+  if (match) return match[1]
+  
+  // Format: https://drive.google.com/uc?id=FILE_ID
+  match = url.match(/drive\.google\.com\/uc\?.*id=([a-zA-Z0-9_-]+)/)
+  if (match) return match[1]
+  
+  // Format: https://docs.google.com/document/d/FILE_ID/...
+  match = url.match(/docs\.google\.com\/\w+\/d\/([a-zA-Z0-9_-]+)/)
+  if (match) return match[1]
+  
+  return null
+}
+
+/**
+ * Convert Google Drive URL to direct download URL
+ */
+function getGoogleDriveDownloadUrl(fileId: string): string {
+  return `https://drive.google.com/uc?export=download&id=${fileId}`
+}
+
 async function openUrl(url?: string) {
   const targetUrl = url || urlInput.value || defaultUrl
   urlDialogVisible.value = false
   
   store.setTextImmediate(JSON.stringify({ action: 'loading...', url: targetUrl }, null, 2))
   
+  // Check if it's a Google Drive URL
+  const googleDriveFileId = extractGoogleDriveFileId(targetUrl)
+  let fetchUrl = targetUrl
+  
+  if (googleDriveFileId) {
+    fetchUrl = getGoogleDriveDownloadUrl(googleDriveFileId)
+    toast.add({ 
+      severity: 'info', 
+      summary: 'Google Drive detected', 
+      detail: 'Attempting to fetch shared file...', 
+      life: 3000 
+    })
+  }
+  
   try {
-    const response = await fetch(targetUrl)
+    const response = await fetch(fetchUrl)
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+    }
+    
     const text = await response.text()
+    
+    // Check if Google returned an HTML page (happens when file isn't publicly shared)
+    if (googleDriveFileId && text.trim().startsWith('<!DOCTYPE') || text.trim().startsWith('<html')) {
+      throw new Error('File may not be publicly shared. Please ensure the file is shared with "Anyone with the link".')
+    }
+    
     store.setTextImmediate(text)
     toast.add({ severity: 'success', summary: 'URL loaded', detail: targetUrl, life: 3000 })
   } catch (error) {
-    store.setTextImmediate(JSON.stringify({ error: (error as Error).message, url: targetUrl }, null, 2))
-    toast.add({ severity: 'error', summary: 'Failed to load URL', detail: (error as Error).message, life: 5000 })
+    const errorMessage = (error as Error).message
+    let helpText = ''
+    
+    if (googleDriveFileId) {
+      helpText = '\n\nFor Google Drive files:\n1. Right-click the file in Drive\n2. Select "Share"\n3. Change to "Anyone with the link"\n4. Try again'
+    }
+    
+    if (errorMessage.includes('Failed to fetch') || errorMessage.includes('NetworkError')) {
+      helpText += '\n\nCORS Error: The server may not allow cross-origin requests. Try downloading the file manually and pasting the content.'
+    }
+    
+    store.setTextImmediate(JSON.stringify({ 
+      error: errorMessage, 
+      url: targetUrl,
+      ...(googleDriveFileId && { googleDriveFileId, downloadUrl: fetchUrl }),
+      help: helpText.trim() || undefined
+    }, null, 2))
+    toast.add({ severity: 'error', summary: 'Failed to load URL', detail: errorMessage, life: 5000 })
   }
 }
 
@@ -305,7 +376,11 @@ defineExpose({ openUrl })
     >
       <div class="url-dialog-content">
         <label>URL:</label>
-        <InputText v-model="urlInput" :placeholder="defaultUrl" class="url-input" />
+        <InputText v-model="urlInput" :placeholder="defaultUrl" class="url-input" @keydown.enter="openUrl()" />
+        <small class="url-hint">
+          <i class="pi pi-google"></i>
+          Google Drive links supported - ensure file is shared with "Anyone with the link"
+        </small>
       </div>
       <template #footer>
         <Button label="Cancel" severity="secondary" @click="urlDialogVisible = false" />
@@ -533,6 +608,17 @@ defineExpose({ openUrl })
 
 .url-input {
   width: 100%;
+}
+
+.url-hint {
+  color: var(--tdv-text-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.url-hint i {
+  font-size: 0.9rem;
 }
 
 /* Splitpanes theme overrides - compact splitter */
