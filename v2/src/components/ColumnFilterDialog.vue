@@ -490,7 +490,6 @@ function toggleColorPicker(value: string) {
         <span v-if="localQuery && previewPatternFields.length === 0">
           Use ${name}, $name to extract values, * for wildcard
         </span>
-        <span>Ctrl+Enter to apply filter</span>
       </div>
       
       <!-- Extended Fields Section -->
@@ -515,11 +514,6 @@ function toggleColorPicker(value: string) {
             rows="2"
             @input="debouncedApplyFilter"
           />
-          <div class="extended-fields-hint">
-            <small>
-              If column is a JSON string, it will be auto-parsed. Syntax: <code>fieldName: $.path</code>
-            </small>
-          </div>
         </div>
       </div>
       
