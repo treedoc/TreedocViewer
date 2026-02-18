@@ -82,6 +82,7 @@ interface TableColumn {
   sortable: boolean
   filterable: boolean
   visible: boolean
+  isFieldExtended?: boolean  // True if created by field-level extended fields
 }
 
 interface TableRow {
@@ -262,6 +263,52 @@ function cancelHoverTimeout() {
   }
 }
 
+// Track field-extended columns to update outside computed
+let pendingFieldExtendedColumns: Set<string> | null = null
+let fieldExtendedUpdateScheduled = false
+
+function scheduleFieldExtendedColumnUpdate(newColumns: Set<string>) {
+  pendingFieldExtendedColumns = newColumns
+  if (!fieldExtendedUpdateScheduled) {
+    fieldExtendedUpdateScheduled = true
+    nextTick(() => {
+      fieldExtendedUpdateScheduled = false
+      if (pendingFieldExtendedColumns) {
+        updateFieldExtendedColumns(pendingFieldExtendedColumns)
+        pendingFieldExtendedColumns = null
+      }
+    })
+  }
+}
+
+function updateFieldExtendedColumns(newFieldExtendedColumns: Set<string>) {
+  // Remove old field-extended columns that are no longer needed
+  const columnsToRemove = columns.value.filter(col => 
+    col.isFieldExtended && !newFieldExtendedColumns.has(col.field)
+  )
+  
+  if (columnsToRemove.length > 0) {
+    columns.value = columns.value.filter(col => {
+      if (!col.isFieldExtended) return true
+      return newFieldExtendedColumns.has(col.field)
+    })
+  }
+  
+  // Add new field extended columns
+  for (const colName of newFieldExtendedColumns) {
+    if (!columns.value.find(c => c.field === colName)) {
+      columns.value.push({
+        field: colName,
+        header: colName,
+        sortable: true,
+        filterable: true,
+        visible: true,
+        isFieldExtended: true,
+      })
+    }
+  }
+}
+
 
 function updateFieldQuery(query: FieldQuery) {
   if (activeFilterColumn.value) {
@@ -393,18 +440,8 @@ const filteredData = computed(() => {
     })
   }
   
-  // Add field extended columns to columns list
-  for (const colName of newFieldExtendedColumns) {
-    if (!columns.value.find(c => c.field === colName)) {
-      columns.value.push({
-        field: colName,
-        header: colName,
-        sortable: true,
-        filterable: true,
-        visible: true,
-      })
-    }
-  }
+  // Schedule column updates outside of computed (to avoid side effects in computed)
+  scheduleFieldExtendedColumnUpdate(newFieldExtendedColumns)
   
   // Apply JS query if specified
   if (jsQuery.value && jsQuery.value !== '$') {
