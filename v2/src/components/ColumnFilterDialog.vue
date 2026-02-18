@@ -60,12 +60,14 @@ const showExtendedFields = ref(false)
 // Resize functionality
 const dialogWidth = ref(550)
 // Base height when both sections are collapsed
-const baseDialogHeight = ref(220)
+const baseDialogHeight = ref(300)
 // Additional height for each expanded section
-const extendedFieldsHeight = 100
+const extendedFieldsHeight = 250
 const statsHeight = 220
+const patternModeHeight = 80 // Extra height for textarea + pattern preview/hint
 const dialogHeight = computed(() => {
   let height = baseDialogHeight.value
+  if (localIsPattern.value) height += patternModeHeight
   if (showExtendedFields.value) height += extendedFieldsHeight
   if (showStats.value) height += statsHeight
   return height
@@ -97,7 +99,7 @@ function onResize(e: MouseEvent) {
   let newBaseHeight = newHeight
   if (showExtendedFields.value) newBaseHeight -= extendedFieldsHeight
   if (showStats.value) newBaseHeight -= statsHeight
-  baseDialogHeight.value = Math.max(200, newBaseHeight)
+  baseDialogHeight.value = Math.max(260, newBaseHeight)
 }
 
 function stopResize() {
@@ -372,6 +374,11 @@ function toggleColorPicker(value: string) {
     :style="{ width: dialogWidth + 'px', height: dialogHeight + 'px', minWidth: '350px', minHeight: '200px' }"
     :dismissableMask="true"
     class="filter-dialog resizable-dialog"
+    :pt="{
+      header: { style: 'padding: 0.35rem 0.75rem' },
+      title: { style: 'font-size: 0.875rem' },
+      content: { style: 'padding: 0.5rem 0.75rem' }
+    }"
   >
     <div class="filter-content">
       <!-- Filter Input -->
@@ -651,15 +658,6 @@ function toggleColorPicker(value: string) {
 </template>
 
 <style scoped>
-/* Reduce dialog header height */
-:deep(.resizable-dialog .p-dialog-header) {
-  padding: 0.5rem 1rem;
-}
-
-:deep(.resizable-dialog .p-dialog-title) {
-  font-size: 0.95rem;
-}
-
 /* Make dialog resizable */
 :deep(.resizable-dialog) {
   display: flex;
