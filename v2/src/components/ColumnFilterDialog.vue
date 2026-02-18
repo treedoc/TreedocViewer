@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
 import { debounce } from 'lodash-es'
-import Dialog from 'primevue/dialog'
+import Popover from 'primevue/popover'
 import InputText from 'primevue/inputtext'
 import Button from 'primevue/button'
 import ToggleButton from 'primevue/togglebutton'
@@ -33,7 +33,6 @@ export interface ColumnStatistic {
 }
 
 const props = defineProps<{
-  visible: boolean
   field: string
   title: string
   fieldQuery: FieldQuery
@@ -41,11 +40,34 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  'update:visible': [value: boolean]
   'update:fieldQuery': [query: FieldQuery]
+  'hide-column': []
 }>()
 
-const inputRef = ref<HTMLInputElement>()
+// Popover ref for programmatic control
+const popoverRef = ref()
+
+// Expose methods for parent to control popover
+function show(event: Event) {
+  popoverRef.value?.show(event)
+}
+
+function hide() {
+  popoverRef.value?.hide()
+}
+
+function toggle(event: Event) {
+  popoverRef.value?.toggle(event)
+}
+
+function resetSize() {
+  popoverWidth.value = defaultPopoverWidth
+  popoverHeight.value = defaultPopoverHeight
+}
+
+defineExpose({ show, hide, toggle, resetSize })
+
+const inputRef = ref()
 const textareaRef = ref<HTMLTextAreaElement>()
 const showStats = ref(false)
 const localQuery = ref(props.fieldQuery.query)
@@ -57,21 +79,11 @@ const localIsDisabled = ref(props.fieldQuery.isDisabled || false)
 const localExtendedFields = ref(props.fieldQuery.extendedFields || '')
 const showExtendedFields = ref(false)
 
-// Resize functionality
-const dialogWidth = ref(550)
-// Base height when both sections are collapsed
-const baseDialogHeight = ref(300)
-// Additional height for each expanded section
-const extendedFieldsHeight = 250
-const statsHeight = 220
-const patternModeHeight = 80 // Extra height for textarea + pattern preview/hint
-const dialogHeight = computed(() => {
-  let height = baseDialogHeight.value
-  if (localIsPattern.value) height += patternModeHeight
-  if (showExtendedFields.value) height += extendedFieldsHeight
-  if (showStats.value) height += statsHeight
-  return height
-})
+// Popover size and resize
+const defaultPopoverWidth = 450
+const defaultPopoverHeight = 400
+const popoverWidth = ref(defaultPopoverWidth)
+const popoverHeight = ref(defaultPopoverHeight)
 const isResizing = ref(false)
 const resizeStartX = ref(0)
 const resizeStartY = ref(0)
@@ -80,11 +92,12 @@ const resizeStartHeight = ref(0)
 
 function startResize(e: MouseEvent) {
   e.preventDefault()
+  e.stopPropagation()
   isResizing.value = true
   resizeStartX.value = e.clientX
   resizeStartY.value = e.clientY
-  resizeStartWidth.value = dialogWidth.value
-  resizeStartHeight.value = dialogHeight.value
+  resizeStartWidth.value = popoverWidth.value
+  resizeStartHeight.value = popoverHeight.value
   document.addEventListener('mousemove', onResize)
   document.addEventListener('mouseup', stopResize)
 }
@@ -93,13 +106,8 @@ function onResize(e: MouseEvent) {
   if (!isResizing.value) return
   const deltaX = e.clientX - resizeStartX.value
   const deltaY = e.clientY - resizeStartY.value
-  dialogWidth.value = Math.max(350, Math.min(window.innerWidth * 0.9, resizeStartWidth.value + deltaX))
-  const newHeight = Math.max(200, Math.min(window.innerHeight * 0.9, resizeStartHeight.value + deltaY))
-  // Calculate the base height by subtracting the expanded section heights
-  let newBaseHeight = newHeight
-  if (showExtendedFields.value) newBaseHeight -= extendedFieldsHeight
-  if (showStats.value) newBaseHeight -= statsHeight
-  baseDialogHeight.value = Math.max(260, newBaseHeight)
+  popoverWidth.value = Math.max(350, Math.min(window.innerWidth * 0.9, resizeStartWidth.value + deltaX))
+  popoverHeight.value = Math.max(300, Math.min(window.innerHeight * 0.8, resizeStartHeight.value + deltaY))
 }
 
 function stopResize() {
@@ -149,18 +157,22 @@ function extractPatternFields(pattern: string): string[] {
   return fields
 }
 
-// Auto-focus input when dialog opens
-watch(() => props.visible, (visible) => {
-  if (visible) {
-    nextTick(() => {
-      if (localIsPattern.value) {
-        textareaRef.value?.focus()
-      } else {
-        inputRef.value?.focus()
+// Focus input when popover shows
+function onPopoverShow() {
+  // Use setTimeout to ensure the popover is fully rendered
+  setTimeout(() => {
+    if (localIsPattern.value) {
+      textareaRef.value?.focus()
+    } else {
+      // Find the input element - PrimeVue Popover teleports content, so search document
+      const popoverContent = document.querySelector('.column-filter-popover .p-popover-content')
+      if (popoverContent) {
+        const inputEl = popoverContent.querySelector('input') as HTMLInputElement
+        inputEl?.focus()
       }
-    })
-  }
-})
+    }
+  }, 50)
+}
 
 function applyFilter() {
   const patternFields = localIsPattern.value ? extractPatternFields(localQuery.value) : []
@@ -182,7 +194,7 @@ const debouncedApplyFilter = debounce(() => {
 }, 300)
 
 function close() {
-  emit('update:visible', false)
+  hide()
 }
 
 function handleKeydown(e: KeyboardEvent) {
@@ -366,19 +378,12 @@ function toggleColorPicker(value: string) {
 </script>
 
 <template>
-  <Dialog
-    :visible="visible"
-    @update:visible="emit('update:visible', $event)"
-    :header="`Filter: ${title}`"
-    :modal="true"
-    :style="{ width: dialogWidth + 'px', height: dialogHeight + 'px', minWidth: '350px', minHeight: '200px' }"
-    :dismissableMask="true"
-    class="filter-dialog resizable-dialog"
-    :pt="{
-      header: { style: 'padding: 0.35rem 0.75rem' },
-      title: { style: 'font-size: 0.875rem' },
-      content: { style: 'padding: 0.5rem 0.75rem' }
-    }"
+  <Popover
+    ref="popoverRef"
+    @show="onPopoverShow"
+    :style="{ width: popoverWidth + 'px', height: popoverHeight + 'px' }"
+    class="column-filter-popover"
+    :pt="{ content: { style: 'height: 100%; display: flex; flex-direction: column;' } }"
   >
     <div class="filter-content">
       <!-- Filter Input -->
@@ -461,6 +466,16 @@ function toggleColorPicker(value: string) {
           v-tooltip.top="'Disable filter (keep config but don\'t apply)'"
           class="filter-option-btn disable-btn"
           :class="{ 'is-disabled-active': localIsDisabled }"
+        />
+        <div class="filter-options-spacer"></div>
+        <Button
+          icon="pi pi-eye-slash"
+          size="small"
+          text
+          severity="secondary"
+          @click="emit('hide-column'); hide()"
+          v-tooltip.top="'Hide column'"
+          class="hide-column-btn"
         />
       </div>
       
@@ -652,35 +667,22 @@ function toggleColorPicker(value: string) {
         </div>
       </div>
     </div>
-    <!-- Resize handle at dialog corner -->
+    <!-- Resize handle -->
     <div class="resize-handle" @mousedown="startResize"></div>
-  </Dialog>
+  </Popover>
 </template>
 
 <style scoped>
-/* Make dialog resizable */
-:deep(.resizable-dialog) {
-  display: flex;
-  flex-direction: column;
-  position: relative;
-}
-
-:deep(.resizable-dialog .p-dialog-content) {
-  flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
-  min-height: 0;
-  padding: 0.75rem 1rem;
-}
-
 .filter-content {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  height: 100%;
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
 }
 
-/* Resize handle at bottom-right corner of dialog */
+/* Resize handle */
 .resize-handle {
   position: absolute;
   bottom: 0;
@@ -691,12 +693,11 @@ function toggleColorPicker(value: string) {
   z-index: 100;
 }
 
-/* Resize grip visual indicator */
 .resize-handle::after {
   content: '';
   position: absolute;
-  bottom: 3px;
-  right: 3px;
+  bottom: 4px;
+  right: 4px;
   width: 8px;
   height: 8px;
   border-right: 2px solid var(--tdv-text-secondary);
@@ -760,8 +761,16 @@ function toggleColorPicker(value: string) {
   margin: 0 4px;
 }
 
+.filter-options-spacer {
+  flex: 1;
+}
+
 .disable-btn {
   min-width: 36px;
+}
+
+.hide-column-btn {
+  margin-left: auto;
 }
 
 .disable-btn.is-disabled-active {

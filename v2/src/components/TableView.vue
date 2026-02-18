@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, reactive, toRaw, shallowRef, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, reactive, toRaw, shallowRef, onBeforeUnmount, nextTick } from 'vue'
 import type { TDNode } from 'treedoc'
 import { TDNodeType } from 'treedoc'
 import DataTable from 'primevue/datatable'
@@ -60,8 +60,10 @@ const showChart = ref(false)
 const first = ref(0)
 const rows = ref(100)
 
-const filterDialogVisible = ref(false)
 const activeFilterColumn = ref<TableColumn | null>(null)
+const columnFilterRef = ref<InstanceType<typeof ColumnFilterDialog> | null>(null)
+let hoverTimeout: ReturnType<typeof setTimeout> | null = null
+let hoverTargetEvent: MouseEvent | null = null
 
 const columnSelectorVisible = ref(false)
 const columnVisibility = ref<ColumnVisibility[]>([])
@@ -206,10 +208,60 @@ function updateColumnVisibility(cols: ColumnVisibility[]) {
   }))
 }
 
-function openFilterDialog(col: TableColumn) {
+function showColumnPopover(event: MouseEvent, col: TableColumn) {
+  // Cancel any pending hover timeout
+  cancelHoverTimeout()
+  
+  // Hide existing popover first, reset size, then show for new column
+  columnFilterRef.value?.hide()
+  columnFilterRef.value?.resetSize()
+  
+  // Set the active column  
   activeFilterColumn.value = col
-  filterDialogVisible.value = true
+  nextTick(() => {
+    // Use the original event for correct positioning
+    columnFilterRef.value?.show(event)
+  })
 }
+
+function onColumnHeaderMouseEnter(event: MouseEvent, col: TableColumn) {
+  // Store the event target for later use
+  const targetElement = event.currentTarget as HTMLElement
+  
+  // Cancel any existing timeout
+  cancelHoverTimeout()
+  
+  // Start 500ms hover timeout
+  hoverTimeout = setTimeout(() => {
+    // Hide existing popover first, reset size
+    columnFilterRef.value?.hide()
+    columnFilterRef.value?.resetSize()
+    
+    activeFilterColumn.value = col
+    nextTick(() => {
+      // Create a fake event object that PrimeVue can use for positioning
+      const fakeEvent = {
+        currentTarget: targetElement,
+        target: targetElement,
+        preventDefault: () => {},
+        stopPropagation: () => {}
+      }
+      columnFilterRef.value?.show(fakeEvent as unknown as Event)
+    })
+  }, 500)
+}
+
+function onColumnHeaderMouseLeave() {
+  cancelHoverTimeout()
+}
+
+function cancelHoverTimeout() {
+  if (hoverTimeout) {
+    clearTimeout(hoverTimeout)
+    hoverTimeout = null
+  }
+}
+
 
 function updateFieldQuery(query: FieldQuery) {
   if (activeFilterColumn.value) {
@@ -719,16 +771,16 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
 
 <template>
   <div class="table-view" tabindex="0">
-    <!-- Filter Dialog -->
+    <!-- Column Filter Popover -->
     <ColumnFilterDialog
       v-if="activeFilterColumn"
-      :visible="filterDialogVisible"
+      ref="columnFilterRef"
       :field="activeFilterColumn.field"
       :title="activeFilterColumn.header"
       :field-query="getFieldQuery(activeFilterColumn.field)"
       :filtered-data="filteredData"
-      @update:visible="filterDialogVisible = $event"
       @update:field-query="updateFieldQuery"
+      @hide-column="hideColumn(activeFilterColumn.field)"
     />
     
     <!-- Column Selector Dialog -->
@@ -952,28 +1004,19 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
           :sortable="col.sortable"
         >
           <template #header="{ column }">
-            <div class="column-header">
+            <div 
+              class="column-header"
+              @click.stop="showColumnPopover($event, col)"
+              @mouseenter="onColumnHeaderMouseEnter($event, col)"
+              @mouseleave="onColumnHeaderMouseLeave"
+            >
               <span class="column-title" :class="{ 'has-filter': hasActiveFilter(col.field), 'has-disabled-filter': hasDisabledFilter(col.field) }">
                 {{ col.header }}
               </span>
-              <Button
-                :icon="hasActiveFilter(col.field) ? 'pi pi-filter-fill' : (hasDisabledFilter(col.field) ? 'pi pi-pause' : 'pi pi-filter')"
-                size="small"
-                text
-                :severity="hasActiveFilter(col.field) ? 'success' : (hasDisabledFilter(col.field) ? 'warning' : 'secondary')"
-                class="column-filter-btn"
+              <i 
+                v-if="hasActiveFilter(col.field)" 
+                class="pi pi-filter-fill column-filter-indicator"
                 :class="{ 'filter-disabled': hasDisabledFilter(col.field) }"
-                @click.stop="openFilterDialog(col)"
-                v-tooltip.top="hasDisabledFilter(col.field) ? 'Filter disabled - ' + col.header : 'Filter ' + col.header"
-              />
-              <Button
-                icon="pi pi-eye-slash"
-                size="small"
-                text
-                severity="secondary"
-                class="column-hide-btn"
-                @click.stop="hideColumn(col.field)"
-                v-tooltip.top="'Hide column'"
               />
             </div>
           </template>
@@ -1198,19 +1241,6 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
   overflow: auto;
 }
 
-.table-content :deep(.p-datatable) {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  width: 100%;
-}
-
-.table-content :deep(.p-datatable-wrapper) {
-  overflow: auto;
-  flex: 1;
-  min-height: 0;
-}
-
 .table-content :deep(.p-paginator) {
   border-top: 1px solid var(--tdv-surface-border);
   padding: 8px;
@@ -1234,14 +1264,18 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
 .column-header {
   display: flex;
   align-items: center;
-  gap: 4px;
-  justify-content: space-between;
+  gap: 6px;
   width: 100%;
-  position: relative;
+  cursor: pointer;
+}
+
+.column-header:hover {
+  background: var(--tdv-hover-bg);
 }
 
 .column-title {
   font-weight: 600;
+  flex: 1;
 }
 
 .column-title.has-filter {
@@ -1253,40 +1287,13 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
   font-style: italic;
 }
 
-.column-filter-btn,
-.column-hide-btn {
-  padding: 4px;
-  width: 24px;
-  height: 24px;
-  opacity: 0;
-  position: absolute;
-  transition: opacity 0.15s;
+.column-filter-indicator {
+  font-size: 0.75rem;
+  color: var(--tdv-success);
 }
 
-.column-filter-btn {
-  right: 0;
-}
-
-.column-filter-btn.p-button-success {
-  opacity: 1;
-}
-
-.column-filter-btn.filter-disabled {
-  opacity: 0.7;
-}
-
-.column-hide-btn {
-  right: 24px;
-}
-
-.column-header:hover .column-filter-btn,
-.column-header:hover .column-hide-btn {
-  opacity: 0.7;
-}
-
-.column-filter-btn:hover,
-.column-hide-btn:hover {
-  opacity: 1 !important;
+.column-filter-indicator.filter-disabled {
+  color: var(--tdv-warning, #f59e0b);
 }
 
 .key-link {
