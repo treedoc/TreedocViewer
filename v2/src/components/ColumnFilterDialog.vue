@@ -81,7 +81,7 @@ const showExtendedFields = ref(false)
 
 // Popover size and resize
 const defaultPopoverWidth = 450
-const defaultPopoverHeight = 400
+const defaultPopoverHeight = 300
 const popoverWidth = ref(defaultPopoverWidth)
 const popoverHeight = ref(defaultPopoverHeight)
 const isResizing = ref(false)

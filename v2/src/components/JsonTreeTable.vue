@@ -310,6 +310,18 @@ watch(() => props.initialPath, (path) => {
   }
 }, { immediate: true })
 
+// Show parse result as toast
+watch(parseResult, (result) => {
+  if (result && result !== 'No data') {
+    toast.add({
+      severity: hasError.value ? 'error' : 'success',
+      summary: hasError.value ? 'Parse Error' : 'Parsed',
+      detail: result,
+      life: hasError.value ? 5000 : 3000
+    })
+  }
+})
+
 // Global keyboard handler for fullscreen toggle
 function handleGlobalKeydown(event: KeyboardEvent) {
   // Ignore if typing in an input field
@@ -445,9 +457,6 @@ defineExpose({ openUrl })
       </div>
       
       <div class="toolbar-right">
-        <span class="status-message" :class="{ error: hasError }">
-          {{ parseResult }}
-        </span>
         <Button
           :icon="isDarkMode ? 'pi pi-sun' : 'pi pi-moon'"
           size="small"

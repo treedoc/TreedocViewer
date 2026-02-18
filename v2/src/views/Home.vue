@@ -17,7 +17,7 @@ const initialPath = urlParams.get('initialPath') || '/'
 const title = urlParams.get('title') || 'TreeDoc Viewer'
 
 // Sample data selection
-const selectedSample = ref(sampleData[1]) // Default to JSON sample
+const selectedSample = ref<typeof sampleData[0] | null>(null)
 const sampleOptions = computed(() => 
   sampleData.map(s => ({ label: s.text, value: s }))
 )
@@ -59,8 +59,8 @@ onMounted(async () => {
       jsonTreeTableRef.value?.openUrl(dataUrlParam)
     }, 100)
   } else if (!embeddedId) {
-    // Load default sample
-    store.loadData(selectedSample.value.value)
+    // Load empty object by default
+    store.loadData('{}')
   }
 })
 
@@ -107,6 +107,7 @@ watch(() => store.rawText, (text) => {
       </div>
       
       <div class="badges">
+        <a href="/v1/" class="version-link" title="Switch to legacy version (Vue 2)">v1</a>
         <a href="https://github.com/treedoc/TreedocViewer" target="_blank" class="badge-link">
           <img alt="GitHub forks" src="https://img.shields.io/github/forks/treedoc/treedocviewer?style=flat-square" />
         </a>
@@ -163,6 +164,27 @@ watch(() => store.rawText, (text) => {
   gap: 8px;
   padding-left: 12px;
   border-left: 1px solid var(--tdv-surface-border);
+}
+
+.version-link {
+  display: flex;
+  align-items: center;
+  padding: 2px 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--tdv-text-muted);
+  background: var(--tdv-surface-light);
+  border: 1px solid var(--tdv-surface-border);
+  border-radius: 4px;
+  text-decoration: none;
+  opacity: 0.8;
+  transition: all 0.2s;
+}
+
+.version-link:hover {
+  opacity: 1;
+  color: var(--tdv-primary);
+  border-color: var(--tdv-primary);
 }
 
 .badge-link {

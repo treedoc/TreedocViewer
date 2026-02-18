@@ -8,7 +8,9 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:run": "vitest run",
-    "deploy": "yarn build && gh-pages -d dist && gh-pages -d dist -r git@github.com:treedoc/treedoc.github.io.git -b master"
+    "build:v1": "cd ../v1 && V1_SUBDIRECTORY=1 NODE_OPTIONS=--openssl-legacy-provider yarn build-app",
+    "deploy:prepare": "yarn build && yarn build:v1 && cp -r ../v1/dist/app dist/v1",
+    "deploy": "yarn deploy:prepare && gh-pages -d dist && gh-pages -d dist -r git@github.com:treedoc/treedoc.github.io.git -b master"
   },
   "dependencies": {
     "@codemirror/lang-javascript": "^6.2.2",
