@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import { debounce } from 'lodash-es'
-import Dialog from 'primevue/dialog'
+import Popover from 'primevue/popover'
 import Checkbox from 'primevue/checkbox'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
@@ -13,14 +13,14 @@ export interface ColumnVisibility {
 }
 
 const props = defineProps<{
-  visible: boolean
   columns: ColumnVisibility[]
 }>()
 
 const emit = defineEmits<{
-  'update:visible': [value: boolean]
   'update:columns': [columns: ColumnVisibility[]]
 }>()
+
+const popoverRef = ref<InstanceType<typeof Popover> | null>(null)
 
 const searchQuery = ref('')
 
@@ -70,22 +70,40 @@ function hideAll() {
   debouncedEmit([...localColumns.value])
 }
 
-function close() {
+function show(event: Event) {
+  popoverRef.value?.show(event)
+}
+
+function hide() {
   // Flush any pending debounced updates
   debouncedEmit.flush()
-  emit('update:visible', false)
+  popoverRef.value?.hide()
 }
+
+function toggle(event: Event) {
+  popoverRef.value?.toggle(event)
+}
+
+function onPopoverShow() {
+  // Auto-focus the search input when popover opens
+  nextTick(() => {
+    setTimeout(() => {
+      const input = document.querySelector('.column-selector-popover .p-popover-content input') as HTMLInputElement
+      if (input) {
+        input.focus()
+      }
+    }, 50)
+  })
+}
+
+defineExpose({ show, hide, toggle })
 </script>
 
 <template>
-  <Dialog
-    :visible="visible"
-    @update:visible="emit('update:visible', $event)"
-    header="Column Selection"
-    :modal="true"
-    :style="{ width: '350px' }"
-    :dismissableMask="true"
-    class="column-selector-dialog"
+  <Popover
+    ref="popoverRef"
+    class="column-selector-popover"
+    @show="onPopoverShow"
   >
     <div class="selector-content">
       <!-- Search -->
@@ -134,31 +152,15 @@ function close() {
         </div>
       </div>
     </div>
-    
-    <template #footer>
-      <Button label="Done" @click="close" />
-    </template>
-  </Dialog>
+  </Popover>
 </template>
 
 <style scoped>
-/* Reduce dialog header height */
-:deep(.p-dialog-header) {
-  padding: 0.5rem 1rem;
-}
-
-:deep(.p-dialog-title) {
-  font-size: 0.95rem;
-}
-
-:deep(.p-dialog-content) {
-  padding: 0.75rem 1rem;
-}
-
 .selector-content {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  width: 320px;
 }
 
 .search-row {

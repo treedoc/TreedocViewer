@@ -65,7 +65,7 @@ const columnFilterRef = ref<InstanceType<typeof ColumnFilterDialog> | null>(null
 let hoverTimeout: ReturnType<typeof setTimeout> | null = null
 let hoverTargetEvent: MouseEvent | null = null
 
-const columnSelectorVisible = ref(false)
+const columnSelectorRef = ref<InstanceType<typeof ColumnSelector> | null>(null)
 const columnVisibility = ref<ColumnVisibility[]>([])
 
 const expandState = reactive<ExpandState>({
@@ -783,11 +783,10 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
       @hide-column="hideColumn(activeFilterColumn.field)"
     />
     
-    <!-- Column Selector Dialog -->
+    <!-- Column Selector Popover -->
     <ColumnSelector
-      :visible="columnSelectorVisible"
+      ref="columnSelectorRef"
       :columns="columnVisibility"
-      @update:visible="columnSelectorVisible = $event"
       @update:columns="updateColumnVisibility"
     />
     
@@ -817,7 +816,7 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
           size="small"
           :severity="hiddenColumnCount > 0 ? 'warning' : 'secondary'"
           text
-          @click="columnSelectorVisible = true"
+          @click="columnSelectorRef?.toggle($event)"
           v-tooltip.top="'Select columns (' + visibleColumns.length + '/' + columns.length + ')'"
         />
         
@@ -1021,39 +1020,41 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
             </div>
           </template>
           <template #body="{ data }">
-            <div class="cell-wrapper" :style="getCellColorStyle(data, col.field)">
-              <div class="cell-content" v-tooltip.top="getCellTimestampHint(data, col.field)">
-                <template v-if="isKeyColumn(col.field)">
-                  <a 
-                    href="#" 
-                    class="key-link"
-                    @click.prevent="nodeClicked(getRowNodePath(data))"
-                  >
-                    {{ getCellValue(data, col.field) }}
-                  </a>
-                </template>
-                <template v-else-if="isComplexValue(data, col.field)">
-                  <a 
-                    href="#" 
-                    class="complex-value-link"
-                    @click.prevent="nodeClicked(['', ...getCellNode(data, col.field)!.path])"
-                  >
-                    <span class="complex-value-summary" :style="{ whiteSpace: whiteSpaceStyle }">
-                      {{ getComplexValueSummary(data, col.field) }}
-                    </span>
-                  </a>
-                </template>
-                <template v-else-if="getCellNode(data, col.field)">
-                  <SimpleValue
-                    :tnode="getCellNode(data, col.field)!"
-                    :is-in-table="true"
-                    :text-wrap="textWrap"
-                    @node-clicked="nodeClicked([$event])"
-                  />
-                </template>
-                <template v-else>
-                  <span class="simple-cell-value" :style="{ whiteSpace: whiteSpaceStyle }">{{ getCellValue(data, col.field) }}</span>
-                </template>
+            <div class="cell-outer" :style="getCellColorStyle(data, col.field)">
+              <div class="cell-wrapper">
+                <div class="cell-content" v-tooltip.top="getCellTimestampHint(data, col.field)">
+                  <template v-if="isKeyColumn(col.field)">
+                    <a 
+                      href="#" 
+                      class="key-link"
+                      @click.prevent="nodeClicked(getRowNodePath(data))"
+                    >
+                      {{ getCellValue(data, col.field) }}
+                    </a>
+                  </template>
+                  <template v-else-if="isComplexValue(data, col.field)">
+                    <a 
+                      href="#" 
+                      class="complex-value-link"
+                      @click.prevent="nodeClicked(['', ...getCellNode(data, col.field)!.path])"
+                    >
+                      <span class="complex-value-summary" :style="{ whiteSpace: whiteSpaceStyle }">
+                        {{ getComplexValueSummary(data, col.field) }}
+                      </span>
+                    </a>
+                  </template>
+                  <template v-else-if="getCellNode(data, col.field)">
+                    <SimpleValue
+                      :tnode="getCellNode(data, col.field)!"
+                      :is-in-table="true"
+                      :text-wrap="textWrap"
+                      @node-clicked="nodeClicked([$event])"
+                    />
+                  </template>
+                  <template v-else>
+                    <span class="simple-cell-value" :style="{ whiteSpace: whiteSpaceStyle }">{{ getCellValue(data, col.field) }}</span>
+                  </template>
+                </div>
               </div>
               <div class="cell-button-bar">
                 <button 
@@ -1352,8 +1353,13 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
   font-size: 2rem;
 }
 
-.cell-wrapper {
+.cell-outer {
   position: relative;
+  display: block;
+  width: 100%;
+}
+
+.cell-wrapper {
   display: block;
   width: 100%;
   max-width: 80vw;
@@ -1382,7 +1388,7 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
   background: transparent;
 }
 
-.cell-wrapper:hover {
+.cell-outer:hover .cell-wrapper {
   overflow: auto;
   overflow: overlay; /* Chromium overlay scrollbars */
 }
@@ -1416,8 +1422,8 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
   left: 1.5em;  /* Leave at least 1-2 characters visible */
 }
 
-/* Show button bar when hovering cell wrapper */
-.cell-wrapper:hover .cell-button-bar {
+/* Show button bar when hovering cell outer */
+.cell-outer:hover .cell-button-bar {
   opacity: 1;
   transition-delay: 100ms;
   pointer-events: auto;
