@@ -1,5 +1,5 @@
 {
-  "name": "treedoc-viewer-v2",
+  "name": "treedoc-viewer",
   "version": "2.0.0",
   "type": "module",
   "scripts": {
@@ -7,7 +7,8 @@
     "build": "vue-tsc && vite build",
     "preview": "vite preview",
     "test": "vitest",
-    "test:run": "vitest run"
+    "test:run": "vitest run",
+    "deploy": "yarn build && gh-pages -d dist && gh-pages -d dist -r git@github.com:treedoc/treedoc.github.io.git -b master"
   },
   "dependencies": {
     "@codemirror/lang-javascript": "^6.2.2",
@@ -31,6 +32,7 @@
   "devDependencies": {
     "@types/lodash-es": "^4.17.12",
     "@vitejs/plugin-vue": "^5.2.1",
+    "gh-pages": "^6.3.0",
     "playwright": "^1.58.2",
     "typescript": "~5.7.2",
     "vite": "^6.1.0",
