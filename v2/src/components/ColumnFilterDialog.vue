@@ -469,14 +469,6 @@ function toggleColorPicker(value: string) {
           @keydown="handleKeydown"
           @input="debouncedApplyFilter"
         />
-        <Button
-          icon="pi pi-times"
-          size="small"
-          text
-          severity="secondary"
-          @click="clearFilter"
-          v-tooltip.top="'Clear filter'"
-        />
       </div>
       
       <!-- Filter Options -->
@@ -537,6 +529,7 @@ function toggleColorPicker(value: string) {
           @click="clearFilter"
           v-tooltip.top="'Clear filter'"
           class="clear-filter-btn"
+          :disabled="!localQuery"
         />
         <Button
           icon="pi pi-eye-slash"
