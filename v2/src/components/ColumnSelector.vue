@@ -102,6 +102,7 @@ defineExpose({ show, hide, toggle })
 <template>
   <Popover
     ref="popoverRef"
+    appendTo="body"
     class="column-selector-popover"
     @show="onPopoverShow"
   >

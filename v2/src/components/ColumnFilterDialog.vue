@@ -136,6 +136,19 @@ watch(() => props.fieldQuery, (fq) => {
   }
 }, { immediate: true })
 
+// Reset showStats when column changes to prevent performance issues
+watch(() => props.field, () => {
+  showStats.value = false
+})
+
+// Enlarge popover when stats are shown (to fit 30 values)
+const statsExpandedHeight = 600
+watch(showStats, (isShowing) => {
+  if (isShowing && popoverHeight.value < statsExpandedHeight) {
+    popoverHeight.value = statsExpandedHeight
+  }
+})
+
 // Extract field names from pattern (e.g., "Order:${orderId}" -> ["orderId"], "user:$name" -> ["name"])
 function extractPatternFields(pattern: string): string[] {
   const fields: string[] = []
@@ -344,9 +357,34 @@ function formatNumber(val: number): string {
 }
 
 function copyStats() {
-  const csv = columnStats.value.topValues
-    .map(v => `"${v.val.replace(/"/g, '""')}",${v.count},${v.percent.toFixed(1)}%`)
+  // Compute full value counts (not just top 30) for copying
+  const valueCounts: Record<string, number> = {}
+  let total = 0
+  
+  for (const row of props.filteredData) {
+    total++
+    let val = row[props.field]
+    
+    // Handle TDNode
+    if (val && typeof val === 'object' && 'value' in val) {
+      val = (val as TDNode).value
+    }
+    
+    if (val === undefined || val === null) val = ''
+    const strVal = typeof val === 'object' ? JSON.stringify(val) : String(val)
+    valueCounts[strVal] = (valueCounts[strVal] || 0) + 1
+  }
+  
+  // Sort by count and format all values
+  const sortedKeys = Object.keys(valueCounts).sort((a, b) => valueCounts[b] - valueCounts[a])
+  const csv = sortedKeys
+    .map(key => {
+      const count = valueCounts[key]
+      const percent = (count / total) * 100
+      return `"${key.replace(/"/g, '""')}",${count},${percent.toFixed(1)}%`
+    })
     .join('\n')
+  
   navigator.clipboard.writeText(`Value,Count,Percent\n${csv}`)
 }
 
@@ -380,6 +418,8 @@ function toggleColorPicker(value: string) {
 <template>
   <Popover
     ref="popoverRef"
+    appendTo="body"
+    :baseZIndex="1100"
     @show="onPopoverShow"
     :style="{ width: popoverWidth + 'px', height: popoverHeight + 'px' }"
     class="column-filter-popover"

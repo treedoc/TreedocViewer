@@ -279,6 +279,16 @@ body {
   border-color: var(--tdv-surface-border);
 }
 
+/* Popover - ensure it renders above panes and is not clipped */
+.p-popover {
+  z-index: 1100 !important;
+}
+
+.column-filter-popover,
+.column-selector-popover {
+  z-index: 1100 !important;
+}
+
 /* Toast */
 .p-toast {
   opacity: 1;
