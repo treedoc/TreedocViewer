@@ -50,7 +50,7 @@ function clearFilterState() {
 }
 
 const expandState = reactive<ExpandState>({
-  expandLevel: props.expandLevel || 1,
+  expandLevel: props.expandLevel || 2,  // Default to 2 to show first level expanded
   minLevel: 1,
   fullyExpand: false,
   moreLevel: false,
@@ -228,9 +228,14 @@ watch(
   () => {
     localTree.value = store.getRawTree()
     logger.log('Tree changed, resetting expand state')
-    expandState.expandLevel = props.expandLevel || 1
+    // Force reactive update by setting to 0 first, then to target level
+    // This ensures TreeViewItem watchers fire even if the value was the same
+    expandState.expandLevel = 0
     expandState.fullyExpand = false
     expandState.moreLevel = false
+    nextTick(() => {
+      expandState.expandLevel = props.expandLevel || 2  // Default to 2 to show first level expanded
+    })
   },
   { immediate: true }
 )

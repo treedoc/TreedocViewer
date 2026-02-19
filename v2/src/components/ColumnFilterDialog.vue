@@ -239,7 +239,7 @@ function clearFilter() {
   localIsArray.value = false
   localIsPattern.value = false
   localIsDisabled.value = false
-  localExtendedFields.value = ''
+  // Don't clear extendedFields - user requested to preserve them
   applyFilter()
 }
 
