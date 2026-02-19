@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, reactive, toRaw, shallowRef, onBeforeUnmount, nextTick } from 'vue'
 import type { TDNode } from 'treedoc'
-import { TDNodeType } from 'treedoc'
+import { TDNodeType, TDJSONWriter, TDJSONWriterOption } from 'treedoc'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import InputText from 'primevue/inputtext'
@@ -44,6 +44,29 @@ const COL_KEY = '@key'
 
 const STORAGE_KEY_JS_QUERY = 'tdv_recent_js_queries'
 const STORAGE_KEY_EXTENDED_FIELDS = 'tdv_recent_extended_fields'
+
+// Convert a cell value to a searchable string representation
+// For complex objects (TDNode or plain objects), this includes all descendants
+function valueToSearchString(value: any): string {
+  if (value === undefined || value === null) return ''
+  
+  // Handle TDNode
+  if (typeof value === 'object' && 'type' in value && 'key' in value) {
+    const node = value as TDNode
+    if (node.type === TDNodeType.SIMPLE) {
+      return String(node.value ?? '')
+    }
+    // For complex nodes, serialize to JSON string
+    return TDJSONWriter.get().writeAsString(node, new TDJSONWriterOption())
+  }
+  
+  // Handle plain objects/arrays
+  if (typeof value === 'object') {
+    return JSON.stringify(value)
+  }
+  
+  return String(value)
+}
 
 const store = useTreeStore()
 const { textWrap, maxPane } = storeToRefs(store)
@@ -338,11 +361,8 @@ const filteredData = computed(() => {
         const filteredRows: typeof data = []
         for (const row of data) {
           const value = row[field]
-          const strValue = value === undefined || value === null 
-            ? ''
-            : (typeof value === 'object' && 'value' in value 
-              ? String((value as TDNode).value) 
-              : String(value))
+          // Use valueToSearchString to include all descendants for complex objects
+          const strValue = valueToSearchString(value)
           
           const extracted = matchPattern(strValue, fq.query)
           if (extracted) {
@@ -358,15 +378,10 @@ const filteredData = computed(() => {
         }
         data = filteredRows
       } else {
-        // Standard filtering
+        // Standard filtering - use valueToSearchString to include all descendants for complex objects
         data = data.filter(row => {
           const value = row[field]
-          if (value === undefined || value === null) {
-            return matchFieldQuery('', fq)
-          }
-          const strValue = typeof value === 'object' && 'value' in value 
-            ? String((value as TDNode).value) 
-            : String(value)
+          const strValue = valueToSearchString(value)
           return matchFieldQuery(strValue, fq)
         })
       }

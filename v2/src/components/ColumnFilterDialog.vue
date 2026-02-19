@@ -7,6 +7,7 @@ import Button from 'primevue/button'
 import ToggleButton from 'primevue/togglebutton'
 import ProgressBar from 'primevue/progressbar'
 import type { TDNode } from 'treedoc'
+import { TDNodeType, TDJSONWriter, TDJSONWriterOption } from 'treedoc'
 
 export interface FieldQuery {
   query: string
@@ -43,6 +44,29 @@ const emit = defineEmits<{
   'update:fieldQuery': [query: FieldQuery]
   'hide-column': []
 }>()
+
+// Convert a cell value to a searchable string representation
+// For complex objects (TDNode or plain objects), this includes all descendants
+function valueToSearchString(value: any): string {
+  if (value === undefined || value === null) return ''
+  
+  // Handle TDNode
+  if (typeof value === 'object' && 'type' in value && 'key' in value) {
+    const node = value as TDNode
+    if (node.type === TDNodeType.SIMPLE) {
+      return String(node.value ?? '')
+    }
+    // For complex nodes, serialize to JSON string
+    return TDJSONWriter.get().writeAsString(node, new TDJSONWriterOption())
+  }
+  
+  // Handle plain objects/arrays
+  if (typeof value === 'object') {
+    return JSON.stringify(value)
+  }
+  
+  return String(value)
+}
 
 // Popover ref for programmatic control
 const popoverRef = ref()
@@ -306,26 +330,29 @@ const columnStats = computed<ColumnStatistic>(() => {
   
   for (const row of props.filteredData) {
     stat.total++
-    let val = row[props.field]
+    const val = row[props.field]
     
-    // Handle TDNode
+    // Get string representation including all descendants for complex objects
+    const strVal = valueToSearchString(val)
+    
+    // For numeric stats, try to get a simple numeric value
+    let simpleVal: any = val
     if (val && typeof val === 'object' && 'value' in val) {
-      val = (val as TDNode).value
+      simpleVal = (val as TDNode).value
     }
     
-    if (val === undefined || val === null) val = ''
-    
-    // Track numeric values
-    const numVal = Number(val)
-    if (!isNaN(numVal) && typeof val !== 'boolean') {
-      numericValues.push(numVal)
-      stat.sum += numVal
-      if (stat.min === null || numVal < (stat.min as number)) stat.min = numVal
-      if (stat.max === null || numVal > (stat.max as number)) stat.max = numVal
+    // Track numeric values (only for simple values)
+    if (simpleVal !== undefined && simpleVal !== null && typeof simpleVal !== 'object') {
+      const numVal = Number(simpleVal)
+      if (!isNaN(numVal) && typeof simpleVal !== 'boolean') {
+        numericValues.push(numVal)
+        stat.sum += numVal
+        if (stat.min === null || numVal < (stat.min as number)) stat.min = numVal
+        if (stat.max === null || numVal > (stat.max as number)) stat.max = numVal
+      }
     }
     
-    // Track value counts
-    const strVal = typeof val === 'object' ? JSON.stringify(val) : String(val)
+    // Track value counts using full string representation
     valueCounts[strVal] = (valueCounts[strVal] || 0) + 1
   }
   
@@ -363,15 +390,9 @@ function copyStats() {
   
   for (const row of props.filteredData) {
     total++
-    let val = row[props.field]
-    
-    // Handle TDNode
-    if (val && typeof val === 'object' && 'value' in val) {
-      val = (val as TDNode).value
-    }
-    
-    if (val === undefined || val === null) val = ''
-    const strVal = typeof val === 'object' ? JSON.stringify(val) : String(val)
+    const val = row[props.field]
+    // Use valueToSearchString to include all descendants for complex objects
+    const strVal = valueToSearchString(val)
     valueCounts[strVal] = (valueCounts[strVal] || 0) + 1
   }
   
@@ -480,8 +501,8 @@ function toggleColorPicker(value: string) {
         />
         <ToggleButton
           v-model="localIsArray"
-          onLabel="[ ]"
-          offLabel="[ ]"
+          onLabel="[]"
+          offLabel="[]"
           @change="applyFilter"
           v-tooltip.top="'Array (comma-separated values)'"
           class="filter-option-btn"
@@ -508,6 +529,15 @@ function toggleColorPicker(value: string) {
           :class="{ 'is-disabled-active': localIsDisabled }"
         />
         <div class="filter-options-spacer"></div>
+        <Button
+          icon="pi pi-filter-slash"
+          size="small"
+          text
+          severity="secondary"
+          @click="clearFilter"
+          v-tooltip.top="'Clear filter'"
+          class="clear-filter-btn"
+        />
         <Button
           icon="pi pi-eye-slash"
           size="small"
@@ -774,25 +804,31 @@ function toggleColorPicker(value: string) {
 
 .filter-options {
   display: flex;
-  gap: 8px;
+  gap: 4px;
   align-items: center;
 }
 
 .filter-option-btn {
-  min-width: 40px;
+  min-width: 28px;
   font-family: 'JetBrains Mono', monospace;
   font-weight: 600;
+  font-size: 0.75rem;
+  padding: 0.25rem 0.4rem;
+}
+
+.filter-option-btn :deep(.p-togglebutton-label) {
+  font-size: 0.75rem;
 }
 
 .pattern-btn {
-  min-width: 45px;
+  min-width: 32px;
 }
 
 .filter-options-separator {
   width: 1px;
-  height: 24px;
+  height: 20px;
   background: var(--tdv-surface-border);
-  margin: 0 4px;
+  margin: 0 2px;
 }
 
 .filter-options-spacer {
@@ -800,11 +836,17 @@ function toggleColorPicker(value: string) {
 }
 
 .disable-btn {
-  min-width: 36px;
+  min-width: 24px;
 }
 
-.hide-column-btn {
-  margin-left: auto;
+.hide-column-btn,
+.clear-filter-btn {
+  padding: 0.25rem;
+}
+
+.hide-column-btn :deep(.p-button-icon),
+.clear-filter-btn :deep(.p-button-icon) {
+  font-size: 0.85rem;
 }
 
 .disable-btn.is-disabled-active {
