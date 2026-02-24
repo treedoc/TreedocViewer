@@ -8,13 +8,14 @@ import { useTreeStore } from '../stores/treeStore'
 const store = useTreeStore()
 const jsonTreeTableRef = ref<InstanceType<typeof JsonTreeTable>>()
 
-// URL parameters
+// URL parameters (support both query string and hash-based params)
 const urlParams = new URLSearchParams(window.location.search)
-const embeddedId = urlParams.get('embeddedId')
-const dataParam = urlParams.get('data')
-const dataUrlParam = urlParams.get('dataUrl')
-const initialPath = urlParams.get('initialPath') || '/'
-const title = urlParams.get('title') || 'TreeDoc Viewer'
+const hashParams = new URLSearchParams(window.location.hash.split('?')[1] || '')
+const embeddedId = urlParams.get('embeddedId') || hashParams.get('embeddedId')
+const dataParam = urlParams.get('data') || hashParams.get('data')
+const dataUrlParam = urlParams.get('dataUrl') || hashParams.get('dataUrl')
+const initialPath = urlParams.get('initialPath') || hashParams.get('initialPath') || '/'
+const title = urlParams.get('title') || hashParams.get('title') || 'TreeDoc Viewer'
 
 // Sample data selection
 const selectedSample = ref<typeof sampleData[0] | null>(null)
@@ -52,7 +53,20 @@ onMounted(async () => {
   
   // Load data from URL param
   if (dataParam) {
-    store.loadData(dataParam)
+    // Check if dataParam is a localStorage key (starts with tdv_temp_)
+    if (dataParam.startsWith('tdv_temp_')) {
+      const storedData = localStorage.getItem(dataParam)
+      if (storedData) {
+        store.loadData(storedData)
+        localStorage.removeItem(dataParam)
+        // Clean up the URL
+        window.history.replaceState({}, '', window.location.pathname + '#/')
+      } else {
+        store.loadData('{}')
+      }
+    } else {
+      store.loadData(dataParam)
+    }
   } else if (dataUrlParam) {
     // Load from URL when component is ready
     setTimeout(() => {

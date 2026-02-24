@@ -805,6 +805,37 @@ function filterCellValue(field: string, value: any, isNegate: boolean) {
   }
 }
 
+function shouldShowOpenInNewTab(row: TableRow, field: string): boolean {
+  if (isComplexValue(row, field)) return true
+  const value = getCellValue(row, field)
+  return typeof value === 'string' && value.length > 200
+}
+
+function openCellInNewTab(row: TableRow, field: string) {
+  const node = getCellNode(row, field)
+  let content: string
+  
+  if (node && isComplexValue(row, field)) {
+    // Complex value - serialize as JSON
+    content = TDJSONWriter.get().writeAsString(node, new TDJSONWriterOption().setIndentFactor(2))
+  } else {
+    // Simple value (either TDNode with simple type, or plain value)
+    const value = getCellValue(row, field)
+    if (!value) return
+    content = value
+  }
+  
+  const dataKey = `tdv_temp_${Date.now()}`
+  try {
+    localStorage.setItem(dataKey, content)
+    const newUrl = `${window.location.origin}${window.location.pathname}#/?data=${dataKey}`
+    window.open(newUrl, '_blank')
+    setTimeout(() => localStorage.removeItem(dataKey), 5000)
+  } catch (e) {
+    console.error('Failed to open in new tab', e)
+  }
+}
+
 function rebuildTable() {
   const node = localSelectedNode.value
   if (node) buildTable(toRaw(node), false)
@@ -1198,6 +1229,14 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
                   @click.stop="filterCellValue(col.field, data[col.field], true)"
                 >
                   <i class="pi pi-filter-slash"></i>
+                </button>
+                <button 
+                  v-if="shouldShowOpenInNewTab(data, col.field)"
+                  class="cell-action-btn cell-open-new"
+                  title="Open in new tab"
+                  @click.stop="openCellInNewTab(data, col.field)"
+                >
+                  <i class="pi pi-external-link"></i>
                 </button>
               </div>
             </div>
