@@ -7,7 +7,7 @@ import { TDNodeType, TDJSONWriter, TDJSONWriterOption, TD } from 'treedoc'
 import { toRaw } from 'vue'
 import { getTimestampHint, tryDate } from './DateUtil'
 
-export type TimeBucket = 'minute' | '5min' | '10min' | '30min' | 'hour' | 'day' | 'week' | 'month'
+export type TimeBucket = 'second' | 'minute' | '5min' | '10min' | '30min' | 'hour' | 'day' | 'week' | 'month'
 
 export interface TimeSeriesDataPoint {
   time: Date
@@ -322,16 +322,18 @@ export function detectBucketSize(data: TableRow[], timeColumn: string): TimeBuck
   }
   
   if (minTime === Infinity || maxTime === -Infinity) {
-    return 'day'
+    return 'minute'
   }
   
   const rangeMs = maxTime - minTime
-  const minuteMs = 60 * 1000
+  const secondMs = 1000
+  const minuteMs = 60 * secondMs
   const hourMs = 60 * minuteMs
   const dayMs = 24 * hourMs
   const weekMs = 7 * dayMs
   const monthMs = 30 * dayMs
   
+  if (rangeMs < 2 * minuteMs) return 'second'
   if (rangeMs < 30 * minuteMs) return 'minute'
   if (rangeMs < 2 * hourMs) return '5min'
   if (rangeMs < 6 * hourMs) return '10min'
@@ -353,6 +355,10 @@ function getBucketKey(date: Date, bucket: TimeBucket): string {
   const minute = date.getMinutes()
   
   switch (bucket) {
+    case 'second': {
+      const second = String(date.getSeconds()).padStart(2, '0')
+      return `${year}-${month}-${day} ${hour}:${String(minute).padStart(2, '0')}:${second}`
+    }
     case 'minute':
       return `${year}-${month}-${day} ${hour}:${String(minute).padStart(2, '0')}`
     case '5min': {
@@ -391,6 +397,12 @@ function getBucketKey(date: Date, bucket: TimeBucket): string {
  */
 function getBucketStartDate(key: string, bucket: TimeBucket): Date {
   switch (bucket) {
+    case 'second': {
+      const [datePart, timePart] = key.split(' ')
+      const [year, month, day] = datePart.split('-').map(Number)
+      const [hour, minute, second] = timePart.split(':').map(Number)
+      return new Date(year, month - 1, day, hour, minute, second)
+    }
     case 'minute':
     case '5min':
     case '10min':

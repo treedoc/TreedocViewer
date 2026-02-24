@@ -63,11 +63,21 @@ export interface Column {
   width?: string
 }
 
+export interface ChartState {
+  showChart?: boolean
+  timeColumn?: string
+  valueColumn?: string
+  groupColumn?: string
+  bucketSize?: string
+  hiddenGroups?: string[]
+}
+
 export interface TableNodeState {
   query: Query
   expandedLevel: number
   columns: Column[]
   isColumnExpanded: boolean
+  chartState?: ChartState
 }
 
 export interface TDVOptions {

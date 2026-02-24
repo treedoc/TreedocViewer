@@ -20,6 +20,7 @@ import type {
   TDVOptions,
   Selection,
   TableNodeState,
+  ChartState,
   Column,
   Query,
   FieldQuery
@@ -76,6 +77,7 @@ export type {
   TDVOptions,
   Selection,
   TableNodeState,
+  ChartState,
   Column,
   Query,
   FieldQuery,

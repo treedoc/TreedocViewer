@@ -34,19 +34,39 @@ ChartJS.register(
 const props = defineProps<{
   data: TableRow[]
   columns: TableColumn[]
+  // Chart state props (for persistence across remounts)
+  timeColumnModel?: string
+  valueColumnModel?: string
+  groupColumnModel?: string
+  bucketSizeModel?: TimeBucket
+  hiddenGroupsModel?: Set<string>
 }>()
 
 const emit = defineEmits<{
   close: []
+  'update:groupFilter': [field: string, values: string[]]
+  'update:timeColumn': [value: string]
+  'update:valueColumn': [value: string]
+  'update:groupColumn': [value: string]
+  'update:bucketSize': [value: TimeBucket]
+  'update:hiddenGroups': [value: Set<string>]
 }>()
 
-// State
-const timeColumn = ref<string>('')
-const valueColumn = ref<string>('')
-const groupColumn = ref<string>('')
-const bucketSize = ref<TimeBucket>('day')
-const autoDetectBucket = ref(true)
+// State - use props if provided, otherwise use local state
+const timeColumn = ref<string>(props.timeColumnModel || '')
+const valueColumn = ref<string>(props.valueColumnModel || '')
+const groupColumn = ref<string>(props.groupColumnModel || '')
+const bucketSize = ref<TimeBucket>(props.bucketSizeModel || 'minute')
+const autoDetectBucket = ref(!props.bucketSizeModel) // Auto-detect only if no saved bucket
 const isMaximized = ref(false)
+const hiddenGroups = ref<Set<string>>(props.hiddenGroupsModel ? new Set(props.hiddenGroupsModel) : new Set())
+
+// Emit state changes to parent
+watch(timeColumn, (val) => emit('update:timeColumn', val))
+watch(valueColumn, (val) => emit('update:valueColumn', val))
+watch(groupColumn, (val) => emit('update:groupColumn', val))
+watch(bucketSize, (val) => emit('update:bucketSize', val))
+watch(hiddenGroups, (val) => emit('update:hiddenGroups', val))
 
 // Detect columns
 const timeColumns = computed(() => detectTimeColumns(props.data, props.columns))
@@ -66,6 +86,15 @@ watch([() => timeColumn.value, () => props.data], () => {
     bucketSize.value = detectBucketSize(props.data, timeColumn.value)
   }
 }, { immediate: true })
+
+// Reset hidden groups when group column changes
+watch(groupColumn, (newCol, oldCol) => {
+  hiddenGroups.value = new Set()
+  // Clear filter for old column
+  if (oldCol) {
+    emit('update:groupFilter', oldCol, [])
+  }
+})
 
 // Aggregate data
 const chartData = computed<TimeSeriesDataPoint[]>(() => {
@@ -123,7 +152,8 @@ const chartJsData = computed<ChartData<'bar'>>(() => {
         borderColor: color.border,
         borderWidth: 1,
         yAxisID: 'y',
-        stack: 'stack0'
+        stack: 'stack0',
+        hidden: hiddenGroups.value.has(group)
       })
     })
   } else {
@@ -171,7 +201,48 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => {
     },
     plugins: {
       legend: {
-        position: 'top'
+        position: 'top',
+        onClick: (evt: any, legendItem: any, legend: any) => {
+          // Track hidden groups and emit filter
+          if (groupColumn.value && uniqueGroups.value.length > 0) {
+            const groupName = legendItem.text
+            const newHiddenGroups = new Set(hiddenGroups.value)
+            
+            if (newHiddenGroups.has(groupName)) {
+              // Currently hidden, make it visible
+              newHiddenGroups.delete(groupName)
+            } else {
+              // Currently visible, hide it
+              newHiddenGroups.add(groupName)
+            }
+            
+            // Check if all groups would be hidden - if so, reset to show all
+            const visibleGroups = uniqueGroups.value.filter(g => !newHiddenGroups.has(g))
+            if (visibleGroups.length === 0) {
+              // All groups hidden - reset to show all
+              hiddenGroups.value = new Set()
+              emit('update:groupFilter', groupColumn.value, [])
+            } else {
+              // Replace the Set to trigger reactivity
+              hiddenGroups.value = newHiddenGroups
+              
+              // Emit visible groups to sync with table filter
+              if (newHiddenGroups.size > 0) {
+                emit('update:groupFilter', groupColumn.value, visibleGroups)
+              } else {
+                // All visible - clear the filter
+                emit('update:groupFilter', groupColumn.value, [])
+              }
+            }
+          } else {
+            // No grouping - use default Chart.js behavior
+            const index = legendItem.datasetIndex
+            const ci = legend.chart
+            const meta = ci.getDatasetMeta(index)
+            meta.hidden = !meta.hidden
+            ci.update()
+          }
+        }
       },
       title: {
         display: false
@@ -216,6 +287,7 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => {
 
 // Bucket options for dropdown
 const bucketOptions = [
+  { label: 'Second', value: 'second' },
   { label: 'Minute', value: 'minute' },
   { label: '5 Minutes', value: '5min' },
   { label: '10 Minutes', value: '10min' },

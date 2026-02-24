@@ -83,6 +83,13 @@ const showChart = ref(false)
 const first = ref(0)
 const rows = ref(100)
 
+// Chart state (lifted up to survive fullscreen toggle)
+const chartTimeColumn = ref('')
+const chartValueColumn = ref('')
+const chartGroupColumn = ref('')
+const chartBucketSize = ref<import('@/utils/TableUtil').TimeBucket>('minute')
+const chartHiddenGroups = ref<Set<string>>(new Set())
+
 const activeFilterColumn = ref<TableColumn | null>(null)
 const columnFilterRef = ref<InstanceType<typeof ColumnFilterDialog> | null>(null)
 let hoverTimeout: ReturnType<typeof setTimeout> | null = null
@@ -339,6 +346,32 @@ function updateFieldQuery(query: FieldQuery) {
   }
 }
 
+// Handle chart group filter sync
+function onChartGroupFilter(field: string, values: string[]) {
+  if (values.length === 0) {
+    // Clear the filter for this field
+    if (fieldQueries.value[field]) {
+      fieldQueries.value[field] = {
+        ...fieldQueries.value[field],
+        query: '',
+        isArray: false,
+        isDisabled: false,
+      }
+    }
+  } else {
+    // Set array filter with selected values
+    fieldQueries.value[field] = {
+      query: values.join(','),
+      isRegex: false,
+      isNegate: false,
+      isArray: true,
+      isPattern: false,
+      isDisabled: false,
+      patternFields: [],
+    }
+  }
+}
+
 
 // Track pattern-extracted columns
 const patternExtractedColumns = ref<Set<string>>(new Set())
@@ -580,6 +613,15 @@ function buildTableInternal(node: TDNode | null, restoreState = true) {
         }
       }
     }
+    // Restore chart state
+    if (cachedState.chartState) {
+      showChart.value = cachedState.chartState.showChart ?? false
+      chartTimeColumn.value = cachedState.chartState.timeColumn ?? ''
+      chartValueColumn.value = cachedState.chartState.valueColumn ?? ''
+      chartGroupColumn.value = cachedState.chartState.groupColumn ?? ''
+      chartBucketSize.value = (cachedState.chartState.bucketSize as import('@/utils/TableUtil').TimeBucket) ?? 'minute'
+      chartHiddenGroups.value = new Set(cachedState.chartState.hiddenGroups ?? [])
+    }
   } else if (!cachedState) {
     // First time visiting this node - auto-detect
     isColumnExpanded.value = shouldExpandColumns(node)
@@ -683,7 +725,15 @@ function isKeyColumn(field: string): boolean {
 
 function getCellColorStyle(data: any, field: string): Record<string, string> | null {
   const value = getCellValue(data, field)
-  return getValueColorStyle(field, String(value))
+  const style = getValueColorStyle(field, String(value))
+  if (style) {
+    // Add CSS variable for pseudo-element background
+    return {
+      ...style,
+      '--cell-bg-color': style.backgroundColor,
+    }
+  }
+  return style
 }
 
 function getRowNodePath(row: TableRow): string[] {
@@ -777,7 +827,15 @@ function saveCurrentTableState() {
       },
       expandedLevel: expandState.expandLevel,
       columns: columns.value.map(c => ({ field: c.field, visible: c.visible })),
-      isColumnExpanded: isColumnExpanded.value
+      isColumnExpanded: isColumnExpanded.value,
+      chartState: {
+        showChart: showChart.value,
+        timeColumn: chartTimeColumn.value,
+        valueColumn: chartValueColumn.value,
+        groupColumn: chartGroupColumn.value,
+        bucketSize: chartBucketSize.value,
+        hiddenGroups: Array.from(chartHiddenGroups.value)
+      }
     })
   }
 }
@@ -1035,7 +1093,18 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
       v-if="showChart && hasTimeColumns"
       :data="filteredData as any"
       :columns="columns as any"
+      :time-column-model="chartTimeColumn"
+      :value-column-model="chartValueColumn"
+      :group-column-model="chartGroupColumn"
+      :bucket-size-model="chartBucketSize"
+      :hidden-groups-model="chartHiddenGroups"
       @close="showChart = false"
+      @update:group-filter="onChartGroupFilter"
+      @update:time-column="chartTimeColumn = $event"
+      @update:value-column="chartValueColumn = $event"
+      @update:group-column="chartGroupColumn = $event"
+      @update:bucket-size="chartBucketSize = $event"
+      @update:hidden-groups="chartHiddenGroups = $event"
     />
     
     <div class="table-content">
@@ -1072,7 +1141,7 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
             </div>
           </template>
           <template #body="{ data }">
-            <div class="cell-outer" :style="getCellColorStyle(data, col.field)">
+            <div class="cell-outer" :class="{ 'has-color': getCellColorStyle(data, col.field) }" :style="getCellColorStyle(data, col.field)">
               <div class="cell-wrapper">
                 <div class="cell-content" v-tooltip.top="getCellTimestampHint(data, col.field)">
                   <template v-if="isKeyColumn(col.field)">
@@ -1406,9 +1475,28 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
 }
 
 .cell-outer {
-  position: relative;
+  position: static;
   display: block;
   width: 100%;
+}
+
+/* When cell has color, create an absolute overlay for the background */
+.cell-outer.has-color {
+  position: static;
+}
+
+.cell-outer.has-color::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-color: var(--cell-bg-color);
+  z-index: 0;
+  pointer-events: none;
+}
+
+.cell-outer.has-color > .cell-wrapper {
+  position: relative;
+  z-index: 1;
 }
 
 .cell-wrapper {
@@ -1534,6 +1622,7 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.85rem;
   border-right: 1px solid var(--tdv-surface-border);
+  position: relative;
 }
 
 :deep(.p-datatable-tbody > tr > td:last-child) {
