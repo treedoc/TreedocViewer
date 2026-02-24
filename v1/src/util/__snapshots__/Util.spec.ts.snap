@@ -1,0 +1,15 @@
+// Vitest Snapshot v1
+
+exports[`Util.ts > topLines 1`] = `
+{
+  "length": 9,
+  "numLines": 3,
+}
+`;
+
+exports[`Util.ts > topLines 2`] = `
+{
+  "length": 6,
+  "numLines": 2,
+}
+`;

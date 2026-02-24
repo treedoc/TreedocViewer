@@ -1,0 +1,3 @@
+// Vitest Snapshot v1
+
+exports[`CSVParser.ts > parse 1`] = `"[{field1: 'v11', field2: 'v12', field3: 'v13'}, {field1: 'v21', field2: 'v2l1\\\\nV2l2', field3: 'v23'}, {field1: 'v31\\"v31', field2: 'v32\\"\\"v32', field3: 'v33'}]"`;
