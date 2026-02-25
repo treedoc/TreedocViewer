@@ -43,6 +43,9 @@ export interface FieldQuery {
   isDisabled: boolean
   patternFields: string[]
   valueColors?: Record<string, ValueColor>
+  patternExtract?: string
+  patternFilter?: boolean
+  extendedFields?: string
 }
 
 export interface Query {

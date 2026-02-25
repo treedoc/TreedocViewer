@@ -19,9 +19,8 @@ import type { ExtendFieldResult } from './ExtendFieldDialog.vue'
 import AutoCompleteInput from './AutoCompleteInput.vue'
 import PresetSelector from './PresetSelector.vue'
 import TimeSeriesChart from './TimeSeriesChart.vue'
-import type { QueryPreset } from '@/models/types'
+import type { QueryPreset, FieldQuery } from '@/models/types'
 import type { ExpandState } from './ExpandControl.vue'
-import type { FieldQuery } from './ColumnFilterDialog.vue'
 import type { ColumnVisibility } from './ColumnSelector.vue'
 import { Logger } from '@/utils/Logger'
 import { 
@@ -38,6 +37,8 @@ import {
 } from '@/utils/TableUtil'
 import { matchFieldQuery, matchPattern, createExtendedFieldsFunc } from '@/utils/QueryUtil'
 import { getValueColorStyle, applyValueColorsFromFieldQueries } from '@/utils/ValueColorService'
+import { TableDataProcessor, type TableRow as ProcessorTableRow, type ProcessingConfig } from '@/utils/TableDataProcessor'
+import { ColumnManager, type TableColumn as ManagerTableColumn } from '@/utils/ColumnManager'
 
 const logger = new Logger('TableView')
 const COL_VALUE = '@value'
@@ -360,216 +361,22 @@ const patternExtractedColumns = ref<string[]>([])
 // Track source field for each derived column (persists for column ordering)
 const derivedColumnSourceMap = ref<Map<string, string>>(new Map())
 
+// Data processor instance for testable data transformation logic
+const dataProcessor = new TableDataProcessor(valueToSearchString)
+
 const filteredData = computed(() => {
-  let data = [...tableData.value]
-  logger.log(`Filtering data: initial count=${data.length}`)
+  logger.log(`Filtering data: initial count=${tableData.value.length}`)
   
-  // Track all derived columns (both pattern-matched and JSON path extended) in unified way
-  const newDerivedColumns: string[] = []
-  const derivedColumnsSet = new Set<string>()
-  const derivedColumnSource = new Map<string, string>() // Local map for this computation run
-  
-  // Helper: Get object from cell value for extended fields processing
-  const getCellObject = (cellValue: any): any => {
-    if (cellValue && typeof cellValue === 'object' && 'type' in cellValue && 'children' in cellValue) {
-      // It's a TDNode - convert to object
-      return (cellValue as TDNode).toObject(true)
-    } else if (cellValue && typeof cellValue === 'object') {
-      // Plain object - use directly
-      return cellValue
-    } else if (typeof cellValue === 'string') {
-      // Try to parse as JSON if it looks like JSON
-      const trimmed = cellValue.trim()
-      if ((trimmed.startsWith('{') && trimmed.endsWith('}')) ||
-          (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
-        try {
-          return JSON.parse(trimmed)
-        } catch {
-          return null
-        }
-      }
-    }
-    return null
+  // Use TableDataProcessor for core data transformation
+  const config: ProcessingConfig = {
+    fieldQueries: fieldQueries.value,
+    columnOrder: columns.value.map(c => c.field),
+    jsQuery: jsQuery.value,
+    valueToString: valueToSearchString
   }
   
-  // Helper: Apply extended fields to a field
-  const applyExtendedFields = (field: string, fq: FieldQuery) => {
-    if (!fq.extendedFields) return
-    
-    const extFunc = createExtendedFieldsFunc(fq.extendedFields)
-    if (!extFunc) return
-    
-    data = data.map(row => {
-      const cellValue = row[field]
-      if (cellValue === undefined) return row
-      
-      const obj = getCellObject(cellValue)
-      if (!obj) return row
-      
-      try {
-        const extracted = extFunc(obj)
-        if (extracted && Object.keys(extracted).length > 0) {
-          const newRow = { ...row }
-          for (const [key, val] of Object.entries(extracted)) {
-            newRow[key] = val
-            // Add to unified derived columns tracking
-            if (!derivedColumnsSet.has(key)) {
-              derivedColumnsSet.add(key)
-              newDerivedColumns.push(key)
-              derivedColumnSource.set(key, field)
-            }
-          }
-          return newRow
-        }
-      } catch {
-        // Ignore errors for individual rows
-      }
-      return row
-    })
-  }
-  
-  // Helper: Apply pattern extraction to a field
-  const applyPatternExtract = (field: string, fq: FieldQuery) => {
-    if (!fq.patternExtract) return
-    
-    const patterns = fq.patternExtract.split('\n').map(p => p.trim()).filter(p => p)
-    if (patterns.length === 0) return
-    
-    const processedRows: typeof data = []
-    for (const row of data) {
-      const value = row[field]
-      if (value === undefined) {
-        if (!fq.patternFilter) processedRows.push(row)
-        continue
-      }
-      
-      const strValue = valueToSearchString(value)
-      
-      // Try each pattern until one matches
-      let matched = false
-      for (const pattern of patterns) {
-        const extracted = matchPattern(strValue, pattern)
-        if (extracted !== null) {
-          const newRow = { ...row }
-          for (const [key, val] of Object.entries(extracted)) {
-            // Use the key directly without prefix
-            newRow[key] = val
-            // Add to unified derived columns tracking
-            if (!derivedColumnsSet.has(key)) {
-              derivedColumnsSet.add(key)
-              newDerivedColumns.push(key)
-              derivedColumnSource.set(key, field)
-            }
-          }
-          processedRows.push(newRow)
-          matched = true
-          break
-        }
-      }
-      
-      if (!matched && !fq.patternFilter) {
-        processedRows.push(row)
-      }
-    }
-    data = processedRows
-  }
-  
-  // Helper: Apply query filter to a field
-  const applyQueryFilter = (field: string, fq: FieldQuery) => {
-    if (!fq.query) return
-    
-    data = data.filter(row => {
-      const value = row[field]
-      if (value === undefined) return true
-      const strValue = valueToSearchString(value)
-      return matchFieldQuery(strValue, fq)
-    })
-  }
-  
-  // Collect all fields with configurations, ordered by:
-  // 1. Existing columns (in their current order)
-  // 2. Additional configured fields (fields with queries but not in columns yet)
-  const fieldsInOrder = columns.value.map(c => c.field)
-  const configuredFields: string[] = []
-  
-  // Add fields in column order first
-  for (const field of fieldsInOrder) {
-    if (fieldQueries.value[field]) {
-      configuredFields.push(field)
-    }
-  }
-  
-  // Add additional configured fields not in columns
-  for (const field of Object.keys(fieldQueries.value)) {
-    if (!configuredFields.includes(field)) {
-      configuredFields.push(field)
-    }
-  }
-  
-  // SINGLE PASS with fixed-point iteration:
-  // Keep processing until no new columns are created
-  // This handles recursive extended fields at any depth
-  const processedFields = new Set<string>()
-  let iteration = 0
-  const MAX_ITERATIONS = 10 // Safety limit to prevent infinite loops
-  
-  while (iteration < MAX_ITERATIONS) {
-    iteration++
-    const columnsBeforeIteration = newDerivedColumns.length
-    
-    // Process all configured fields
-    for (const field of configuredFields) {
-      const fq = fieldQueries.value[field]
-      if (!fq || fq.isDisabled) continue
-      
-      // Check if field exists in data (at least one row has this field)
-      const fieldExistsInData = data.length > 0 && data.some(row => row[field] !== undefined)
-      
-      // Skip if field doesn't exist in data yet (will be processed in a later iteration)
-      if (!fieldExistsInData) continue
-      
-      // Create a unique key for this field + operation combination
-      const extKey = `${field}:ext`
-      const patternKey = `${field}:pattern`
-      const queryKey = `${field}:query`
-      
-      // Apply extended fields if not already done
-      if (fq.extendedFields && !processedFields.has(extKey)) {
-        applyExtendedFields(field, fq)
-        processedFields.add(extKey)
-      }
-      
-      // Apply pattern extraction if not already done
-      if (fq.patternExtract && !processedFields.has(patternKey)) {
-        applyPatternExtract(field, fq)
-        processedFields.add(patternKey)
-      }
-      
-      // Apply query filter if not already done
-      if (fq.query && !processedFields.has(queryKey)) {
-        applyQueryFilter(field, fq)
-        processedFields.add(queryKey)
-      }
-    }
-    
-    // Check if any new columns were created
-    const columnsAfterIteration = newDerivedColumns.length
-    if (columnsAfterIteration === columnsBeforeIteration) {
-      // No new columns, we're done
-      break
-    }
-    
-    // New columns were created, add them to configuredFields for next iteration
-    for (const col of newDerivedColumns) {
-      if (!configuredFields.includes(col) && fieldQueries.value[col]) {
-        configuredFields.push(col)
-      }
-    }
-  }
-  
-  if (iteration >= MAX_ITERATIONS) {
-    console.warn('[filteredData] Reached maximum iterations for field processing')
-  }
+  const result = dataProcessor.processData(tableData.value as ProcessorTableRow[], config)
+  const { data, derivedColumns: newDerivedColumns, derivedColumnSources: derivedColumnSource } = result
   
   // Update derived columns (unified handling for both pattern and extended field columns)
   const newDerivedSet = new Set(newDerivedColumns)
@@ -687,24 +494,8 @@ const filteredData = computed(() => {
     console.log('[filteredData] After adding derived columns, columns count:', columns.value.length)
   }
   
-  // Apply JS query if specified
-  if (jsQuery.value && jsQuery.value !== '$') {
-    try {
-      const queryFn = new Function('$', `return ${jsQuery.value}`)
-      data = data.filter(row => {
-        try {
-          const obj = row.__node?.toObject(true) || row
-          return queryFn(obj)
-        } catch {
-          return true
-        }
-      })
-    } catch (e) {
-      console.warn('Invalid JS query:', e)
-    }
-  }
-  
-  return data
+  // JS query is already applied by the processor
+  return data as TableRow[]
 })
 
 const paginatedData = computed(() => {

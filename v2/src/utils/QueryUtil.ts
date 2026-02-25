@@ -2,7 +2,7 @@
  * Query and filter utilities
  */
 
-import type { FieldQuery } from '../components/ColumnFilterDialog.vue'
+import type { FieldQuery } from '@/models/types'
 
 /**
  * Convert a pattern string to a regex with named capture groups
@@ -257,7 +257,7 @@ export function createExtendedFieldsFunc(expression: string): ((obj: any) => Rec
       const func = new Function('$', exp) as (obj: any) => any
       fieldFuncs.push({ name: field.name, func })
     } catch (e) {
-      console.warn(`Error parsing extended field "${field.name}":`, field.expr, e)
+      // console.warn(`Error parsing extended field "${field.name}":`, field.expr, e)
       // Skip this field but continue with others
     }
   }
