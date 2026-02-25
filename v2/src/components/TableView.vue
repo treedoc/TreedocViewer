@@ -14,6 +14,8 @@ import ExpandControl from './ExpandControl.vue'
 import SimpleValue from './SimpleValue.vue'
 import ColumnFilterDialog from './ColumnFilterDialog.vue'
 import ColumnSelector from './ColumnSelector.vue'
+import ExtendFieldDialog from './ExtendFieldDialog.vue'
+import type { ExtendFieldResult } from './ExtendFieldDialog.vue'
 import AutoCompleteInput from './AutoCompleteInput.vue'
 import PresetSelector from './PresetSelector.vue'
 import TimeSeriesChart from './TimeSeriesChart.vue'
@@ -98,6 +100,11 @@ let hoverTargetEvent: MouseEvent | null = null
 const columnSelectorRef = ref<InstanceType<typeof ColumnSelector> | null>(null)
 const columnVisibility = ref<ColumnVisibility[]>([])
 
+// ExtendFieldDialog state
+const showExtendFieldDialog = ref(false)
+const extendFieldCellValue = ref<any>(null)
+const extendFieldColumn = ref<string>('')
+
 const expandState = reactive<ExpandState>({
   expandLevel: 0,
   minLevel: 0,
@@ -112,7 +119,7 @@ interface TableColumn {
   sortable: boolean
   filterable: boolean
   visible: boolean
-  isFieldExtended?: boolean  // True if created by field-level extended fields
+  isDerived?: boolean  // True if created by pattern or extended fields
 }
 
 interface TableRow {
@@ -123,6 +130,24 @@ interface TableRow {
 const columns = ref<TableColumn[]>([])
 const tableData = ref<TableRow[]>([])
 const fieldQueries = ref<Record<string, FieldQuery>>({})
+
+// Keep columnVisibility in sync with columns (auto-update when columns change)
+watch(columns, (cols) => {
+  console.log('[TableView] columns watcher triggered, count:', cols.length, 'fields:', cols.map(c => c.field))
+  columnVisibility.value = cols.map(c => ({
+    field: c.field,
+    header: c.header,
+    visible: c.visible,
+  }))
+}, { deep: true })
+
+// Computed to get current column's extendedFields for ExtendFieldDialog
+const currentColumnExtendedFields = computed(() => {
+  const field = extendFieldColumn.value
+  if (!field) return ''
+  return fieldQueries.value[field]?.extendedFields || ''
+})
+
 const sortField = ref<string>('')
 const sortOrder = ref<1 | -1 | 0>(0)
 
@@ -135,6 +160,8 @@ function createFieldQuery(): FieldQuery {
     isPattern: false,
     isDisabled: false,
     patternFields: [],
+    patternExtract: undefined,
+    patternFilter: false,
   }
 }
 
@@ -181,15 +208,14 @@ const currentPresetState = computed(() => ({
   expandLevel: expandControlRef.value?.state?.expandLevel,
 }))
 
+// Persistent preset visibility for columns
+const presetColumnVisibility = ref<Map<string, boolean> | null>(null)
+
 // Apply a loaded preset
 function applyPreset(preset: QueryPreset) {
-  // Apply column visibility
-  const visibilityMap = new Map(preset.columns.map(c => [c.field, c.visible]))
-  columns.value.forEach(col => {
-    if (visibilityMap.has(col.field)) {
-      col.visible = visibilityMap.get(col.field)!
-    }
-  })
+  // Save preset column order and visibility for use after rebuild
+  presetColumnOrder.value = preset.columns.map(c => c.field)
+  presetColumnVisibility.value = new Map(preset.columns.map(c => [c.field, c.visible]))
   
   // Apply extended fields
   extendedFields.value = preset.extendedFields || ''
@@ -203,7 +229,7 @@ function applyPreset(preset: QueryPreset) {
   // Apply value colors from field queries
   applyValueColorsFromFieldQueries(preset.fieldQueries)
   
-  // Rebuild table to apply changes
+  // Rebuild table to apply changes (derived columns will be positioned using presetColumnOrder)
   rebuildTable()
 }
 
@@ -293,55 +319,11 @@ function cancelHoverTimeout() {
   }
 }
 
-// Track field-extended columns to update outside computed
-let pendingFieldExtendedColumns: Set<string> | null = null
-let fieldExtendedUpdateScheduled = false
-
-function scheduleFieldExtendedColumnUpdate(newColumns: Set<string>) {
-  pendingFieldExtendedColumns = newColumns
-  if (!fieldExtendedUpdateScheduled) {
-    fieldExtendedUpdateScheduled = true
-    nextTick(() => {
-      fieldExtendedUpdateScheduled = false
-      if (pendingFieldExtendedColumns) {
-        updateFieldExtendedColumns(pendingFieldExtendedColumns)
-        pendingFieldExtendedColumns = null
-      }
-    })
-  }
-}
-
-function updateFieldExtendedColumns(newFieldExtendedColumns: Set<string>) {
-  // Remove old field-extended columns that are no longer needed
-  const columnsToRemove = columns.value.filter(col => 
-    col.isFieldExtended && !newFieldExtendedColumns.has(col.field)
-  )
-  
-  if (columnsToRemove.length > 0) {
-    columns.value = columns.value.filter(col => {
-      if (!col.isFieldExtended) return true
-      return newFieldExtendedColumns.has(col.field)
-    })
-  }
-  
-  // Add new field extended columns
-  for (const colName of newFieldExtendedColumns) {
-    if (!columns.value.find(c => c.field === colName)) {
-      columns.value.push({
-        field: colName,
-        header: colName,
-        sortable: true,
-        filterable: true,
-        visible: true,
-        isFieldExtended: true,
-      })
-    }
-  }
-}
 
 
 function updateFieldQuery(query: FieldQuery) {
   if (activeFilterColumn.value) {
+    console.log(`[updateFieldQuery] Field: ${activeFilterColumn.value.field}, patternExtract: "${query.patternExtract}", extendedFields: "${query.extendedFields}"`)
     fieldQueries.value[activeFilterColumn.value.field] = query
   }
 }
@@ -373,101 +355,55 @@ function onChartGroupFilter(field: string, values: string[]) {
 }
 
 
-// Track pattern-extracted columns
-const patternExtractedColumns = ref<Set<string>>(new Set())
+// Track derived columns (both pattern-matched and extended fields)
+const patternExtractedColumns = ref<string[]>([])
+// Track source field for each derived column (persists for column ordering)
+const derivedColumnSourceMap = ref<Map<string, string>>(new Map())
 
 const filteredData = computed(() => {
   let data = [...tableData.value]
   logger.log(`Filtering data: initial count=${data.length}`)
   
-  // Clear and rebuild pattern extracted columns
-  const newPatternColumns = new Set<string>()
+  // Track all derived columns (both pattern-matched and JSON path extended) in unified way
+  const newDerivedColumns: string[] = []
+  const derivedColumnsSet = new Set<string>()
+  const derivedColumnSource = new Map<string, string>() // Local map for this computation run
   
-  // Apply field queries
-  for (const [field, fq] of Object.entries(fieldQueries.value)) {
-    // Skip disabled filters
-    if (fq.isDisabled) continue
-    
-    if (fq.query) {
-      if (fq.isPattern && fq.patternFields && fq.patternFields.length > 0) {
-        // Pattern matching with value extraction
-        const filteredRows: typeof data = []
-        for (const row of data) {
-          const value = row[field]
-          // Use valueToSearchString to include all descendants for complex objects
-          const strValue = valueToSearchString(value)
-          
-          const extracted = matchPattern(strValue, fq.query)
-          if (extracted) {
-            // Create a new row object with extracted values
-            const newRow = { ...row }
-            for (const [key, val] of Object.entries(extracted)) {
-              const colName = `⊛${key}`
-              newRow[colName] = val
-              newPatternColumns.add(colName)
-            }
-            filteredRows.push(newRow)
-          }
+  // Helper: Get object from cell value for extended fields processing
+  const getCellObject = (cellValue: any): any => {
+    if (cellValue && typeof cellValue === 'object' && 'type' in cellValue && 'children' in cellValue) {
+      // It's a TDNode - convert to object
+      return (cellValue as TDNode).toObject(true)
+    } else if (cellValue && typeof cellValue === 'object') {
+      // Plain object - use directly
+      return cellValue
+    } else if (typeof cellValue === 'string') {
+      // Try to parse as JSON if it looks like JSON
+      const trimmed = cellValue.trim()
+      if ((trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+          (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+        try {
+          return JSON.parse(trimmed)
+        } catch {
+          return null
         }
-        data = filteredRows
-      } else {
-        // Standard filtering - use valueToSearchString to include all descendants for complex objects
-        data = data.filter(row => {
-          const value = row[field]
-          const strValue = valueToSearchString(value)
-          return matchFieldQuery(strValue, fq)
-        })
       }
     }
+    return null
   }
   
-  // Update pattern extracted columns and add to columns list
-  if (newPatternColumns.size !== patternExtractedColumns.value.size ||
-      [...newPatternColumns].some(c => !patternExtractedColumns.value.has(c))) {
-    patternExtractedColumns.value = newPatternColumns
-    // Add pattern columns to the columns list if not already present
-    for (const colName of newPatternColumns) {
-      if (!columns.value.find(c => c.field === colName)) {
-        columns.value.push({
-          field: colName,
-          header: colName,
-          sortable: true,
-          filterable: true,
-          visible: true,
-        })
-      }
-    }
-  }
-  
-  // Apply field-level extended fields
-  const newFieldExtendedColumns = new Set<string>()
-  for (const [field, fq] of Object.entries(fieldQueries.value)) {
-    if (!fq.extendedFields) continue
+  // Helper: Apply extended fields to a field
+  const applyExtendedFields = (field: string, fq: FieldQuery) => {
+    if (!fq.extendedFields) return
     
     const extFunc = createExtendedFieldsFunc(fq.extendedFields)
-    if (!extFunc) continue
+    if (!extFunc) return
     
     data = data.map(row => {
       const cellValue = row[field]
-      let obj: any = null
+      if (cellValue === undefined) return row
       
-      // Get the object to apply extended fields to
-      if (cellValue && typeof cellValue === 'object' && 'type' in cellValue) {
-        // It's a TDNode - convert to object
-        obj = (cellValue as TDNode).toObject(true)
-      } else if (typeof cellValue === 'string') {
-        // Try to parse as JSON if it looks like JSON
-        const trimmed = cellValue.trim()
-        if ((trimmed.startsWith('{') && trimmed.endsWith('}')) ||
-            (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
-          try {
-            obj = JSON.parse(trimmed)
-          } catch {
-            // Not valid JSON, skip
-          }
-        }
-      }
-      
+      const obj = getCellObject(cellValue)
       if (!obj) return row
       
       try {
@@ -476,20 +412,280 @@ const filteredData = computed(() => {
           const newRow = { ...row }
           for (const [key, val] of Object.entries(extracted)) {
             newRow[key] = val
-            newFieldExtendedColumns.add(key)
+            // Add to unified derived columns tracking
+            if (!derivedColumnsSet.has(key)) {
+              derivedColumnsSet.add(key)
+              newDerivedColumns.push(key)
+              derivedColumnSource.set(key, field)
+            }
           }
           return newRow
         }
-      } catch (e) {
+      } catch {
         // Ignore errors for individual rows
       }
-      
       return row
     })
   }
   
-  // Schedule column updates outside of computed (to avoid side effects in computed)
-  scheduleFieldExtendedColumnUpdate(newFieldExtendedColumns)
+  // Helper: Apply pattern extraction to a field
+  const applyPatternExtract = (field: string, fq: FieldQuery) => {
+    if (!fq.patternExtract) return
+    
+    const patterns = fq.patternExtract.split('\n').map(p => p.trim()).filter(p => p)
+    if (patterns.length === 0) return
+    
+    const processedRows: typeof data = []
+    for (const row of data) {
+      const value = row[field]
+      if (value === undefined) {
+        if (!fq.patternFilter) processedRows.push(row)
+        continue
+      }
+      
+      const strValue = valueToSearchString(value)
+      
+      // Try each pattern until one matches
+      let matched = false
+      for (const pattern of patterns) {
+        const extracted = matchPattern(strValue, pattern)
+        if (extracted !== null) {
+          const newRow = { ...row }
+          for (const [key, val] of Object.entries(extracted)) {
+            // Use the key directly without prefix
+            newRow[key] = val
+            // Add to unified derived columns tracking
+            if (!derivedColumnsSet.has(key)) {
+              derivedColumnsSet.add(key)
+              newDerivedColumns.push(key)
+              derivedColumnSource.set(key, field)
+            }
+          }
+          processedRows.push(newRow)
+          matched = true
+          break
+        }
+      }
+      
+      if (!matched && !fq.patternFilter) {
+        processedRows.push(row)
+      }
+    }
+    data = processedRows
+  }
+  
+  // Helper: Apply query filter to a field
+  const applyQueryFilter = (field: string, fq: FieldQuery) => {
+    if (!fq.query) return
+    
+    data = data.filter(row => {
+      const value = row[field]
+      if (value === undefined) return true
+      const strValue = valueToSearchString(value)
+      return matchFieldQuery(strValue, fq)
+    })
+  }
+  
+  // Collect all fields with configurations, ordered by:
+  // 1. Existing columns (in their current order)
+  // 2. Additional configured fields (fields with queries but not in columns yet)
+  const fieldsInOrder = columns.value.map(c => c.field)
+  const configuredFields: string[] = []
+  
+  // Add fields in column order first
+  for (const field of fieldsInOrder) {
+    if (fieldQueries.value[field]) {
+      configuredFields.push(field)
+    }
+  }
+  
+  // Add additional configured fields not in columns
+  for (const field of Object.keys(fieldQueries.value)) {
+    if (!configuredFields.includes(field)) {
+      configuredFields.push(field)
+    }
+  }
+  
+  // SINGLE PASS with fixed-point iteration:
+  // Keep processing until no new columns are created
+  // This handles recursive extended fields at any depth
+  const processedFields = new Set<string>()
+  let iteration = 0
+  const MAX_ITERATIONS = 10 // Safety limit to prevent infinite loops
+  
+  while (iteration < MAX_ITERATIONS) {
+    iteration++
+    const columnsBeforeIteration = newDerivedColumns.length
+    
+    // Process all configured fields
+    for (const field of configuredFields) {
+      const fq = fieldQueries.value[field]
+      if (!fq || fq.isDisabled) continue
+      
+      // Check if field exists in data (at least one row has this field)
+      const fieldExistsInData = data.length > 0 && data.some(row => row[field] !== undefined)
+      
+      // Skip if field doesn't exist in data yet (will be processed in a later iteration)
+      if (!fieldExistsInData) continue
+      
+      // Create a unique key for this field + operation combination
+      const extKey = `${field}:ext`
+      const patternKey = `${field}:pattern`
+      const queryKey = `${field}:query`
+      
+      // Apply extended fields if not already done
+      if (fq.extendedFields && !processedFields.has(extKey)) {
+        applyExtendedFields(field, fq)
+        processedFields.add(extKey)
+      }
+      
+      // Apply pattern extraction if not already done
+      if (fq.patternExtract && !processedFields.has(patternKey)) {
+        applyPatternExtract(field, fq)
+        processedFields.add(patternKey)
+      }
+      
+      // Apply query filter if not already done
+      if (fq.query && !processedFields.has(queryKey)) {
+        applyQueryFilter(field, fq)
+        processedFields.add(queryKey)
+      }
+    }
+    
+    // Check if any new columns were created
+    const columnsAfterIteration = newDerivedColumns.length
+    if (columnsAfterIteration === columnsBeforeIteration) {
+      // No new columns, we're done
+      break
+    }
+    
+    // New columns were created, add them to configuredFields for next iteration
+    for (const col of newDerivedColumns) {
+      if (!configuredFields.includes(col) && fieldQueries.value[col]) {
+        configuredFields.push(col)
+      }
+    }
+  }
+  
+  if (iteration >= MAX_ITERATIONS) {
+    console.warn('[filteredData] Reached maximum iterations for field processing')
+  }
+  
+  // Update derived columns (unified handling for both pattern and extended field columns)
+  const newDerivedSet = new Set(newDerivedColumns)
+  const derivedColumnsChanged = newDerivedColumns.length !== patternExtractedColumns.value.length ||
+      newDerivedColumns.some((c, i) => patternExtractedColumns.value[i] !== c)
+  
+  if (derivedColumnsChanged) {
+    console.log('[filteredData] Derived columns changed, new:', newDerivedColumns)
+    patternExtractedColumns.value = [...newDerivedColumns]
+    
+    // Update the global source map with new entries
+    for (const [col, source] of derivedColumnSource) {
+      derivedColumnSourceMap.value.set(col, source)
+    }
+    // Remove entries for columns no longer present
+    for (const key of derivedColumnSourceMap.value.keys()) {
+      if (!newDerivedSet.has(key)) {
+        derivedColumnSourceMap.value.delete(key)
+      }
+    }
+    
+    // Remove old derived columns that are no longer present
+    const columnsToRemove = columns.value.filter(col => 
+      col.isDerived && !newDerivedSet.has(col.field)
+    )
+    if (columnsToRemove.length > 0) {
+      console.log('[filteredData] Removing old derived columns:', columnsToRemove.map(c => c.field))
+      columns.value = columns.value.filter(col => 
+        !col.isDerived || newDerivedSet.has(col.field)
+      )
+    }
+    
+    // Add all derived columns to the columns list
+    for (const colName of newDerivedColumns) {
+      if (!columns.value.find(c => c.field === colName)) {
+        const sourceField = derivedColumnSourceMap.value.get(colName)
+        console.log('[filteredData] Adding derived column:', colName, 'source:', sourceField)
+        
+        // Use preset visibility if available, otherwise default to true
+        const presetVisible = presetColumnVisibility.value?.get(colName)
+        const newCol = {
+          field: colName,
+          header: colName,
+          sortable: true,
+          filterable: true,
+          visible: presetVisible !== undefined ? presetVisible : true,
+          isDerived: true,
+        }
+        
+        // If we have a preset order, check if this column should go at a specific position
+        if (presetColumnOrder.value) {
+          const presetIndex = presetColumnOrder.value.indexOf(colName)
+          if (presetIndex !== -1) {
+            // Find the best position based on preset order
+            let insertIndex = 0
+            for (let i = 0; i < columns.value.length; i++) {
+              const existingPresetIndex = presetColumnOrder.value.indexOf(columns.value[i].field)
+              if (existingPresetIndex !== -1 && existingPresetIndex < presetIndex) {
+                insertIndex = i + 1
+              }
+            }
+            columns.value.splice(insertIndex, 0, newCol)
+            continue
+          }
+        }
+        
+        // Fallback: insert after source field
+        if (sourceField) {
+          const sourceIndex = columns.value.findIndex(c => c.field === sourceField)
+          if (sourceIndex !== -1) {
+            // Find the last consecutive derived column after source to insert after all of them
+            let insertIndex = sourceIndex + 1
+            while (insertIndex < columns.value.length) {
+              const col = columns.value[insertIndex]
+              // Check if this column was also derived from the same source (use global map)
+              if (col.isDerived && derivedColumnSourceMap.value.get(col.field) === sourceField) {
+                insertIndex++
+              } else {
+                break
+              }
+            }
+            columns.value.splice(insertIndex, 0, newCol)
+            continue
+          }
+        }
+        // Final fallback: push to end if source not found
+        columns.value.push(newCol)
+      }
+    }
+    
+    // If we have a preset order, reorder all columns to match it
+    if (presetColumnOrder.value && presetColumnOrder.value.length > 0) {
+      const orderMap = new Map(presetColumnOrder.value.map((field, i) => [field, i]))
+      columns.value.sort((a, b) => {
+        const aOrder = orderMap.get(a.field) ?? Infinity
+        const bOrder = orderMap.get(b.field) ?? Infinity
+        return aOrder - bOrder
+      })
+      // Clear preset order after applying (only apply once)
+      presetColumnOrder.value = null
+    }
+    
+    // Apply preset visibility to all columns (including base columns that were rebuilt)
+    if (presetColumnVisibility.value && presetColumnVisibility.value.size > 0) {
+      for (const col of columns.value) {
+        const presetVisible = presetColumnVisibility.value.get(col.field)
+        if (presetVisible !== undefined) {
+          col.visible = presetVisible
+        }
+      }
+      // Clear preset visibility after applying
+      presetColumnVisibility.value = null
+    }
+    
+    console.log('[filteredData] After adding derived columns, columns count:', columns.value.length)
+  }
   
   // Apply JS query if specified
   if (jsQuery.value && jsQuery.value !== '$') {
@@ -542,8 +738,12 @@ function addExtObject(key: string, val: any, row: TableRow) {
   row[key] = val?.$$tdNode || val
 }
 
-// Used during rebuild to preserve column visibility
+// Used during rebuild to preserve column visibility and order
 let savedColumnVisibility: Map<string, boolean> | null = null
+let savedColumnOrder: string[] | null = null
+
+// Persistent preset column order for derived columns positioning
+const presetColumnOrder = ref<string[] | null>(null)
 
 function addColumn(field: string, header: string, isExtended: boolean = false) {
   if (!columns.value.find(c => c.field === field)) {
@@ -573,21 +773,27 @@ function buildTable(node: TDNode | null, restoreState = true) {
 function buildTableInternal(node: TDNode | null, restoreState = true) {
   logger.log(`Building table for node: ${node?.key}, restoreState=${restoreState}`)
   
-  // Save current column visibility before rebuilding (for non-restore rebuilds)
+  // Save current column visibility and order before rebuilding (for non-restore rebuilds)
   const currentFieldQueries = { ...fieldQueries.value }
   if (!restoreState) {
     savedColumnVisibility = new Map<string, boolean>()
+    savedColumnOrder = []
     for (const col of columns.value) {
       savedColumnVisibility.set(col.field, col.visible)
+      savedColumnOrder.push(col.field)
     }
   } else {
     savedColumnVisibility = null
+    savedColumnOrder = null
   }
   
   columns.value = []
   tableData.value = []
   if (restoreState) {
     fieldQueries.value = {}
+    // Clear derived column tracking when starting fresh
+    patternExtractedColumns.value = []
+    derivedColumnSourceMap.value = new Map()
   }
   if (!node || !node.children) return
   
@@ -703,15 +909,33 @@ function buildTableInternal(node: TDNode | null, restoreState = true) {
     tableData.value.push(row)
   }
   
-  // Clear saved visibility after build is complete
-  savedColumnVisibility = null
+  // Reorder columns to match saved order (for non-restore rebuilds)
+  if (savedColumnOrder && savedColumnOrder.length > 0) {
+    const currentColumnsMap = new Map(columns.value.map(c => [c.field, c]))
+    const reorderedColumns: typeof columns.value = []
+    
+    // First, add columns in saved order (if they exist)
+    for (const field of savedColumnOrder) {
+      const col = currentColumnsMap.get(field)
+      if (col) {
+        reorderedColumns.push(col)
+        currentColumnsMap.delete(field)
+      }
+    }
+    
+    // Then, append any new columns that weren't in saved order
+    for (const col of currentColumnsMap.values()) {
+      reorderedColumns.push(col)
+    }
+    
+    columns.value = reorderedColumns
+  }
   
-  // Update column visibility state for selector
-  columnVisibility.value = columns.value.map(c => ({
-    field: c.field,
-    header: c.header,
-    visible: c.visible,
-  }))
+  // Clear saved visibility and order after build is complete
+  savedColumnVisibility = null
+  savedColumnOrder = null
+  
+  // Note: columnVisibility is auto-updated by the watcher on columns
 }
 
 function nodeClicked(path: string[]) {
@@ -836,6 +1060,64 @@ function openCellInNewTab(row: TableRow, field: string) {
   }
 }
 
+function openExtendFieldDialog(row: TableRow, field: string) {
+  extendFieldCellValue.value = row[field]
+  extendFieldColumn.value = field
+  showExtendFieldDialog.value = true
+}
+
+function handleExtendFieldResult(result: ExtendFieldResult) {
+  const field = extendFieldColumn.value
+  if (!field) return
+  
+  const existingQuery = fieldQueries.value[field] || {
+    query: '',
+    isRegex: false,
+    isNegate: false,
+    isArray: false,
+    isPattern: false,
+    isDisabled: false,
+    patternFields: [],
+  }
+  
+  if (result.type === 'pattern' && result.pattern) {
+    // Append pattern to existing patternExtract (newline separated)
+    const existingPattern = existingQuery.patternExtract || ''
+    const newPattern = existingPattern 
+      ? `${existingPattern}\n${result.pattern}` 
+      : result.pattern
+    
+    fieldQueries.value[field] = {
+      ...existingQuery,
+      patternExtract: newPattern,
+    }
+  }
+  // Note: jsonpath is now handled by immediate sync via handleUpdateExtendedFields
+}
+
+// Handle immediate sync of JSON path extended fields from ExtendFieldDialog
+function handleUpdateExtendedFields(fields: string) {
+  const field = extendFieldColumn.value
+  console.log('[TableView] handleUpdateExtendedFields called, field:', field, 'fields:', fields)
+  if (!field) return
+  
+  const existingQuery = fieldQueries.value[field] || {
+    query: '',
+    isRegex: false,
+    isNegate: false,
+    isArray: false,
+    isPattern: false,
+    isDisabled: false,
+    patternFields: [],
+  }
+  
+  fieldQueries.value[field] = {
+    ...existingQuery,
+    extendedFields: fields,
+  }
+  console.log('[TableView] fieldQueries updated:', fieldQueries.value[field])
+}
+
 function rebuildTable() {
   const node = localSelectedNode.value
   if (node) buildTable(toRaw(node), false)
@@ -922,6 +1204,16 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
       :filtered-data="filteredData"
       @update:field-query="updateFieldQuery"
       @hide-column="hideColumn(activeFilterColumn.field)"
+    />
+    
+    <!-- Extend Field Dialog -->
+    <ExtendFieldDialog
+      v-model:visible="showExtendFieldDialog"
+      :cell-value="extendFieldCellValue"
+      :column-field="extendFieldColumn"
+      :current-extended-fields="currentColumnExtendedFields"
+      @apply="handleExtendFieldResult"
+      @update-extended-fields="handleUpdateExtendedFields"
     />
     
     <!-- Column Selector Popover -->
@@ -1237,6 +1529,13 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
                   @click.stop="openCellInNewTab(data, col.field)"
                 >
                   <i class="pi pi-external-link"></i>
+                </button>
+                <button 
+                  class="cell-action-btn cell-extend"
+                  title="Create pattern or extract fields"
+                  @click.stop="openExtendFieldDialog(data, col.field)"
+                >
+                  <i class="pi pi-plus-circle"></i>
                 </button>
               </div>
             </div>
@@ -1640,6 +1939,10 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
 
 .cell-action-btn i {
   font-size: 11px;
+}
+
+.cell-extend:hover {
+  color: var(--tdv-info, #3b82f6);
 }
 
 /* PrimeVue DataTable overrides */

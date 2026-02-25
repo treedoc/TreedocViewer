@@ -47,7 +47,7 @@ export const useTreeStore = defineStore('tree', () => {
   const showTable = ref(true)
   const maxPane = ref<string>('')
   const currentPane = ref<string>('')
-  const textWrap = ref(false)
+  const textWrap = ref(true)
   const codeView = ref(true)
   const hasTreeInTable = ref(false)
   

@@ -18,6 +18,8 @@ export interface FieldQuery {
   isDisabled: boolean  // Keep filter config but don't apply
   patternFields: string[]  // Extracted field names from pattern
   extendedFields?: string  // Field-level extended fields expression (e.g., "name: $.user.name, id: $.id")
+  patternExtract?: string  // Pattern for extracting fields (e.g., "Request: $request *")
+  patternFilter?: boolean  // Whether to filter rows based on pattern (default: false, just extract)
 }
 
 export interface ColumnStatistic {
@@ -92,7 +94,6 @@ function resetSize() {
 defineExpose({ show, hide, toggle, resetSize })
 
 const inputRef = ref()
-const textareaRef = ref<HTMLTextAreaElement>()
 const showStats = ref(false)
 const localQuery = ref(props.fieldQuery.query)
 const localIsRegex = ref(props.fieldQuery.isRegex)
@@ -101,6 +102,8 @@ const localIsArray = ref(props.fieldQuery.isArray)
 const localIsPattern = ref(props.fieldQuery.isPattern || false)
 const localIsDisabled = ref(props.fieldQuery.isDisabled || false)
 const localExtendedFields = ref(props.fieldQuery.extendedFields || '')
+const localPatternExtract = ref(props.fieldQuery.patternExtract || '')
+const localPatternFilter = ref(props.fieldQuery.patternFilter || false)
 const showExtendedFields = ref(false)
 
 // Popover size and resize
@@ -154,8 +157,10 @@ watch(() => props.fieldQuery, (fq) => {
   localIsPattern.value = fq.isPattern || false
   localIsDisabled.value = fq.isDisabled || false
   localExtendedFields.value = fq.extendedFields || ''
+  localPatternExtract.value = fq.patternExtract || ''
+  localPatternFilter.value = fq.patternFilter || false
   // Auto-show extended fields section if there's content
-  if (fq.extendedFields) {
+  if (fq.extendedFields || fq.patternExtract) {
     showExtendedFields.value = true
   }
 }, { immediate: true })
@@ -174,21 +179,34 @@ watch(showStats, (isShowing) => {
 })
 
 // Extract field names from pattern (e.g., "Order:${orderId}" -> ["orderId"], "user:$name" -> ["name"])
-function extractPatternFields(pattern: string): string[] {
+// Supports multiple patterns separated by newlines
+function extractPatternFields(patternText: string): string[] {
   const fields: string[] = []
+  const seen = new Set<string>()
   
-  // First extract ${name} patterns
-  const bracedMatches = pattern.matchAll(/\$\{(\w+)\}/g)
-  for (const m of bracedMatches) {
-    fields.push(m[1])
-  }
+  // Split by newlines to support multiple patterns
+  const patterns = patternText.split('\n').map(p => p.trim()).filter(p => p)
   
-  // Then extract $name patterns (not followed by {, and not already captured as ${name})
-  // Remove ${...} first to avoid double-matching
-  const withoutBraced = pattern.replace(/\$\{(\w+)\}/g, '')
-  const simpleMatches = withoutBraced.matchAll(/\$(\w+)/g)
-  for (const m of simpleMatches) {
-    fields.push(m[1])
+  for (const pattern of patterns) {
+    // First extract ${name} patterns
+    const bracedMatches = pattern.matchAll(/\$\{(\w+)\}/g)
+    for (const m of bracedMatches) {
+      if (!seen.has(m[1])) {
+        fields.push(m[1])
+        seen.add(m[1])
+      }
+    }
+    
+    // Then extract $name patterns (not followed by {, and not already captured as ${name})
+    // Remove ${...} first to avoid double-matching
+    const withoutBraced = pattern.replace(/\$\{(\w+)\}/g, '')
+    const simpleMatches = withoutBraced.matchAll(/\$(\w+)/g)
+    for (const m of simpleMatches) {
+      if (!seen.has(m[1])) {
+        fields.push(m[1])
+        seen.add(m[1])
+      }
+    }
   }
   
   return fields
@@ -198,30 +216,29 @@ function extractPatternFields(pattern: string): string[] {
 function onPopoverShow() {
   // Use setTimeout to ensure the popover is fully rendered
   setTimeout(() => {
-    if (localIsPattern.value) {
-      textareaRef.value?.focus()
-    } else {
-      // Find the input element - PrimeVue Popover teleports content, so search document
-      const popoverContent = document.querySelector('.column-filter-popover .p-popover-content')
-      if (popoverContent) {
-        const inputEl = popoverContent.querySelector('input') as HTMLInputElement
-        inputEl?.focus()
-      }
+    // Find the input element - PrimeVue Popover teleports content, so search document
+    const popoverContent = document.querySelector('.column-filter-popover .p-popover-content')
+    if (popoverContent) {
+      const inputEl = popoverContent.querySelector('input') as HTMLInputElement
+      inputEl?.focus()
     }
   }, 50)
 }
 
 function applyFilter() {
-  const patternFields = localIsPattern.value ? extractPatternFields(localQuery.value) : []
+  // Extract pattern fields from the new patternExtract field
+  const patternFields = localPatternExtract.value ? extractPatternFields(localPatternExtract.value) : []
   emit('update:fieldQuery', {
     query: localQuery.value,
     isRegex: localIsRegex.value,
     isNegate: localIsNegate.value,
     isArray: localIsArray.value,
-    isPattern: localIsPattern.value,
+    isPattern: false,  // No longer used in filter options
     isDisabled: localIsDisabled.value,
     patternFields,
     extendedFields: localExtendedFields.value || undefined,
+    patternExtract: localPatternExtract.value || undefined,
+    patternFilter: localPatternFilter.value,
   })
 }
 
@@ -304,8 +321,8 @@ function addValueToFilter(value: string, isNegate: boolean) {
 
 // Preview of extracted fields from pattern
 const previewPatternFields = computed(() => {
-  if (!localIsPattern.value || !localQuery.value) return []
-  return extractPatternFields(localQuery.value)
+  if (!localPatternExtract.value) return []
+  return extractPatternFields(localPatternExtract.value)
 })
 
 // Calculate column statistics
@@ -449,19 +466,7 @@ function toggleColorPicker(value: string) {
     <div class="filter-content">
       <!-- Filter Input -->
       <div class="filter-input-row">
-        <!-- Use textarea for pattern mode to support multi-line text -->
-        <textarea
-          v-if="localIsPattern"
-          ref="textareaRef"
-          v-model="localQuery"
-          :placeholder="`Paste multi-line pattern for ${field}...`"
-          class="filter-input filter-textarea"
-          @keydown="handleTextareaKeydown"
-          @input="debouncedApplyFilter"
-          rows="3"
-        />
         <InputText
-          v-else
           ref="inputRef"
           v-model="localQuery"
           :placeholder="`Search ${field}...`"
@@ -480,7 +485,6 @@ function toggleColorPicker(value: string) {
           @change="applyFilter"
           v-tooltip.top="'Negate filter (exclude matches)'"
           class="filter-option-btn"
-          :disabled="localIsPattern"
         />
         <ToggleButton
           v-model="localIsRegex"
@@ -489,7 +493,6 @@ function toggleColorPicker(value: string) {
           @change="applyFilter"
           v-tooltip.top="'Regex matching'"
           class="filter-option-btn"
-          :disabled="localIsPattern"
         />
         <ToggleButton
           v-model="localIsArray"
@@ -498,15 +501,6 @@ function toggleColorPicker(value: string) {
           @change="applyFilter"
           v-tooltip.top="'Array (comma-separated values)'"
           class="filter-option-btn"
-          :disabled="localIsPattern"
-        />
-        <ToggleButton
-          v-model="localIsPattern"
-          onLabel="${}"
-          offLabel="${}"
-          @change="applyFilter"
-          v-tooltip.top="'Pattern match with placeholders (e.g., Order:${orderId})'"
-          class="filter-option-btn pattern-btn"
         />
         <div class="filter-options-separator"></div>
         <ToggleButton
@@ -542,19 +536,6 @@ function toggleColorPicker(value: string) {
         />
       </div>
       
-      <!-- Pattern Fields Preview -->
-      <div v-if="localIsPattern && previewPatternFields.length > 0" class="pattern-preview">
-        <span class="pattern-preview-label">Extracted columns:</span>
-        <span v-for="field in previewPatternFields" :key="field" class="pattern-field-tag">
-          {{ field }}
-        </span>
-      </div>
-      <div v-if="localIsPattern" class="pattern-hint">
-        <span v-if="localQuery && previewPatternFields.length === 0">
-          Use ${name}, $name to extract values, * for wildcard
-        </span>
-      </div>
-      
       <!-- Extended Fields Section -->
       <div class="extended-fields-section">
         <div class="extended-fields-header" @click="showExtendedFields = !showExtendedFields">
@@ -565,18 +546,55 @@ function toggleColorPicker(value: string) {
             severity="secondary"
           />
           <span class="extended-fields-title">
-            Extended Fields
-            <span v-if="localExtendedFields" class="has-value-indicator">●</span>
+            Pattern / Extended Fields
+            <span v-if="localExtendedFields || localPatternExtract" class="has-value-indicator">●</span>
           </span>
         </div>
         <div v-if="showExtendedFields" class="extended-fields-content">
-          <textarea
-            v-model="localExtendedFields"
-            placeholder="Extract fields from this column. E.g.: name: $.user.name, id: $.id"
-            class="extended-fields-input"
-            rows="2"
-            @input="debouncedApplyFilter"
-          />
+          <!-- Pattern Extraction -->
+          <div class="pattern-extract-section">
+            <div class="pattern-extract-header">
+              <span class="pattern-extract-label">Pattern Extract</span>
+              <label class="pattern-filter-toggle">
+                <input 
+                  type="checkbox" 
+                  v-model="localPatternFilter"
+                  @change="applyFilter"
+                />
+                <span>Filter rows</span>
+              </label>
+            </div>
+            <textarea
+              v-model="localPatternExtract"
+              placeholder="Extract fields using patterns (one per line). E.g.:
+Request: $request *
+user=${userId}, action=$action"
+              class="extended-fields-input"
+              rows="3"
+              @input="debouncedApplyFilter"
+            />
+            <div v-if="previewPatternFields.length > 0" class="pattern-preview">
+              <span class="pattern-preview-label">Extracted:</span>
+              <span v-for="f in previewPatternFields" :key="f" class="pattern-field-tag">
+                {{ f }}
+              </span>
+            </div>
+            <div v-else-if="localPatternExtract" class="pattern-hint">
+              Use ${name} or $name to extract values, * for wildcard
+            </div>
+          </div>
+          
+          <!-- JSON Path Extended Fields -->
+          <div class="jsonpath-extract-section">
+            <span class="jsonpath-extract-label">JSON Path</span>
+            <textarea
+              v-model="localExtendedFields"
+              placeholder="Extract fields using JSON path. E.g.: name: $.user.name, id: $.id"
+              class="extended-fields-input"
+              rows="2"
+              @input="debouncedApplyFilter"
+            />
+          </div>
         </div>
       </div>
       
@@ -851,36 +869,35 @@ function toggleColorPicker(value: string) {
 .pattern-preview {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
-  padding: 8px;
+  padding: 4px 8px;
   background: var(--tdv-surface-light);
   border-radius: var(--tdv-radius-sm);
   border: 1px solid var(--tdv-success);
+  margin-top: 4px;
 }
 
 .pattern-preview-label {
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   color: var(--tdv-text-muted);
 }
 
 .pattern-field-tag {
-  padding: 2px 8px;
+  padding: 1px 6px;
   background: var(--tdv-success);
   color: white;
-  border-radius: 4px;
-  font-size: 0.8rem;
+  border-radius: 3px;
+  font-size: 0.75rem;
   font-family: 'JetBrains Mono', monospace;
   font-weight: 500;
 }
 
 .pattern-hint {
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   color: var(--tdv-text-muted);
   font-style: italic;
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
+  margin-top: 4px;
 }
 
 .extended-fields-section {
@@ -915,6 +932,46 @@ function toggleColorPicker(value: string) {
 .extended-fields-content {
   padding: 8px;
   border-top: 1px solid var(--tdv-surface-border);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pattern-extract-section,
+.jsonpath-extract-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pattern-extract-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.pattern-extract-label,
+.jsonpath-extract-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--tdv-text-muted);
+}
+
+.pattern-filter-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  color: var(--tdv-text-muted);
+  cursor: pointer;
+}
+
+.pattern-filter-toggle input {
+  cursor: pointer;
+}
+
+.pattern-filter-toggle:hover {
+  color: var(--tdv-text);
 }
 
 .extended-fields-input {
