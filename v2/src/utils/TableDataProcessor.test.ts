@@ -632,4 +632,187 @@ describe('TableDataProcessor', () => {
       expect(result.data[0].v).toBe(42)
     })
   })
+
+  describe('JS Expression Filter', () => {
+    it('should filter rows using JS expression on string field', () => {
+      const data: TableRow[] = [
+        { name: 'hello' },
+        { name: 'hi' },
+        { name: 'hello world' },
+        { name: 'hey' }
+      ]
+      
+      const config: ProcessingConfig = {
+        fieldQueries: {
+          name: createFieldQuery({ jsExpression: '$.length > 3' })
+        },
+        columnOrder: ['name']
+      }
+      
+      const result = processor.processData(data, config)
+      
+      expect(result.data.length).toBe(2)
+      expect(result.data[0].name).toBe('hello')
+      expect(result.data[1].name).toBe('hello world')
+    })
+
+    it('should filter rows using JS expression on numeric field', () => {
+      const data: TableRow[] = [
+        { value: 10 },
+        { value: 50 },
+        { value: 100 },
+        { value: 5 }
+      ]
+      
+      const config: ProcessingConfig = {
+        fieldQueries: {
+          value: createFieldQuery({ jsExpression: '$ > 20' })
+        },
+        columnOrder: ['value']
+      }
+      
+      const result = processor.processData(data, config)
+      
+      expect(result.data.length).toBe(2)
+      expect(result.data[0].value).toBe(50)
+      expect(result.data[1].value).toBe(100)
+    })
+
+    it('should filter rows using JS expression with string methods', () => {
+      const data: TableRow[] = [
+        { status: 'SUCCESS' },
+        { status: 'FAILED' },
+        { status: 'SUCCESS_PARTIAL' },
+        { status: 'ERROR' }
+      ]
+      
+      const config: ProcessingConfig = {
+        fieldQueries: {
+          status: createFieldQuery({ jsExpression: '$.includes("SUCCESS")' })
+        },
+        columnOrder: ['status']
+      }
+      
+      const result = processor.processData(data, config)
+      
+      expect(result.data.length).toBe(2)
+      expect(result.data[0].status).toBe('SUCCESS')
+      expect(result.data[1].status).toBe('SUCCESS_PARTIAL')
+    })
+
+    it('should handle null/undefined values gracefully', () => {
+      const data: TableRow[] = [
+        { value: 'hello' },
+        { value: null },
+        { value: undefined },
+        { value: 'world' }
+      ]
+      
+      const config: ProcessingConfig = {
+        fieldQueries: {
+          value: createFieldQuery({ jsExpression: '$ && $.length > 3' })
+        },
+        columnOrder: ['value']
+      }
+      
+      const result = processor.processData(data, config)
+      
+      expect(result.data.length).toBe(2)
+      expect(result.data[0].value).toBe('hello')
+      expect(result.data[1].value).toBe('world')
+    })
+
+    it('should return all rows on invalid JS expression', () => {
+      const data: TableRow[] = [
+        { value: 'a' },
+        { value: 'b' }
+      ]
+      
+      const config: ProcessingConfig = {
+        fieldQueries: {
+          value: createFieldQuery({ jsExpression: 'invalid syntax {{' })
+        },
+        columnOrder: ['value']
+      }
+      
+      const result = processor.processData(data, config)
+      
+      expect(result.data.length).toBe(2)
+    })
+
+    it('should work with object field values', () => {
+      const data: TableRow[] = [
+        { payload: { count: 5 } },
+        { payload: { count: 15 } },
+        { payload: { count: 25 } }
+      ]
+      
+      const config: ProcessingConfig = {
+        fieldQueries: {
+          payload: createFieldQuery({ jsExpression: '$.count > 10' })
+        },
+        columnOrder: ['payload']
+      }
+      
+      const result = processor.processData(data, config)
+      
+      expect(result.data.length).toBe(2)
+      expect(result.data[0].payload.count).toBe(15)
+      expect(result.data[1].payload.count).toBe(25)
+    })
+
+    it('should filter when jsExpression is in fieldQueries without query', () => {
+      const data: TableRow[] = [
+        { name: 'short' },
+        { name: 'this is longer' },
+        { name: 'a' }
+      ]
+      
+      const config: ProcessingConfig = {
+        fieldQueries: {
+          name: createFieldQuery({ 
+            query: '',  // Empty query (JS mode)
+            jsExpression: '$.length > 5' 
+          })
+        },
+        columnOrder: ['name']
+      }
+      
+      const result = processor.processData(data, config)
+      
+      expect(result.data.length).toBe(1)
+      expect(result.data[0].name).toBe('this is longer')
+    })
+
+    it('should handle the exact scenario from UI: field in columnOrder, jsExpression set', () => {
+      const data: TableRow[] = [
+        { id: 1, status: 'active' },
+        { id: 2, status: 'inactive' },
+        { id: 3, status: 'active' },
+        { id: 4, status: 'pending' }
+      ]
+      
+      const config: ProcessingConfig = {
+        fieldQueries: {
+          status: {
+            query: '',
+            isRegex: false,
+            isNegate: false,
+            isArray: false,
+            isPattern: false,
+            isDisabled: false,
+            patternFields: [],
+            jsExpression: '$ === "active"'
+          }
+        },
+        columnOrder: ['id', 'status']
+      }
+      
+      const result = processor.processData(data, config)
+      
+      expect(result.data.length).toBe(2)
+      expect(result.data[0].status).toBe('active')
+      expect(result.data[1].status).toBe('active')
+    })
+  })
 })

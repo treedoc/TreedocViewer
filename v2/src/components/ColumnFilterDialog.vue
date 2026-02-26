@@ -8,19 +8,9 @@ import ToggleButton from 'primevue/togglebutton'
 import ProgressBar from 'primevue/progressbar'
 import type { TDNode } from 'treedoc'
 import { TDNodeType, TDJSONWriter, TDJSONWriterOption } from 'treedoc'
+import type { FieldQuery } from '@/models/types'
 
-export interface FieldQuery {
-  query: string
-  isRegex: boolean
-  isNegate: boolean
-  isArray: boolean
-  isPattern: boolean
-  isDisabled: boolean  // Keep filter config but don't apply
-  patternFields: string[]  // Extracted field names from pattern
-  extendedFields?: string  // Field-level extended fields expression (e.g., "name: $.user.name, id: $.id")
-  patternExtract?: string  // Pattern for extracting fields (e.g., "Request: $request *")
-  patternFilter?: boolean  // Whether to filter rows based on pattern (default: false, just extract)
-}
+export type { FieldQuery }
 
 export interface ColumnStatistic {
   total: number
@@ -101,6 +91,7 @@ const localIsNegate = ref(props.fieldQuery.isNegate)
 const localIsArray = ref(props.fieldQuery.isArray)
 const localIsPattern = ref(props.fieldQuery.isPattern || false)
 const localIsDisabled = ref(props.fieldQuery.isDisabled || false)
+const localIsJs = ref(!!props.fieldQuery.jsExpression && props.fieldQuery.jsExpression !== 'true')
 const localExtendedFields = ref(props.fieldQuery.extendedFields || '')
 const localPatternExtract = ref(props.fieldQuery.patternExtract || '')
 const localPatternFilter = ref(props.fieldQuery.patternFilter || false)
@@ -150,19 +141,26 @@ onBeforeUnmount(() => {
 
 // Sync with props
 watch(() => props.fieldQuery, (fq) => {
-  localQuery.value = fq.query
+  // JS mode is active if jsExpression is set (including 'true' which means empty JS filter)
+  const isJsMode = !!fq.jsExpression
+  // In JS mode, the query text is stored in jsExpression, not query
+  // 'true' means JS mode is on but no filter text (show empty)
+  if (isJsMode) {
+    localQuery.value = fq.jsExpression === 'true' ? '' : fq.jsExpression!
+  } else {
+    localQuery.value = fq.query
+  }
   localIsRegex.value = fq.isRegex
   localIsNegate.value = fq.isNegate
   localIsArray.value = fq.isArray
   localIsPattern.value = fq.isPattern || false
   localIsDisabled.value = fq.isDisabled || false
+  localIsJs.value = isJsMode
   localExtendedFields.value = fq.extendedFields || ''
   localPatternExtract.value = fq.patternExtract || ''
   localPatternFilter.value = fq.patternFilter || false
-  // Auto-show extended fields section if there's content
-  if (fq.extendedFields || fq.patternExtract) {
-    showExtendedFields.value = true
-  }
+  // Auto-show/hide extended fields section based on content
+  showExtendedFields.value = !!(fq.extendedFields || fq.patternExtract)
 }, { immediate: true })
 
 // Reset showStats when column changes to prevent performance issues
@@ -228,24 +226,34 @@ function onPopoverShow() {
 function applyFilter() {
   // Extract pattern fields from the new patternExtract field
   const patternFields = localPatternExtract.value ? extractPatternFields(localPatternExtract.value) : []
+  
+  // When JS mode is active, store the expression (use empty string to indicate JS mode is on but no filter)
+  // When query is empty in JS mode, use 'true' to indicate "no filtering" but JS mode is active
+  let jsExpression: string | undefined = undefined
+  if (localIsJs.value) {
+    jsExpression = localQuery.value || 'true'  // 'true' means no filtering
+  }
+  
   emit('update:fieldQuery', {
-    query: localQuery.value,
-    isRegex: localIsRegex.value,
-    isNegate: localIsNegate.value,
-    isArray: localIsArray.value,
+    ...props.fieldQuery,  // Preserve valueColors and other properties
+    query: localIsJs.value ? '' : localQuery.value,
+    isRegex: localIsJs.value ? false : localIsRegex.value,
+    isNegate: localIsJs.value ? false : localIsNegate.value,
+    isArray: localIsJs.value ? false : localIsArray.value,
     isPattern: false,  // No longer used in filter options
     isDisabled: localIsDisabled.value,
     patternFields,
     extendedFields: localExtendedFields.value || undefined,
     patternExtract: localPatternExtract.value || undefined,
     patternFilter: localPatternFilter.value,
+    jsExpression,
   })
 }
 
-// Debounced version for input changes
+// Debounced version for input changes (2s delay to allow selecting multiple values from statistics)
 const debouncedApplyFilter = debounce(() => {
   applyFilter()
-}, 300)
+}, 1000)
 
 function close() {
   hide()
@@ -280,6 +288,7 @@ function clearFilter() {
   localIsArray.value = false
   localIsPattern.value = false
   localIsDisabled.value = false
+  localIsJs.value = false
   // Don't clear extendedFields - user requested to preserve them
   applyFilter()
 }
@@ -291,6 +300,20 @@ function copyValue(value: string) {
 
 // Add value to filter (from statistics)
 function addValueToFilter(value: string, isNegate: boolean) {
+  // For empty values, use JS expression filter
+  // Filter In (isNegate=false): show only empty values → !$ (keep falsy values)
+  // Filter Out (isNegate=true): hide empty values → $ (keep truthy values)
+  if (value === '') {
+    localIsJs.value = true
+    localQuery.value = isNegate ? '$' : '!$'
+    localIsArray.value = false
+    localIsNegate.value = false
+    localIsRegex.value = false
+    localIsPattern.value = false
+    debouncedApplyFilter()
+    return
+  }
+  
   // If current filter has different negate mode, override it
   if (localIsArray.value && localIsNegate.value !== isNegate) {
     localQuery.value = value
@@ -298,7 +321,8 @@ function addValueToFilter(value: string, isNegate: boolean) {
     localIsArray.value = true
     localIsRegex.value = false
     localIsPattern.value = false
-    applyFilter()
+    localIsJs.value = false
+    debouncedApplyFilter()
     return
   }
   
@@ -315,8 +339,9 @@ function addValueToFilter(value: string, isNegate: boolean) {
     localIsNegate.value = isNegate
     localIsRegex.value = false
     localIsPattern.value = false
+    localIsJs.value = false
   }
-  applyFilter()
+  debouncedApplyFilter()
 }
 
 // Preview of extracted fields from pattern
@@ -470,8 +495,9 @@ function toggleColorPicker(value: string) {
           <InputText
             ref="inputRef"
             v-model="localQuery"
-            :placeholder="`Search ${field}...`"
+            :placeholder="localIsJs ? 'JS expression, e.g.: $.length > 10 ($ = field value)' : `Search ${field}...`"
             class="filter-input"
+            :class="{ 'js-mode-input': localIsJs }"
             :disabled="localIsDisabled"
             @keydown="handleKeydown"
             @input="debouncedApplyFilter"
@@ -489,45 +515,53 @@ function toggleColorPicker(value: string) {
       </div>
       
       <!-- Filter Options -->
-      <div class="filter-options" :class="{ 'filter-paused': localIsDisabled }">
+      <div class="filter-options" :class="{ 'filter-paused': localIsDisabled, 'filter-js-mode': localIsJs }">
         <ToggleButton
           v-model="localIsNegate"
-          onLabel="!="
-          offLabel="!="
-          @change="applyFilter"
+          onLabel="!"
+          offLabel="!"
+          @change="debouncedApplyFilter"
           v-tooltip.top="'Negate filter (exclude matches)'"
           class="filter-option-btn"
-          :class="{ 'is-active': localIsNegate }"
-          :disabled="localIsDisabled"
+          :class="{ 'is-active': localIsNegate && !localIsJs }"
+          :disabled="localIsDisabled || localIsJs"
         />
         <ToggleButton
           v-model="localIsRegex"
           onLabel=".*"
           offLabel=".*"
-          @change="applyFilter"
+          @change="debouncedApplyFilter"
           v-tooltip.top="'Regex matching'"
           class="filter-option-btn"
-          :class="{ 'is-active': localIsRegex }"
-          :disabled="localIsDisabled"
+          :class="{ 'is-active': localIsRegex && !localIsJs }"
+          :disabled="localIsDisabled || localIsJs"
         />
         <ToggleButton
           v-model="localIsArray"
           onLabel="[]"
           offLabel="[]"
-          @change="applyFilter"
+          @change="debouncedApplyFilter"
           v-tooltip.top="'Array (comma-separated values)'"
           class="filter-option-btn"
-          :class="{ 'is-active': localIsArray }"
+          :class="{ 'is-active': localIsArray && !localIsJs }"
+          :disabled="localIsDisabled || localIsJs"
+        />
+        <ToggleButton
+          v-model="localIsJs"
+          onLabel="JS"
+          offLabel="JS"
+          @change="debouncedApplyFilter"
+          v-tooltip.top="'JavaScript expression (use $ for field value)'"
+          class="filter-option-btn"
+          :class="{ 'is-js-active': localIsJs }"
           :disabled="localIsDisabled"
         />
         <div class="filter-options-separator"></div>
         <ToggleButton
           v-model="localIsDisabled"
-          onIcon="pi pi-pause"
-          offIcon="pi pi-pause"
-          onLabel=""
-          offLabel=""
-          @change="applyFilter"
+          onLabel="||"
+          offLabel="||"
+          @change="debouncedApplyFilter"
           v-tooltip.top="'Pause Filter'"
           class="filter-option-btn pause-btn"
           :class="{ 'is-paused-active': localIsDisabled }"
@@ -625,6 +659,7 @@ user=${userId}, action=$action"
               </button>
             </div>
           </div>
+          
         </div>
       </div>
       
@@ -1171,6 +1206,30 @@ user=${userId}, action=$action"
   padding: 1px 4px;
   border-radius: 2px;
   font-size: 0.8rem;
+}
+
+/* JS mode input styling */
+.js-mode-input {
+  font-family: var(--tdv-font-mono);
+}
+
+/* JS button active state - use a distinct color */
+.filter-option-btn.is-js-active {
+  background: var(--tdv-info, #0ea5e9) !important;
+  border-color: var(--tdv-info, #0ea5e9) !important;
+  color: white !important;
+  box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.3);
+}
+
+:global(.dark-mode) .filter-option-btn.is-js-active {
+  background: #0ea5e9 !important;
+  border-color: #38bdf8 !important;
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.4);
+}
+
+/* Disabled state for buttons when JS mode is active */
+.filter-js-mode .filter-option-btn:not(.is-js-active):not(.pause-btn) {
+  opacity: 0.5;
 }
 
 .stats-section {

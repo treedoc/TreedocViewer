@@ -189,6 +189,13 @@ export class TableDataProcessor {
           data = this.applyQueryFilter(data, field, fq, isDerivedColumn)
           processedFields.add(queryKey)
         }
+        
+        // Apply JS expression filter
+        const jsKey = `${field}:js`
+        if (fq.jsExpression && !processedFields.has(jsKey)) {
+          data = this.applyJsExpressionFilter(data, field, fq.jsExpression)
+          processedFields.add(jsKey)
+        }
       }
       
       // Check if any new columns were created
@@ -340,6 +347,30 @@ export class TableDataProcessor {
       const strValue = this.valueToString(value)
       return matchFieldQuery(strValue, fq)
     })
+  }
+  
+  /**
+   * Apply JS expression filter for a specific field
+   * $ references the field value
+   */
+  applyJsExpressionFilter(data: TableRow[], field: string, jsExpression: string): TableRow[] {
+    try {
+      const filterFn = new Function('$', `return ${jsExpression}`) as (value: any) => boolean
+      return data.filter(row => {
+        try {
+          const value = row[field]
+          // For TDNode values, convert to plain object
+          const plainValue = value?.__node?.toObject?.(true) ?? 
+                            (value?.toObject ? value.toObject(true) : value)
+          return filterFn(plainValue)
+        } catch {
+          return true
+        }
+      })
+    } catch (e) {
+      console.warn('Invalid JS expression for field', field, ':', e)
+      return data
+    }
   }
   
   /**

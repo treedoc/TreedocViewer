@@ -46,6 +46,7 @@ export interface FieldQuery {
   patternExtract?: string
   patternFilter?: boolean
   extendedFields?: string
+  jsExpression?: string
 }
 
 export interface Query {

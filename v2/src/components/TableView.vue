@@ -175,16 +175,27 @@ function getFieldQuery(field: string): FieldQuery {
 
 function hasActiveFilter(field: string): boolean {
   const fq = fieldQueries.value[field]
-  return fq?.query?.length > 0 && !fq.isDisabled
+  const hasQuery = fq?.query?.length > 0
+  // jsExpression 'true' means JS mode is on but no actual filter
+  const hasJsExpression = !!fq?.jsExpression && fq.jsExpression !== 'true'
+  return (hasQuery || hasJsExpression) && !fq.isDisabled
 }
 
 function hasDisabledFilter(field: string): boolean {
   const fq = fieldQueries.value[field]
-  return fq?.query?.length > 0 && fq.isDisabled
+  const hasQuery = fq?.query?.length > 0
+  // jsExpression 'true' means JS mode is on but no actual filter
+  const hasJsExpression = !!fq?.jsExpression && fq.jsExpression !== 'true'
+  return (hasQuery || hasJsExpression) && fq.isDisabled
 }
 
 const activeFilterCount = computed(() => {
-  return Object.values(fieldQueries.value).filter(fq => fq.query?.length > 0 && !fq.isDisabled).length
+  return Object.values(fieldQueries.value).filter(fq => {
+    const hasQuery = fq.query?.length > 0
+    // jsExpression 'true' means JS mode is on but no actual filter
+    const hasJsExpression = !!fq.jsExpression && fq.jsExpression !== 'true'
+    return (hasQuery || hasJsExpression) && !fq.isDisabled
+  }).length
 })
 
 const visibleColumns = computed(() => {
@@ -324,7 +335,6 @@ function cancelHoverTimeout() {
 
 function updateFieldQuery(query: FieldQuery) {
   if (activeFilterColumn.value) {
-    console.log(`[updateFieldQuery] Field: ${activeFilterColumn.value.field}, patternExtract: "${query.patternExtract}", extendedFields: "${query.extendedFields}"`)
     fieldQueries.value[activeFilterColumn.value.field] = query
   }
 }
@@ -784,7 +794,8 @@ function clearAllFilters() {
         isNegate: false,
         isArray: false,
         isPattern: false,
-        isDisabled: false
+        isDisabled: false,
+        jsExpression: undefined
       }
     }
   }
