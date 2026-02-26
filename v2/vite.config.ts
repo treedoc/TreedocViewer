@@ -12,5 +12,8 @@ export default defineConfig({
     watch: {
       usePolling: true
     }
+  },
+  test: {
+    exclude: ['**/node_modules/**', '**/tests/**']
   }
 })
