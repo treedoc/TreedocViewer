@@ -477,27 +477,12 @@ const filteredData = computed(() => {
       }
     }
     
-    // If we have a preset order, reorder all columns to match it
-    if (presetColumnOrder.value && presetColumnOrder.value.length > 0) {
-      const orderMap = new Map(presetColumnOrder.value.map((field, i) => [field, i]))
-      columns.value.sort((a, b) => {
-        const aOrder = orderMap.get(a.field) ?? Infinity
-        const bOrder = orderMap.get(b.field) ?? Infinity
-        return aOrder - bOrder
-      })
-      // Clear preset order after applying (only apply once)
+    // Clear preset order/visibility after derived columns have been processed
+    // (Base columns use these in buildTable, derived columns use them above)
+    if (presetColumnOrder.value) {
       presetColumnOrder.value = null
     }
-    
-    // Apply preset visibility to all columns (including base columns that were rebuilt)
-    if (presetColumnVisibility.value && presetColumnVisibility.value.size > 0) {
-      for (const col of columns.value) {
-        const presetVisible = presetColumnVisibility.value.get(col.field)
-        if (presetVisible !== undefined) {
-          col.visible = presetVisible
-        }
-      }
-      // Clear preset visibility after applying
+    if (presetColumnVisibility.value) {
       presetColumnVisibility.value = null
     }
     
@@ -577,11 +562,17 @@ function buildTableInternal(node: TDNode | null, restoreState = true) {
   // Save current column visibility and order before rebuilding (for non-restore rebuilds)
   const currentFieldQueries = { ...fieldQueries.value }
   if (!restoreState) {
-    savedColumnVisibility = new Map<string, boolean>()
-    savedColumnOrder = []
-    for (const col of columns.value) {
-      savedColumnVisibility.set(col.field, col.visible)
-      savedColumnOrder.push(col.field)
+    // If we have preset visibility (from loading a preset), use that instead of current columns
+    if (presetColumnVisibility.value && presetColumnVisibility.value.size > 0) {
+      savedColumnVisibility = presetColumnVisibility.value
+      savedColumnOrder = presetColumnOrder.value ? [...presetColumnOrder.value] : null
+    } else {
+      savedColumnVisibility = new Map<string, boolean>()
+      savedColumnOrder = []
+      for (const col of columns.value) {
+        savedColumnVisibility.set(col.field, col.visible)
+        savedColumnOrder.push(col.field)
+      }
     }
   } else {
     savedColumnVisibility = null
@@ -735,6 +726,10 @@ function buildTableInternal(node: TDNode | null, restoreState = true) {
   // Clear saved visibility and order after build is complete
   savedColumnVisibility = null
   savedColumnOrder = null
+  
+  // Note: presetColumnVisibility and presetColumnOrder are NOT cleared here
+  // because derived columns (added in filteredData) may still need them
+  // They will be cleared in filteredData after derived columns are processed
   
   // Note: columnVisibility is auto-updated by the watcher on columns
 }

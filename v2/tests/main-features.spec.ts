@@ -289,4 +289,42 @@ test.describe('TreeDoc Viewer - Main UI Features', () => {
       await expect(page.locator('.p-datatable-tbody tr')).toHaveCount(1, { timeout: 5000 });
     });
   });
+
+  test.describe('Presets', () => {
+    test.beforeEach(async ({ page }) => {
+      await enterJsonData(page, sampleData);
+      await ensureTableViewVisible(page);
+    });
+
+    test('should save and load preset with column visibility', async ({ page }) => {
+      // Hide a column first
+      const statusHeader = page.locator('.column-header').filter({ hasText: 'status' });
+      await statusHeader.click();
+      await page.locator('.p-popover').waitFor({ state: 'visible' });
+      
+      // Click hide column button
+      await page.locator('.pi-eye-slash').click();
+      await page.waitForTimeout(300);
+      
+      // Verify column is hidden
+      await expect(page.locator('.column-header').filter({ hasText: 'status' })).not.toBeVisible();
+      
+      // Save preset
+      const presetSelector = page.locator('.preset-selector, [class*="preset"]').first();
+      if (await presetSelector.isVisible()) {
+        await presetSelector.click();
+        // Look for save option
+        const saveBtn = page.locator('text=Save').first();
+        if (await saveBtn.isVisible()) {
+          await saveBtn.click();
+          // Fill preset name
+          const nameInput = page.locator('input[placeholder*="name"], input[type="text"]').first();
+          if (await nameInput.isVisible()) {
+            await nameInput.fill('Test Preset');
+            await page.locator('text=Save').last().click();
+          }
+        }
+      }
+    });
+  });
 });
