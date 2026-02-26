@@ -524,6 +524,7 @@ function toggleColorPicker(value: string) {
           v-tooltip.top="'Negate filter (exclude matches)'"
           class="filter-option-btn"
           :class="{ 'is-active': localIsNegate && !localIsJs }"
+          :style="localIsNegate && !localIsJs ? { background: '#3b82f6', borderColor: '#3b82f6', color: 'white' } : {}"
           :disabled="localIsDisabled || localIsJs"
         />
         <ToggleButton
@@ -534,6 +535,7 @@ function toggleColorPicker(value: string) {
           v-tooltip.top="'Regex matching'"
           class="filter-option-btn"
           :class="{ 'is-active': localIsRegex && !localIsJs }"
+          :style="localIsRegex && !localIsJs ? { background: '#3b82f6', borderColor: '#3b82f6', color: 'white' } : {}"
           :disabled="localIsDisabled || localIsJs"
         />
         <ToggleButton
@@ -544,6 +546,7 @@ function toggleColorPicker(value: string) {
           v-tooltip.top="'Array (comma-separated values)'"
           class="filter-option-btn"
           :class="{ 'is-active': localIsArray && !localIsJs }"
+          :style="localIsArray && !localIsJs ? { background: '#3b82f6', borderColor: '#3b82f6', color: 'white' } : {}"
           :disabled="localIsDisabled || localIsJs"
         />
         <ToggleButton
@@ -554,6 +557,7 @@ function toggleColorPicker(value: string) {
           v-tooltip.top="'JavaScript expression (use $ for field value)'"
           class="filter-option-btn"
           :class="{ 'is-js-active': localIsJs }"
+          :style="localIsJs ? { background: '#0ea5e9', borderColor: '#0ea5e9', color: 'white' } : {}"
           :disabled="localIsDisabled"
         />
         <div class="filter-options-separator"></div>
@@ -565,6 +569,7 @@ function toggleColorPicker(value: string) {
           v-tooltip.top="'Pause Filter'"
           class="filter-option-btn pause-btn"
           :class="{ 'is-paused-active': localIsDisabled }"
+          :style="localIsDisabled ? { background: '#f59e0b', borderColor: '#f59e0b', color: 'white' } : {}"
         />
         <div class="filter-options-spacer"></div>
         <Button
@@ -1005,11 +1010,29 @@ user=${userId}, action=$action"
 }
 
 /* Active state - make it visually obvious */
-.filter-option-btn.is-active {
-  background: var(--tdv-primary, #3b82f6) !important;
-  border-color: var(--tdv-primary, #3b82f6) !important;
+/* Use :global to override PrimeVue's styling with high specificity */
+:global(.filter-option-btn.is-active),
+:global(.filter-option-btn.is-active.p-togglebutton),
+:global(.filter-option-btn.is-active.p-togglebutton-checked),
+:global(button.p-togglebutton.filter-option-btn.is-active) {
+  background: #3b82f6 !important;
+  background-color: #3b82f6 !important;
+  border-color: #3b82f6 !important;
   color: white !important;
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+}
+
+:global(.filter-option-btn.is-active .p-togglebutton-label),
+:global(.filter-option-btn.is-active .p-togglebutton-icon),
+:global(.filter-option-btn.is-active span),
+:global(.filter-option-btn.is-active .p-togglebutton-content) {
+  color: white !important;
+}
+
+/* PrimeVue Aura sets background on .p-togglebutton-content - override it */
+:global(.filter-option-btn.is-active .p-togglebutton-content) {
+  background: #3b82f6 !important;
+  background-color: #3b82f6 !important;
 }
 
 :global(.dark-mode) .filter-option-btn.is-active {
@@ -1019,11 +1042,27 @@ user=${userId}, action=$action"
 }
 
 /* Pause button active state */
-.filter-option-btn.is-paused-active {
-  background: var(--tdv-warning, #f59e0b) !important;
-  border-color: var(--tdv-warning, #f59e0b) !important;
+:global(.filter-option-btn.is-paused-active),
+:global(.filter-option-btn.is-paused-active.p-togglebutton),
+:global(.filter-option-btn.is-paused-active.p-togglebutton-checked),
+:global(button.p-togglebutton.filter-option-btn.is-paused-active) {
+  background: #f59e0b !important;
+  background-color: #f59e0b !important;
+  border-color: #f59e0b !important;
   color: white !important;
   box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.3);
+}
+
+:global(.filter-option-btn.is-paused-active .p-togglebutton-label),
+:global(.filter-option-btn.is-paused-active .p-togglebutton-icon),
+:global(.filter-option-btn.is-paused-active span),
+:global(.filter-option-btn.is-paused-active .p-togglebutton-content) {
+  color: white !important;
+}
+
+:global(.filter-option-btn.is-paused-active .p-togglebutton-content) {
+  background: #f59e0b !important;
+  background-color: #f59e0b !important;
 }
 
 :global(.dark-mode) .filter-option-btn.is-paused-active {
@@ -1214,11 +1253,27 @@ user=${userId}, action=$action"
 }
 
 /* JS button active state - use a distinct color */
-.filter-option-btn.is-js-active {
-  background: var(--tdv-info, #0ea5e9) !important;
-  border-color: var(--tdv-info, #0ea5e9) !important;
+:global(.filter-option-btn.is-js-active),
+:global(.filter-option-btn.is-js-active.p-togglebutton),
+:global(.filter-option-btn.is-js-active.p-togglebutton-checked),
+:global(button.p-togglebutton.filter-option-btn.is-js-active) {
+  background: #0ea5e9 !important;
+  background-color: #0ea5e9 !important;
+  border-color: #0ea5e9 !important;
   color: white !important;
   box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.3);
+}
+
+:global(.filter-option-btn.is-js-active .p-togglebutton-label),
+:global(.filter-option-btn.is-js-active .p-togglebutton-icon),
+:global(.filter-option-btn.is-js-active span),
+:global(.filter-option-btn.is-js-active .p-togglebutton-content) {
+  color: white !important;
+}
+
+:global(.filter-option-btn.is-js-active .p-togglebutton-content) {
+  background: #0ea5e9 !important;
+  background-color: #0ea5e9 !important;
 }
 
 :global(.dark-mode) .filter-option-btn.is-js-active {

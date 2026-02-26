@@ -8,6 +8,9 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:run": "vitest run",
+    "cypress:open": "cypress open",
+    "cypress:run": "cypress run",
+    "test:e2e": "start-server-and-test dev http://localhost:5173 cypress:run",
     "build:v1": "cd ../v1 && yarn install --ignore-engines && V1_SUBDIRECTORY=1 NODE_OPTIONS=--openssl-legacy-provider yarn build-app",
     "deploy:prepare": "yarn build && yarn build:v1 && cp -r ../v1/dist/app dist/v1",
     "deploy": "yarn deploy:prepare && gh-pages -d dist && gh-pages -d dist -r git@github.com:treedoc/treedoc.github.io.git -b master"
@@ -34,8 +37,10 @@
   "devDependencies": {
     "@types/lodash-es": "^4.17.12",
     "@vitejs/plugin-vue": "^5.2.1",
+    "cypress": "^14.5.4",
     "gh-pages": "^6.3.0",
     "playwright": "^1.58.2",
+    "start-server-and-test": "^2.1.5",
     "typescript": "~5.7.2",
     "vite": "^6.1.0",
     "vitest": "^3.2.4",
