@@ -1259,6 +1259,8 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
         stripedRows
         size="small"
         tableStyle="min-width: 100%"
+        resizableColumns
+        columnResizeMode="expand"
       >
         <Column
           v-for="col in visibleColumns"
