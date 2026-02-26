@@ -1,0 +1,10 @@
+[
+  { "id": 1, "name": "Alice", "status": "Success", "value": 100, "metadata": { "region": "US", "tier": "premium" } },
+  { "id": 2, "name": "Bob", "status": "Fail", "value": 200, "metadata": { "region": "EU", "tier": "basic" } },
+  { "id": 3, "name": "Charlie", "status": "Success", "value": null, "metadata": { "region": "US", "tier": "premium" } },
+  { "id": 4, "name": "David", "status": "", "value": 400, "metadata": { "region": "APAC", "tier": "basic" } },
+  { "id": 5, "name": "Eve", "status": "Pending", "value": 500, "metadata": { "region": "US", "tier": "enterprise" } },
+  { "id": 6, "name": "Frank", "status": "Success", "value": 150, "metadata": { "region": "EU", "tier": "premium" } },
+  { "id": 7, "name": "Grace", "status": "Fail", "value": 0, "metadata": { "region": "APAC", "tier": "basic" } },
+  { "id": 8, "name": "Henry", "status": "Success", "value": 350, "metadata": { "region": "US", "tier": "enterprise" } }
+]
