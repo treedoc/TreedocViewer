@@ -108,7 +108,7 @@ const showExtendedFields = ref(false)
 
 // Popover size and resize
 const defaultPopoverWidth = 450
-const defaultPopoverHeight = 300
+const defaultPopoverHeight = 420
 const popoverWidth = ref(defaultPopoverWidth)
 const popoverHeight = ref(defaultPopoverHeight)
 const isResizing = ref(false)
@@ -134,7 +134,7 @@ function onResize(e: MouseEvent) {
   const deltaX = e.clientX - resizeStartX.value
   const deltaY = e.clientY - resizeStartY.value
   popoverWidth.value = Math.max(350, Math.min(window.innerWidth * 0.9, resizeStartWidth.value + deltaX))
-  popoverHeight.value = Math.max(300, Math.min(window.innerHeight * 0.8, resizeStartHeight.value + deltaY))
+  popoverHeight.value = Math.max(350, Math.min(window.innerHeight * 0.8, resizeStartHeight.value + deltaY))
 }
 
 function stopResize() {
@@ -465,19 +465,31 @@ function toggleColorPicker(value: string) {
   >
     <div class="filter-content">
       <!-- Filter Input -->
-      <div class="filter-input-row">
-        <InputText
-          ref="inputRef"
-          v-model="localQuery"
-          :placeholder="`Search ${field}...`"
-          class="filter-input"
-          @keydown="handleKeydown"
-          @input="debouncedApplyFilter"
-        />
+      <div class="filter-input-row" :class="{ 'filter-paused': localIsDisabled }">
+        <div class="filter-input-wrapper">
+          <InputText
+            ref="inputRef"
+            v-model="localQuery"
+            :placeholder="`Search ${field}...`"
+            class="filter-input"
+            :disabled="localIsDisabled"
+            @keydown="handleKeydown"
+            @input="debouncedApplyFilter"
+          />
+          <button
+            v-if="localQuery"
+            class="input-clear-btn"
+            @click="clearFilter"
+            type="button"
+            tabindex="-1"
+          >
+            <i class="pi pi-times"></i>
+          </button>
+        </div>
       </div>
       
       <!-- Filter Options -->
-      <div class="filter-options">
+      <div class="filter-options" :class="{ 'filter-paused': localIsDisabled }">
         <ToggleButton
           v-model="localIsNegate"
           onLabel="!="
@@ -485,6 +497,8 @@ function toggleColorPicker(value: string) {
           @change="applyFilter"
           v-tooltip.top="'Negate filter (exclude matches)'"
           class="filter-option-btn"
+          :class="{ 'is-active': localIsNegate }"
+          :disabled="localIsDisabled"
         />
         <ToggleButton
           v-model="localIsRegex"
@@ -493,6 +507,8 @@ function toggleColorPicker(value: string) {
           @change="applyFilter"
           v-tooltip.top="'Regex matching'"
           class="filter-option-btn"
+          :class="{ 'is-active': localIsRegex }"
+          :disabled="localIsDisabled"
         />
         <ToggleButton
           v-model="localIsArray"
@@ -501,6 +517,8 @@ function toggleColorPicker(value: string) {
           @change="applyFilter"
           v-tooltip.top="'Array (comma-separated values)'"
           class="filter-option-btn"
+          :class="{ 'is-active': localIsArray }"
+          :disabled="localIsDisabled"
         />
         <div class="filter-options-separator"></div>
         <ToggleButton
@@ -510,21 +528,11 @@ function toggleColorPicker(value: string) {
           onLabel=""
           offLabel=""
           @change="applyFilter"
-          v-tooltip.top="'Disable filter (keep config but don\'t apply)'"
-          class="filter-option-btn disable-btn"
-          :class="{ 'is-disabled-active': localIsDisabled }"
+          v-tooltip.top="'Pause Filter'"
+          class="filter-option-btn pause-btn"
+          :class="{ 'is-paused-active': localIsDisabled }"
         />
         <div class="filter-options-spacer"></div>
-        <Button
-          icon="pi pi-filter-slash"
-          size="small"
-          text
-          severity="secondary"
-          @click="clearFilter"
-          v-tooltip.top="'Clear filter'"
-          class="clear-filter-btn"
-          :disabled="!localQuery"
-        />
         <Button
           icon="pi pi-eye-slash"
           size="small"
@@ -564,15 +572,26 @@ function toggleColorPicker(value: string) {
                 <span>Filter rows</span>
               </label>
             </div>
-            <textarea
-              v-model="localPatternExtract"
-              placeholder="Extract fields using patterns (one per line). E.g.:
+            <div class="textarea-wrapper">
+              <textarea
+                v-model="localPatternExtract"
+                placeholder="Extract fields using patterns (one per line). E.g.:
 Request: $request *
 user=${userId}, action=$action"
-              class="extended-fields-input"
-              rows="3"
-              @input="debouncedApplyFilter"
-            />
+                class="extended-fields-input"
+                rows="3"
+                @input="debouncedApplyFilter"
+              />
+              <button
+                v-if="localPatternExtract"
+                class="textarea-clear-btn"
+                @click="localPatternExtract = ''; applyFilter()"
+                type="button"
+                tabindex="-1"
+              >
+                <i class="pi pi-times"></i>
+              </button>
+            </div>
             <div v-if="previewPatternFields.length > 0" class="pattern-preview">
               <span class="pattern-preview-label">Extracted:</span>
               <span v-for="f in previewPatternFields" :key="f" class="pattern-field-tag">
@@ -587,13 +606,24 @@ user=${userId}, action=$action"
           <!-- JSON Path Extended Fields -->
           <div class="jsonpath-extract-section">
             <span class="jsonpath-extract-label">JSON Path</span>
-            <textarea
-              v-model="localExtendedFields"
-              placeholder="Extract fields using JSON path. E.g.: name: $.user.name, id: $.id"
-              class="extended-fields-input"
-              rows="2"
-              @input="debouncedApplyFilter"
-            />
+            <div class="textarea-wrapper">
+              <textarea
+                v-model="localExtendedFields"
+                placeholder="Extract fields using JSON path. E.g.: name: $.user.name, id: $.id"
+                class="extended-fields-input"
+                rows="2"
+                @input="debouncedApplyFilter"
+              />
+              <button
+                v-if="localExtendedFields"
+                class="textarea-clear-btn"
+                @click="localExtendedFields = ''; applyFilter()"
+                type="button"
+                tabindex="-1"
+              >
+                <i class="pi pi-times"></i>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -791,8 +821,81 @@ user=${userId}, action=$action"
   align-items: center;
 }
 
+.filter-input-wrapper {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+
 .filter-input {
   flex: 1;
+  padding-right: 28px;
+}
+
+.input-clear-btn {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: transparent;
+  color: var(--tdv-text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  padding: 0;
+  transition: all 0.15s ease;
+}
+
+.input-clear-btn:hover {
+  background: var(--tdv-surface-hover);
+  color: var(--tdv-text);
+}
+
+.input-clear-btn i {
+  font-size: 10px;
+}
+
+.textarea-wrapper {
+  position: relative;
+  flex: 1;
+}
+
+.textarea-wrapper textarea {
+  width: 100%;
+  padding-right: 28px;
+}
+
+.textarea-clear-btn {
+  position: absolute;
+  right: 6px;
+  top: 6px;
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: var(--tdv-surface-light);
+  color: var(--tdv-text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  padding: 0;
+  transition: all 0.15s ease;
+}
+
+.textarea-clear-btn:hover {
+  background: var(--tdv-surface-hover);
+  color: var(--tdv-text);
+}
+
+.textarea-clear-btn i {
+  font-size: 10px;
 }
 
 .filter-textarea {
@@ -820,19 +923,93 @@ user=${userId}, action=$action"
 }
 
 .filter-option-btn {
-  min-width: 28px;
+  width: 32px;
+  min-width: 32px;
+  max-width: 32px;
+  height: 26px;
   font-family: 'JetBrains Mono', monospace;
   font-weight: 600;
-  font-size: 0.75rem;
-  padding: 0.25rem 0.4rem;
+  font-size: 0.7rem;
+  padding: 0;
+  background: var(--tdv-surface-light);
+  border: 1px solid var(--tdv-surface-border);
+  color: var(--tdv-text);
+}
+
+/* Dark mode: improve button contrast */
+:global(.dark-mode) .filter-option-btn {
+  background: #4b5563 !important;
+  border: 1.5px solid #9ca3af !important;
+  color: #f3f4f6 !important;
+}
+
+:global(.dark-mode) .filter-option-btn:hover {
+  background: #6b7280 !important;
+  border-color: #d1d5db !important;
+}
+
+.filter-option-btn :deep(.p-togglebutton-content) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
 }
 
 .filter-option-btn :deep(.p-togglebutton-label) {
-  font-size: 0.75rem;
+  font-size: 0.7rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.pattern-btn {
-  min-width: 32px;
+.filter-option-btn :deep(.p-togglebutton-icon) {
+  font-size: 0.75rem;
+  margin: 0 !important;
+}
+
+/* Active state - make it visually obvious */
+.filter-option-btn.is-active {
+  background: var(--tdv-primary, #3b82f6) !important;
+  border-color: var(--tdv-primary, #3b82f6) !important;
+  color: white !important;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+}
+
+:global(.dark-mode) .filter-option-btn.is-active {
+  background: #3b82f6 !important;
+  border-color: #60a5fa !important;
+  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.4);
+}
+
+/* Pause button active state */
+.filter-option-btn.is-paused-active {
+  background: var(--tdv-warning, #f59e0b) !important;
+  border-color: var(--tdv-warning, #f59e0b) !important;
+  color: white !important;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.3);
+}
+
+:global(.dark-mode) .filter-option-btn.is-paused-active {
+  background: #f59e0b !important;
+  border-color: #fbbf24 !important;
+  box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.4);
+}
+
+/* Disabled/paused state for other buttons */
+.filter-paused .filter-option-btn:not(.pause-btn) {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.filter-paused .filter-input {
+  opacity: 0.5;
+}
+
+.filter-paused .input-clear-btn {
+  opacity: 0.5;
+  pointer-events: none;
 }
 
 .filter-options-separator {
@@ -846,24 +1023,17 @@ user=${userId}, action=$action"
   flex: 1;
 }
 
-.disable-btn {
-  min-width: 24px;
+.pause-btn {
+  width: 32px;
+  min-width: 32px;
 }
 
-.hide-column-btn,
-.clear-filter-btn {
+.hide-column-btn {
   padding: 0.25rem;
 }
 
-.hide-column-btn :deep(.p-button-icon),
-.clear-filter-btn :deep(.p-button-icon) {
+.hide-column-btn :deep(.p-button-icon) {
   font-size: 0.85rem;
-}
-
-.disable-btn.is-disabled-active {
-  background: var(--tdv-warning, #f59e0b) !important;
-  border-color: var(--tdv-warning, #f59e0b) !important;
-  color: white !important;
 }
 
 .pattern-preview {
@@ -1142,14 +1312,14 @@ user=${userId}, action=$action"
 }
 
 .stat-action-btn {
-  background: transparent;
-  border: none;
+  background: var(--tdv-surface-light);
+  border: 1px solid var(--tdv-surface-border);
   cursor: pointer;
-  color: var(--tdv-text-muted);
-  padding: 2px 4px;
+  color: var(--tdv-text);
+  padding: 3px 5px;
   border-radius: 3px;
   font-size: 0.75rem;
-  transition: color 0.15s, background 0.15s;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1157,6 +1327,7 @@ user=${userId}, action=$action"
 
 .stat-action-btn:hover {
   background: var(--tdv-hover-bg);
+  border-color: var(--tdv-text-muted);
 }
 
 .stat-copy-btn:hover {
@@ -1181,6 +1352,23 @@ user=${userId}, action=$action"
 
 .stat-action-btn i {
   font-size: 10px;
+}
+
+/* Dark mode: higher contrast for stat action buttons */
+:global(.dark-mode) .top-value-actions {
+  background: #374151;
+  border-color: #6b7280;
+}
+
+:global(.dark-mode) .stat-action-btn {
+  background: #4b5563;
+  border: 1px solid #9ca3af;
+  color: #f3f4f6;
+}
+
+:global(.dark-mode) .stat-action-btn:hover {
+  background: #6b7280;
+  border-color: #d1d5db;
 }
 
 /* Color picker popup */

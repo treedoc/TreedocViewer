@@ -215,6 +215,16 @@ describe('matchFieldQuery', () => {
     expect(matchFieldQuery('any value', createFieldQuery())).toBe(true)
   })
 
+  it('should not match empty string value against non-empty query', () => {
+    const fq = createFieldQuery({ query: 'test' })
+    expect(matchFieldQuery('', fq)).toBe(false)
+  })
+  
+  it('should not match empty string value against any non-empty array query', () => {
+    const fq = createFieldQuery({ query: 'a, b, c', isArray: true })
+    expect(matchFieldQuery('', fq)).toBe(false)
+  })
+
   it('should match substring (case insensitive)', () => {
     const fq = createFieldQuery({ query: 'hello' })
     expect(matchFieldQuery('Hello World', fq)).toBe(true)

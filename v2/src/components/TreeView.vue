@@ -275,21 +275,24 @@ defineExpose({ onKeyPress })
     
     <div v-if="showTreeFilter" class="filter-bar">
       <i class="pi pi-filter filter-icon"></i>
-      <InputText
-        v-model="treeFilterQuery"
-        placeholder="Filter nodes..."
-        class="filter-input"
-        @keydown="onFilterKeydown"
-      />
-      <Button
-        v-if="treeFilterQuery"
-        icon="pi pi-times"
-        size="small"
-        text
-        severity="secondary"
-        @click="clearFilter"
-        v-tooltip.top="'Clear (Esc)'"
-      />
+      <div class="filter-input-wrapper">
+        <InputText
+          v-model="treeFilterQuery"
+          placeholder="Filter nodes..."
+          class="filter-input"
+          @keydown="onFilterKeydown"
+        />
+        <button
+          v-if="treeFilterQuery"
+          class="input-clear-btn"
+          @click="clearFilter"
+          type="button"
+          tabindex="-1"
+          title="Clear (Esc)"
+        >
+          <i class="pi pi-times"></i>
+        </button>
+      </div>
       <template v-if="activeFilter">
         <Button
           icon="pi pi-chevron-up"
@@ -373,9 +376,45 @@ defineExpose({ onKeyPress })
   font-size: 0.9rem;
 }
 
+.filter-input-wrapper {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  min-width: 150px;
+}
+
 .filter-input {
   flex: 1;
-  min-width: 150px;
+  padding-right: 28px;
+}
+
+.input-clear-btn {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: transparent;
+  color: var(--tdv-text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  padding: 0;
+  transition: all 0.15s ease;
+}
+
+.input-clear-btn:hover {
+  background: var(--tdv-surface-hover);
+  color: var(--tdv-text);
+}
+
+.input-clear-btn i {
+  font-size: 10px;
 }
 
 .match-count {

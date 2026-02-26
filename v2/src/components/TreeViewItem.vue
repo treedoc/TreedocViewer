@@ -261,22 +261,22 @@ defineExpose({ selectNode, tnode: rawNode, selected })
           v-html="highlightedKey"
         ></a>
         <span class="node-label">{{ label }}</span>
-        <button 
-          v-show="isHovered"
-          class="copy-btn"
-          title="Copy path"
-          @click.stop="copyPath"
-        >
-          <i class="pi pi-link"></i>
-        </button>
-        <button 
-          v-show="isHovered"
-          class="copy-btn"
-          title="Copy node"
-          @click.stop="copyNode"
-        >
-          <i class="pi pi-copy"></i>
-        </button>
+        <div v-show="isHovered" class="node-action-bar">
+          <button 
+            class="node-action-btn"
+            title="Copy path"
+            @click.stop="copyPath"
+          >
+            <i class="pi pi-link"></i>
+          </button>
+          <button 
+            class="node-action-btn"
+            title="Copy node"
+            @click.stop="copyNode"
+          >
+            <i class="pi pi-copy"></i>
+          </button>
+        </div>
       </div>
       
       <template v-if="open">
@@ -310,22 +310,22 @@ defineExpose({ selectNode, tnode: rawNode, selected })
     >
       <span class="node-key leaf-key" v-html="highlightedKey"></span>:
       <SimpleValue :tnode="rawNode" :filter-query="filterQuery" @node-clicked="emit('nodeClicked', [$event])" />
-      <button 
-        v-show="isHovered"
-        class="copy-btn"
-        title="Copy path"
-        @click.stop="copyPath"
-      >
-        <i class="pi pi-link"></i>
-      </button>
-      <button 
-        v-show="isHovered"
-        class="copy-btn"
-        title="Copy node"
-        @click.stop="copyNode"
-      >
-        <i class="pi pi-copy"></i>
-      </button>
+      <div v-show="isHovered" class="node-action-bar">
+        <button 
+          class="node-action-btn"
+          title="Copy path"
+          @click.stop="copyPath"
+        >
+          <i class="pi pi-link"></i>
+        </button>
+        <button 
+          class="node-action-btn"
+          title="Copy node"
+          @click.stop="copyNode"
+        >
+          <i class="pi pi-copy"></i>
+        </button>
+      </div>
     </div>
   </div>
 </template>
@@ -418,27 +418,58 @@ defineExpose({ selectNode, tnode: rawNode, selected })
   color: var(--tdv-primary-light);
 }
 
-.copy-btn {
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  color: var(--tdv-text-muted);
-  padding: 2px 6px;
-  margin-left: 4px;
+/* Node action button bar */
+.node-action-bar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 8px;
+  padding: 2px;
+  background: var(--tdv-surface-light);
+  border: 1px solid var(--tdv-surface-border);
   border-radius: 4px;
+}
+
+.node-action-btn {
+  background: var(--tdv-surface-light);
+  border: 1px solid var(--tdv-surface-border);
+  cursor: pointer;
+  color: var(--tdv-text);
+  padding: 3px 5px;
+  border-radius: 3px;
   font-size: 0.75rem;
-  opacity: 0.7;
-  transition: opacity 0.15s, color 0.15s, background 0.15s;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.copy-btn:hover {
-  opacity: 1;
-  color: var(--tdv-primary);
+.node-action-btn:hover {
   background: var(--tdv-hover-bg);
+  border-color: var(--tdv-text-muted);
+  color: var(--tdv-primary);
 }
 
-.copy-btn i {
-  font-size: 12px;
+.node-action-btn i {
+  font-size: 11px;
+}
+
+/* Dark mode: higher contrast for node action buttons */
+:global(.dark-mode) .node-action-bar {
+  background: #374151;
+  border-color: #6b7280;
+}
+
+:global(.dark-mode) .node-action-btn {
+  background: #4b5563;
+  border: 1px solid #9ca3af;
+  color: #f3f4f6;
+}
+
+:global(.dark-mode) .node-action-btn:hover {
+  background: #6b7280;
+  border-color: #d1d5db;
+  color: #60a5fa;
 }
 
 /* Highlight for matched filter text - use :deep() since v-html content is not affected by scoped styles */

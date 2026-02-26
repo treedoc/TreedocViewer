@@ -72,6 +72,15 @@ export function getCellObject(cellValue: any): any {
 }
 
 /**
+ * TDNodeType enum values from treedoc library
+ */
+const TDNodeTypeEnum = {
+  MAP: 0,
+  ARRAY: 1,
+  SIMPLE: 2
+} as const
+
+/**
  * Default value to string converter
  */
 export function defaultValueToString(value: any): string {
@@ -80,7 +89,7 @@ export function defaultValueToString(value: any): string {
   if (typeof value === 'object') {
     // Check for TDNode-like structure
     if ('type' in value && 'key' in value) {
-      if (value.type === 0 && 'value' in value) { // TDNodeType.SIMPLE
+      if (value.type === TDNodeTypeEnum.SIMPLE && 'value' in value) {
         return String(value.value ?? '')
       }
       // For complex nodes, try to stringify
@@ -174,8 +183,10 @@ export class TableDataProcessor {
         }
         
         // Apply query filter
+        // For derived columns, undefined values should be filtered out (not kept)
         if (fq.query && !processedFields.has(queryKey)) {
-          data = this.applyQueryFilter(data, field, fq)
+          const isDerivedColumn = derivedColumnsSet.has(field)
+          data = this.applyQueryFilter(data, field, fq, isDerivedColumn)
           processedFields.add(queryKey)
         }
       }
@@ -231,7 +242,16 @@ export class TableDataProcessor {
         if (extracted && Object.keys(extracted).length > 0) {
           const newRow = { ...row }
           for (const [key, val] of Object.entries(extracted)) {
-            newRow[key] = val
+            // Convert objects/arrays to JSON string to avoid [object Object]
+            if (val !== null && typeof val === 'object') {
+              try {
+                newRow[key] = JSON.stringify(val)
+              } catch {
+                newRow[key] = String(val)
+              }
+            } else {
+              newRow[key] = val
+            }
             if (!derivedColumnsSet.has(key)) {
               derivedColumnsSet.add(key)
               derivedColumns.push(key)
@@ -302,13 +322,21 @@ export class TableDataProcessor {
   
   /**
    * Apply query filter to data
+   * @param isDerivedColumn - If true, undefined values are filtered out (derived columns should have values)
    */
-  applyQueryFilter(data: TableRow[], field: string, fq: FieldQuery): TableRow[] {
+  applyQueryFilter(data: TableRow[], field: string, fq: FieldQuery, isDerivedColumn = false): TableRow[] {
     if (!fq.query) return data
     
     return data.filter(row => {
       const value = row[field]
-      if (value === undefined) return true
+      
+      // Handle undefined values:
+      // - For base columns: keep rows where field doesn't exist (don't filter by missing fields)
+      // - For derived columns: filter out rows where extraction didn't produce a value
+      if (value === undefined) {
+        return !isDerivedColumn
+      }
+      
       const strValue = this.valueToString(value)
       return matchFieldQuery(strValue, fq)
     })

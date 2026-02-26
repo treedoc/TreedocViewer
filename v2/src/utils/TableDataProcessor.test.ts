@@ -76,6 +76,22 @@ describe('defaultValueToString', () => {
     expect(defaultValueToString(undefined)).toBe('')
   })
   
+  it('should handle TDNode SIMPLE type (type=2) correctly', () => {
+    // TDNodeType.SIMPLE = 2 in treedoc library
+    expect(defaultValueToString({ type: 2, key: 'test', value: 'hello' })).toBe('hello')
+    expect(defaultValueToString({ type: 2, key: 'test', value: '' })).toBe('')
+    expect(defaultValueToString({ type: 2, key: 'test', value: null })).toBe('')
+    expect(defaultValueToString({ type: 2, key: 'test', value: 123 })).toBe('123')
+  })
+  
+  it('should JSON stringify non-SIMPLE TDNode types', () => {
+    // MAP type (0) should be JSON stringified, not treated as SIMPLE
+    expect(defaultValueToString({ type: 0, key: 'test', value: 'hello' })).toBe('{"type":0,"key":"test","value":"hello"}')
+    
+    // ARRAY type (1) should be JSON stringified
+    expect(defaultValueToString({ type: 1, key: 'test', children: [] })).toBe('{"type":1,"key":"test","children":[]}')
+  })
+  
   it('should stringify objects', () => {
     expect(defaultValueToString({ a: 1 })).toBe('{"a":1}')
     expect(defaultValueToString([1, 2, 3])).toBe('[1,2,3]')
@@ -171,6 +187,207 @@ describe('TableDataProcessor', () => {
       const result = processor.processData(data, config)
       expect(result.data).toHaveLength(2)
       expect(result.data.every(r => r.status !== 'inactive')).toBe(true)
+    })
+    
+    it('should filter out empty string values when searching', () => {
+      const data: TableRow[] = [
+        { name: 'Alice', status: 'active' },
+        { name: 'Bob', status: '' },
+        { name: 'Charlie', status: 'active' }
+      ]
+      
+      const config: ProcessingConfig = {
+        fieldQueries: {
+          status: createFieldQuery({ query: 'active' })
+        },
+        columnOrder: ['name', 'status']
+      }
+      
+      const result = processor.processData(data, config)
+      expect(result.data).toHaveLength(2)
+      expect(result.data.every(r => r.status === 'active')).toBe(true)
+    })
+    
+    it('should filter out empty values when searching for Success (user scenario)', () => {
+      // Exact user scenario: array of json with status column 'Success', 'fail' and empty values
+      const data: TableRow[] = [
+        { id: 1, status: 'Success' },
+        { id: 2, status: 'fail' },
+        { id: 3, status: '' },       // empty string
+        { id: 4, status: null },     // null
+        { id: 5 },                   // undefined (no status field)
+        { id: 6, status: 'Success' }
+      ]
+      
+      const config: ProcessingConfig = {
+        fieldQueries: {
+          status: createFieldQuery({ query: 'Success' })
+        },
+        columnOrder: ['id', 'status']
+      }
+      
+      const result = processor.processData(data, config)
+      
+      // Should only show rows with 'Success' and rows with undefined status (field not present)
+      // Empty string and null should be filtered out
+      console.log('Result data:', result.data.map(r => ({ id: r.id, status: r.status })))
+      
+      // Rows 1, 5, 6 should remain (Success, undefined, Success)
+      // Rows 2, 3, 4 should be filtered (fail, empty, null)
+      expect(result.data).toHaveLength(3)
+      expect(result.data.map(r => r.id)).toEqual([1, 5, 6])
+    })
+    
+    it('should filter TDNode empty values when searching for Success', () => {
+      // Test with TDNode-like objects (type 2 = SIMPLE)
+      const data: TableRow[] = [
+        { id: 1, status: { type: 2, key: 'status', value: 'Success' } },
+        { id: 2, status: { type: 2, key: 'status', value: 'fail' } },
+        { id: 3, status: { type: 2, key: 'status', value: '' } },
+        { id: 4, status: { type: 2, key: 'status', value: null } },
+        { id: 5, status: { type: 2, key: 'status' } },  // value property not present
+        { id: 6, status: { type: 2, key: 'status', value: 'Success' } }
+      ]
+      
+      const config: ProcessingConfig = {
+        fieldQueries: {
+          status: createFieldQuery({ query: 'Success' })
+        },
+        columnOrder: ['id', 'status']
+      }
+      
+      const result = processor.processData(data, config)
+      
+      console.log('TDNode Result data:', result.data.map(r => ({ id: r.id, status: r.status })))
+      
+      // Only rows 1 and 6 should remain (Success)
+      // Empty, null, and 'value property not present' should be filtered out
+      expect(result.data).toHaveLength(2)
+      expect(result.data.map(r => r.id)).toEqual([1, 6])
+    })
+    
+    it('should filter out undefined values when filtering on derived/extended columns', () => {
+      // Scenario: User has extended field from JSON path extraction
+      // Some rows have the extended field value, some don't (extraction failed)
+      const data: TableRow[] = [
+        { id: 1, payload: '{"status": "Success"}' },
+        { id: 2, payload: '{"status": "fail"}' },
+        { id: 3, payload: '{"other": "data"}' },  // No status field
+        { id: 4, payload: 'invalid json' },
+        { id: 5, payload: '{"status": "Success"}' }
+      ]
+      
+      // Simulate extended fields extraction: status: $.status
+      const config: ProcessingConfig = {
+        fieldQueries: {
+          payload: createFieldQuery({ extendedFields: 'status: $.status' }),
+          status: createFieldQuery({ query: 'Success' })
+        },
+        columnOrder: ['id', 'payload']
+      }
+      
+      const result = processor.processData(data, config)
+      
+      console.log('Extended field filter result:', result.data.map(r => ({ id: r.id, status: r.status })))
+      
+      // Only rows 1 and 5 should remain (status = "Success")
+      // Row 2 has status="fail" - filtered out
+      // Rows 3 and 4 don't have status field (extraction failed) - should be filtered out
+      expect(result.data).toHaveLength(2)
+      expect(result.data.map(r => r.id)).toEqual([1, 5])
+    })
+    
+    it('should filter correctly using applyQueryFilter directly', () => {
+      const data: TableRow[] = [
+        { name: 'Alice', status: 'active' },
+        { name: 'Bob', status: '' },
+        { name: 'Charlie', status: null },
+        { name: 'Dave', status: 'inactive' }
+      ]
+      
+      const fq = createFieldQuery({ query: 'active' })
+      const result = processor.applyQueryFilter(data, 'status', fq)
+      
+      // Should only keep Alice (active match)
+      // Bob (empty) and Charlie (null) don't contain 'active'
+      // Dave (inactive) does contain 'active'
+      expect(result).toHaveLength(2)
+      expect(result[0].name).toBe('Alice')
+      expect(result[1].name).toBe('Dave')  // 'inactive' contains 'active'
+    })
+    
+    it('should filter TDNode-like values with empty/null content', () => {
+      // TDNode-like structures (type 2 = SIMPLE in treedoc)
+      const data: TableRow[] = [
+        { name: 'Alice', status: { type: 2, key: 'status', value: 'active' } },
+        { name: 'Bob', status: { type: 2, key: 'status', value: '' } },
+        { name: 'Charlie', status: { type: 2, key: 'status', value: null } },
+        { name: 'Dave', status: { type: 2, key: 'status', value: 'inactive' } }
+      ]
+      
+      const fq = createFieldQuery({ query: 'active' })
+      const result = processor.applyQueryFilter(data, 'status', fq)
+      
+      expect(result).toHaveLength(2)
+      expect(result[0].name).toBe('Alice')
+      expect(result[1].name).toBe('Dave')
+    })
+    
+    it('should filter TDNode-like values with missing value property', () => {
+      // TDNode with type but no value property - should be treated as complex node
+      const data: TableRow[] = [
+        { name: 'Alice', status: { type: 2, key: 'status', value: 'active' } },
+        { name: 'Bob', status: { type: 2, key: 'status' } },  // No value property
+        { name: 'Charlie', status: { type: 2, key: 'status', value: undefined } }
+      ]
+      
+      const fq = createFieldQuery({ query: 'active' })
+      const result = processor.applyQueryFilter(data, 'status', fq)
+      
+      // Only Alice should match
+      // Bob and Charlie have no value or undefined value, which converts to ''
+      expect(result).toHaveLength(1)
+      expect(result[0].name).toBe('Alice')
+    })
+    
+    
+    it('should filter out null values when searching', () => {
+      const data: TableRow[] = [
+        { name: 'Alice', status: 'active' },
+        { name: 'Bob', status: null },
+        { name: 'Charlie', status: 'active' }
+      ]
+      
+      const config: ProcessingConfig = {
+        fieldQueries: {
+          status: createFieldQuery({ query: 'active' })
+        },
+        columnOrder: ['name', 'status']
+      }
+      
+      const result = processor.processData(data, config)
+      expect(result.data).toHaveLength(2)
+      expect(result.data.every(r => r.status === 'active')).toBe(true)
+    })
+    
+    it('should keep rows with undefined field values for base columns (field not present)', () => {
+      const data: TableRow[] = [
+        { name: 'Alice', status: 'active' },
+        { name: 'Bob' },  // no status field
+        { name: 'Charlie', status: 'active' }
+      ]
+      
+      const config: ProcessingConfig = {
+        fieldQueries: {
+          status: createFieldQuery({ query: 'active' })
+        },
+        columnOrder: ['name', 'status']
+      }
+      
+      const result = processor.processData(data, config)
+      // Bob should be kept because status is a BASE column (not derived)
+      // and his status field doesn't exist - we don't filter by missing base fields
+      expect(result.data).toHaveLength(3)
     })
     
     it('should skip disabled queries', () => {

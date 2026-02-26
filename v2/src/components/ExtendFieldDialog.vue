@@ -5,8 +5,14 @@ import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Checkbox from 'primevue/checkbox'
 import Textarea from 'primevue/textarea'
+import Tabs from 'primevue/tabs'
+import TabList from 'primevue/tablist'
+import Tab from 'primevue/tab'
+import TabPanels from 'primevue/tabpanels'
+import TabPanel from 'primevue/tabpanel'
 import type { TDNode } from 'treedoc'
 import { TDNodeType, TDJSONWriter, TDJSONWriterOption } from 'treedoc'
+import { debounce } from 'lodash-es'
 
 export interface ExtendFieldResult {
   type: 'pattern' | 'jsonpath'
@@ -330,21 +336,25 @@ const previewPatternFields = computed(() => {
 // Computed for selected JSON paths
 const selectedPaths = computed(() => jsonPaths.value.filter(p => p.selected))
 
-// Sync selection to parent immediately when checkbox changes
+// Debounced sync to parent to avoid UI lagging
+const debouncedEmitExtendedFields = debounce(() => {
+  const fields = selectedPaths.value.map(p => `${p.customName}: ${p.path}`).join(', ')
+  console.log('[ExtendFieldDialog] debouncedEmit emitting:', fields)
+  emit('updateExtendedFields', fields)
+}, 500)
+
+// Sync selection to parent when checkbox changes (debounced)
 function onPathSelectionChange() {
   // Use nextTick to ensure v-model has updated before calculating selection
   nextTick(() => {
-    const fields = selectedPaths.value.map(p => `${p.customName}: ${p.path}`).join(', ')
-    console.log('[ExtendFieldDialog] onPathSelectionChange emitting:', fields)
-    emit('updateExtendedFields', fields)
+    debouncedEmitExtendedFields()
   })
 }
 
-// Also sync when custom name changes
+// Also sync when custom name changes (debounced)
 function onCustomNameChange() {
   if (selectedPaths.value.length > 0) {
-    const fields = selectedPaths.value.map(p => `${p.customName}: ${p.path}`).join(', ')
-    emit('updateExtendedFields', fields)
+    debouncedEmitExtendedFields()
   }
 }
 
@@ -364,9 +374,20 @@ function applyPattern() {
 }
 
 const canApplyPattern = computed(() => {
-  // Must have at least one variable or wildcard
-  return patternText.value.includes('$') || patternText.value.includes('*')
+  const text = patternText.value || ''
+  return text.includes('$') || text.includes('*')
 })
+
+// Format path for display - strip the '$.' prefix
+function formatPathForDisplay(path: string): string {
+  if (path.startsWith('$.')) {
+    return path.substring(2)
+  }
+  if (path.startsWith('$')) {
+    return path.substring(1)
+  }
+  return path
+}
 </script>
 
 <template>
@@ -374,115 +395,113 @@ const canApplyPattern = computed(() => {
     v-model:visible="dialogVisible"
     modal
     dismissableMask
-    :header="mode === 'pattern' ? 'Create Pattern' : 'Select JSON Fields'"
+    header="Extend Fields"
     :style="{ width: '600px', maxHeight: '80vh' }"
     class="extend-field-dialog"
   >
-    <!-- Mode tabs -->
-    <div class="mode-tabs">
-      <Button
-        :severity="mode === 'pattern' ? 'primary' : 'secondary'"
-        :outlined="mode !== 'pattern'"
-        size="small"
-        @click="mode = 'pattern'"
-      >
-        <i class="pi pi-pencil"></i>
-        Pattern Match
-      </Button>
-      <Button
-        :severity="mode === 'jsonpath' ? 'primary' : 'secondary'"
-        :outlined="mode !== 'jsonpath'"
-        size="small"
-        @click="mode = 'jsonpath'"
-        :disabled="jsonPaths.length === 0"
-      >
-        <i class="pi pi-sitemap"></i>
-        JSON Fields
-      </Button>
-    </div>
+    <Tabs :value="mode" @update:value="(v: any) => mode = v">
+      <TabList>
+        <Tab value="pattern">
+          <i class="pi pi-pencil tab-icon"></i>
+          Pattern Match
+        </Tab>
+        <Tab value="jsonpath" :disabled="jsonPaths.length === 0">
+          <i class="pi pi-sitemap tab-icon"></i>
+          JSON Fields
+        </Tab>
+      </TabList>
+      <TabPanels>
+        <!-- Pattern Mode -->
+        <TabPanel value="pattern">
+          <div class="pattern-mode">      
+            <div class="textarea-wrapper">
+              <Textarea
+                v-model="patternText"
+                rows="5"
+                class="pattern-textarea"
+                placeholder="Enter pattern with variables, e.g.: Request: $path $method"
+              />
+              <button
+                v-if="patternText"
+                class="textarea-clear-btn"
+                @click="patternText = ''"
+                type="button"
+                tabindex="-1"
+              >
+                <i class="pi pi-times"></i>
+              </button>
+            </div>
+            
+            <div v-if="previewPatternFields.length > 0" class="pattern-fields">
+              <span class="pattern-fields-label">Extracted:</span>
+              <span v-for="f in previewPatternFields" :key="f" class="pattern-field-tag">
+                {{ f }}
+              </span>
+            </div>
+            <div v-else-if="patternText" class="pattern-hint">
+              Use ${name} or $name to extract values, * for wildcard
+            </div>
+            
+            <div class="pattern-footer">
+              <Button
+                label="Apply Pattern"
+                :disabled="!(patternText.includes('$') || patternText.includes('*'))"
+                @click="applyPattern"
+              />
+            </div>
+          </div>
+        </TabPanel>
 
-    <!-- Pattern Mode -->
-    <div v-if="mode === 'pattern'" class="pattern-mode">
-      <p class="help-text">
-        Use <code>${"${"}name{"}"}</code> or <code>$name</code> to extract values, <code>*</code> for wildcard.
-      </p>
-      
-      <Textarea
-        v-model="patternText"
-        rows="5"
-        class="pattern-textarea"
-        placeholder="Enter pattern with variables, e.g.: Request: $path $method"
-      />
-      
-      <div v-if="previewPatternFields.length > 0" class="pattern-fields">
-        <span class="pattern-fields-label">Extracted:</span>
-        <span v-for="f in previewPatternFields" :key="f" class="pattern-field-tag">
-          {{ f }}
-        </span>
-      </div>
-      <div v-else-if="patternText" class="pattern-hint">
-        Use ${"${"}name{"}"} or $name to extract values, * for wildcard
-      </div>
-      
-      <div class="pattern-footer">
-        <Button
-          label="Apply Pattern"
-          :disabled="!canApplyPattern"
-          @click="applyPattern"
-        />
-      </div>
-    </div>
-
-    <!-- JSON Path Mode -->
-    <div v-else-if="mode === 'jsonpath'" class="jsonpath-mode">
-      <p class="help-text">
-        Select fields to extract from this JSON value. Changes are applied immediately.
-      </p>
-      
-      <div class="path-actions">
-        <Button size="small" severity="secondary" @click="toggleAllPaths(true)">
-          Select All
-        </Button>
-        <Button size="small" severity="secondary" @click="toggleAllPaths(false)">
-          Deselect All
-        </Button>
-      </div>
-      
-      <div class="path-list">
-        <div
-          v-for="pathInfo in jsonPaths"
-          :key="pathInfo.path"
-          class="path-item"
-        >
-          <Checkbox
-            v-model="pathInfo.selected"
-            :inputId="pathInfo.path"
-            :binary="true"
-            @update:model-value="onPathSelectionChange"
-          />
-          <label :for="pathInfo.path" class="path-label">
-            <span class="path-name">{{ pathInfo.path }}</span>
-            <span class="path-sample">{{ pathInfo.sampleValue }}</span>
-          </label>
-          <InputText
-            v-if="pathInfo.selected"
-            v-model="pathInfo.customName"
-            size="small"
-            class="path-custom-name"
-            placeholder="Field name"
-            @input="onCustomNameChange"
-          />
-        </div>
-      </div>
-    </div>
+        <!-- JSON Path Mode -->
+        <TabPanel value="jsonpath">
+          <div class="jsonpath-mode">
+            Select fields to extract from this JSON value.
+            <div class="path-actions">
+              <Button size="small" severity="secondary" @click="toggleAllPaths(true)">
+                Select All
+              </Button>
+              <Button size="small" severity="secondary" @click="toggleAllPaths(false)">
+                Deselect All
+              </Button>
+            </div>
+            
+            <div class="path-list">
+              <div
+                v-for="pathInfo in jsonPaths"
+                :key="pathInfo.path"
+                class="path-item"
+              >
+                <Checkbox
+                  v-model="pathInfo.selected"
+                  :inputId="pathInfo.path"
+                  :binary="true"
+                  @update:model-value="onPathSelectionChange"
+                />
+                <label :for="pathInfo.path" class="path-label">
+                  <span class="path-name">{{ formatPathForDisplay(pathInfo.path) }}</span>
+                  <span class="path-sample">=</span>
+                  <span class="path-value">{{ pathInfo.sampleValue }}</span>
+                </label>
+                <InputText
+                  v-if="pathInfo.selected"
+                  v-model="pathInfo.customName"
+                  size="small"
+                  class="path-custom-name"
+                  placeholder="Field name"
+                  @input="onCustomNameChange"
+                />
+              </div>
+            </div>
+          </div>
+        </TabPanel>
+      </TabPanels>
+    </Tabs>
   </Dialog>
 </template>
 
 <style scoped>
-.mode-tabs {
-  display: flex;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
+.tab-icon {
+  margin-right: 0.4rem;
 }
 
 .help-text {
@@ -503,10 +522,42 @@ const canApplyPattern = computed(() => {
   gap: 0.75rem;
 }
 
+.textarea-wrapper {
+  position: relative;
+}
+
 .pattern-textarea {
   width: 100%;
   font-family: monospace;
   font-size: 0.9rem;
+  padding-right: 28px;
+}
+
+.textarea-clear-btn {
+  position: absolute;
+  right: 6px;
+  top: 6px;
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: var(--p-surface-100);
+  color: var(--p-text-muted-color);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  padding: 0;
+  transition: all 0.15s ease;
+}
+
+.textarea-clear-btn:hover {
+  background: var(--p-surface-200);
+  color: var(--p-text-color);
+}
+
+.textarea-clear-btn i {
+  font-size: 10px;
 }
 
 .pattern-fields {
@@ -565,8 +616,9 @@ const canApplyPattern = computed(() => {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.35rem 0;
+  padding: 0.2rem 0;
   border-bottom: 1px solid var(--surface-100);
+  min-height: 28px;
 }
 
 .path-item:last-child {
@@ -583,11 +635,18 @@ const canApplyPattern = computed(() => {
 
 .path-name {
   font-family: monospace;
-  color: var(--primary-color);
+  color: var(--tdv-text);
+  font-weight: 500;
 }
 
 .path-sample {
-  color: var(--text-color-secondary);
+  color: var(--tdv-text-muted);
+  font-size: 0.8rem;
+}
+
+.path-value {
+  color: var(--tdv-success, #22c55e);
+  font-family: monospace;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -595,6 +654,12 @@ const canApplyPattern = computed(() => {
 }
 
 .path-custom-name {
-  width: 120px;
+  width: 100px;
+}
+
+.path-custom-name :deep(.p-inputtext) {
+  padding: 0.2rem 0.4rem;
+  font-size: 0.8rem;
+  height: 24px;
 }
 </style>

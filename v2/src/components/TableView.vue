@@ -771,7 +771,25 @@ function onPage(event: { first: number; rows: number }) {
 }
 
 function clearAllFilters() {
-  fieldQueries.value = {}
+  // Clear only filter queries, preserve extended fields (patternExtract, extendedFields)
+  const newFieldQueries: Record<string, FieldQuery> = {}
+  
+  for (const [field, fq] of Object.entries(fieldQueries.value)) {
+    // Keep entry if it has extended fields configuration
+    if (fq.patternExtract || fq.extendedFields) {
+      newFieldQueries[field] = {
+        ...fq,
+        query: '',
+        isRegex: false,
+        isNegate: false,
+        isArray: false,
+        isPattern: false,
+        isDisabled: false
+      }
+    }
+  }
+  
+  fieldQueries.value = newFieldQueries
 }
 
 function filterCellValue(field: string, value: any, isNegate: boolean) {
@@ -1157,16 +1175,16 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
             :storage-key="STORAGE_KEY_JS_QUERY"
             input-class="query-input"
           />
-          <Button
+          <button
             v-if="jsQuery && jsQuery !== '$'"
-            icon="pi pi-times"
-            size="small"
-            severity="secondary"
-            text
-            class="clear-btn"
+            class="input-clear-btn"
             @click="jsQuery = '$'"
-            v-tooltip.top="'Clear JS Query'"
-          />
+            type="button"
+            tabindex="-1"
+            title="Clear JS Query"
+          >
+            <i class="pi pi-times"></i>
+          </button>
         </div>
       </label>
     </div>
@@ -1183,16 +1201,16 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
             @blur="rebuildTable"
             @enter="rebuildTable"
           />
-          <Button
+          <button
             v-if="extendedFields"
-            icon="pi pi-times"
-            size="small"
-            severity="secondary"
-            text
-            class="clear-btn"
+            class="input-clear-btn"
             @click="extendedFields = ''; rebuildTable()"
-            v-tooltip.top="'Clear Extended Fields'"
-          />
+            type="button"
+            tabindex="-1"
+            title="Clear Extended Fields"
+          >
+            <i class="pi pi-times"></i>
+          </button>
         </div>
       </label>
       <div class="extended-fields-help">
@@ -1436,14 +1454,43 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
 }
 
 .input-with-clear {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 4px;
   flex: 1;
 }
 
-.clear-btn {
-  flex-shrink: 0;
+.input-with-clear :deep(input) {
+  padding-right: 28px;
+}
+
+.input-clear-btn {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: transparent;
+  color: var(--tdv-text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  padding: 0;
+  transition: all 0.15s ease;
+  z-index: 1;
+}
+
+.input-clear-btn:hover {
+  background: var(--tdv-surface-hover);
+  color: var(--tdv-text);
+}
+
+.input-clear-btn i {
+  font-size: 10px;
 }
 
 .query-input {
@@ -1699,14 +1746,14 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
 }
 
 .cell-action-btn {
-  background: transparent;
-  border: none;
+  background: var(--tdv-surface-light);
+  border: 1px solid var(--tdv-surface-border);
   cursor: pointer;
-  color: var(--tdv-text-muted);
+  color: var(--tdv-text);
   padding: 3px 5px;
   border-radius: 3px;
   font-size: 1rem;
-  transition: color 0.15s, background 0.15s;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1714,6 +1761,19 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
 
 .cell-action-btn:hover {
   background: var(--tdv-hover-bg);
+  border-color: var(--tdv-text-muted);
+}
+
+/* Dark mode: higher contrast for cell action buttons */
+:global(.dark-mode) .cell-action-btn {
+  background: #4b5563;
+  border: 1px solid #9ca3af;
+  color: #f3f4f6;
+}
+
+:global(.dark-mode) .cell-action-btn:hover {
+  background: #6b7280;
+  border-color: #d1d5db;
 }
 
 .cell-copy-btn:hover {
