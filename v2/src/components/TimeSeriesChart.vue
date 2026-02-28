@@ -5,6 +5,7 @@ import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
+  TimeScale,
   BarElement,
   BarController,
   LineElement,
@@ -16,6 +17,7 @@ import {
   type ChartData,
   type ChartOptions
 } from 'chart.js'
+import 'chartjs-adapter-date-fns'
 import type { TableRow, TableColumn, TimeBucket, TimeSeriesDataPoint } from '@/utils/TableUtil'
 import { detectTimeColumns, detectNumericColumns, detectGroupableColumns, detectBucketSize, aggregateByTime } from '@/utils/TableUtil'
 import Select from 'primevue/select'
@@ -25,6 +27,7 @@ import Button from 'primevue/button'
 ChartJS.register(
   CategoryScale,
   LinearScale,
+  TimeScale,
   BarElement,
   BarController,
   LineElement,
@@ -140,18 +143,75 @@ const colorPalette = [
   { bg: 'rgba(99, 255, 132, 0.6)', border: 'rgba(99, 255, 132, 1)' },
 ]
 
+// Get time unit for chart.js based on bucket size
+function getTimeUnit(bucket: TimeBucket): 'second' | 'minute' | 'hour' | 'day' | 'week' | 'month' {
+  switch (bucket) {
+    case 'second': return 'second'
+    case 'minute': 
+    case '5min':
+    case '10min':
+    case '30min':
+      return 'minute'
+    case 'hour': return 'hour'
+    case 'day': return 'day'
+    case 'week': return 'week'
+    case 'month': return 'month'
+    default: return 'minute'
+  }
+}
+
+// Get step size for chart.js based on bucket size
+function getStepSize(bucket: TimeBucket): number {
+  switch (bucket) {
+    case '5min': return 5
+    case '10min': return 10
+    case '30min': return 30
+    default: return 1
+  }
+}
+
+// Get bucket duration in milliseconds
+function getBucketDuration(bucket: TimeBucket): number {
+  switch (bucket) {
+    case 'second': return 1000
+    case 'minute': return 60 * 1000
+    case '5min': return 5 * 60 * 1000
+    case '10min': return 10 * 60 * 1000
+    case '30min': return 30 * 60 * 1000
+    case 'hour': return 60 * 60 * 1000
+    case 'day': return 24 * 60 * 60 * 1000
+    case 'week': return 7 * 24 * 60 * 60 * 1000
+    case 'month': return 30 * 24 * 60 * 60 * 1000
+    default: return 60 * 1000
+  }
+}
+
+// Calculate time range with padding to include edge data points
+const timeRange = computed(() => {
+  if (chartData.value.length === 0) return { min: undefined, max: undefined }
+  
+  const times = chartData.value.map(d => d.time.getTime())
+  const minTime = Math.min(...times)
+  const maxTime = Math.max(...times)
+  const bucketDuration = getBucketDuration(bucketSize.value)
+  
+  return {
+    min: minTime - bucketDuration,
+    max: maxTime + bucketDuration
+  }
+})
+
 // Chart.js data
 const chartJsData = computed<ChartData<'bar'>>(() => {
-  const labels = chartData.value.map(d => d.label)
   const datasets: any[] = []
   
   if (groupColumn.value && uniqueGroups.value.length > 0) {
-    // Create stacked datasets for each group
+    // Create stacked datasets for each group with {x, y} format
     uniqueGroups.value.forEach((group, index) => {
       const color = colorPalette[index % colorPalette.length]
       datasets.push({
         label: group,
-        data: chartData.value.map(d => d.groups?.[group] || 0),
+        data: chartData.value.map(d => ({ x: d.time.getTime(), y: d.groups?.[group] || 0 })),
         backgroundColor: color.bg,
         borderColor: color.border,
         borderWidth: 1,
@@ -161,11 +221,10 @@ const chartJsData = computed<ChartData<'bar'>>(() => {
       })
     })
   } else {
-    // Single dataset for row counts
-    const counts = chartData.value.map(d => d.count)
+    // Single dataset for row counts with {x, y} format
     datasets.push({
       label: 'Row Count',
-      data: counts,
+      data: chartData.value.map(d => ({ x: d.time.getTime(), y: d.count })),
       backgroundColor: 'rgba(54, 162, 235, 0.6)',
       borderColor: 'rgba(54, 162, 235, 1)',
       borderWidth: 1,
@@ -175,10 +234,9 @@ const chartJsData = computed<ChartData<'bar'>>(() => {
   
   // Add value column as line if selected
   if (valueColumn.value) {
-    const avgValues = chartData.value.map(d => d.avgValue ?? null)
     datasets.push({
       label: `Avg ${valueColumn.value}`,
-      data: avgValues,
+      data: chartData.value.map(d => ({ x: d.time.getTime(), y: d.avgValue ?? null })),
       type: 'line' as const,
       borderColor: 'rgba(255, 99, 132, 1)',
       backgroundColor: 'rgba(255, 99, 132, 0.2)',
@@ -189,12 +247,14 @@ const chartJsData = computed<ChartData<'bar'>>(() => {
     })
   }
   
-  return { labels, datasets }
+  return { datasets }
 })
 
 // Chart.js options
 const chartOptions = computed<ChartOptions<'bar'>>(() => {
   const isStacked = !!(groupColumn.value && uniqueGroups.value.length > 0)
+  const timeUnit = getTimeUnit(bucketSize.value)
+  const stepSize = getStepSize(bucketSize.value)
   
   const options: ChartOptions<'bar'> = {
     responsive: true,
@@ -254,7 +314,27 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => {
     },
     scales: {
       x: {
-        stacked: isStacked
+        type: 'time',
+        stacked: isStacked,
+        min: timeRange.value.min,
+        max: timeRange.value.max,
+        time: {
+          unit: timeUnit,
+          displayFormats: {
+            second: 'HH:mm:ss',
+            minute: 'HH:mm',
+            hour: 'MMM d HH:mm',
+            day: 'MMM d',
+            week: 'MMM d',
+            month: 'MMM yyyy'
+          }
+        },
+        ticks: {
+          source: 'auto',
+          autoSkip: true,
+          maxRotation: 45,
+          stepSize: stepSize
+        }
       },
       y: {
         type: 'linear',

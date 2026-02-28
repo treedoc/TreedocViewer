@@ -35,19 +35,11 @@ import {
   shouldExpandColumns,
   detectTimeColumns
 } from '@/utils/TableUtil'
-import { createExtendedFieldsFunc } from '@/utils/QueryUtil'
+import { matchFieldQuery, matchPattern, createExtendedFieldsFunc } from '@/utils/QueryUtil'
 import { getValueColorStyle, applyValueColorsFromFieldQueries } from '@/utils/ValueColorService'
 import { TableDataProcessor, type TableRow as ProcessorTableRow, type ProcessingConfig } from '@/utils/TableDataProcessor'
-import { ColumnManager } from '@/utils/ColumnManager'
-import { 
-  createFieldQuery, 
-  isFilterActive, 
-  isFilterDisabled, 
-  countActiveFilters,
-  clearFilterFields,
-  hasExtendedFieldsConfig,
-  addValueToArrayFilter
-} from '@/utils/FieldQueryUtils'
+import { ColumnManager, type TableColumn as ManagerTableColumn } from '@/utils/ColumnManager'
+import { isFilterActive, isFilterDisabled } from '@/utils/FieldQueryUtils'
 
 const logger = new Logger('TableView')
 const COL_VALUE = '@value'
@@ -105,9 +97,33 @@ const chartHiddenGroups = ref<Set<string>>(new Set())
 const activeFilterColumn = ref<TableColumn | null>(null)
 const columnFilterRef = ref<InstanceType<typeof ColumnFilterDialog> | null>(null)
 let hoverTimeout: ReturnType<typeof setTimeout> | null = null
+let hoverTargetEvent: MouseEvent | null = null
 
 const columnSelectorRef = ref<InstanceType<typeof ColumnSelector> | null>(null)
 const columnVisibility = ref<ColumnVisibility[]>([])
+
+// File input for open file in fullscreen mode
+const fileInputRef = ref<HTMLInputElement | null>(null)
+
+function openFile() {
+  fileInputRef.value?.click()
+}
+
+function handleFileSelect(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    const text = e.target?.result as string
+    if (text) {
+      store.setRawText(text)
+    }
+  }
+  reader.readAsText(file)
+  input.value = ''
+}
 
 // ExtendFieldDialog state
 const showExtendFieldDialog = ref(false)
@@ -142,6 +158,7 @@ const fieldQueries = ref<Record<string, FieldQuery>>({})
 
 // Keep columnVisibility in sync with columns (auto-update when columns change)
 watch(columns, (cols) => {
+  console.log('[TableView] columns watcher triggered, count:', cols.length, 'fields:', cols.map(c => c.field))
   columnVisibility.value = cols.map(c => ({
     field: c.field,
     header: c.header,
@@ -159,6 +176,20 @@ const currentColumnExtendedFields = computed(() => {
 const sortField = ref<string>('')
 const sortOrder = ref<1 | -1 | 0>(0)
 
+function createFieldQuery(): FieldQuery {
+  return {
+    query: '',
+    isRegex: false,
+    isNegate: false,
+    isArray: false,
+    isPattern: false,
+    isDisabled: false,
+    patternFields: [],
+    patternExtract: undefined,
+    patternFilter: false,
+  }
+}
+
 function getFieldQuery(field: string): FieldQuery {
   if (!fieldQueries.value[field]) {
     fieldQueries.value[field] = createFieldQuery()
@@ -174,7 +205,9 @@ function hasDisabledFilter(field: string): boolean {
   return isFilterDisabled(fieldQueries.value[field])
 }
 
-const activeFilterCount = computed(() => countActiveFilters(fieldQueries.value))
+const activeFilterCount = computed(() => {
+  return Object.values(fieldQueries.value).filter(fq => fq.query?.length > 0 && !fq.isDisabled).length
+})
 
 const visibleColumns = computed(() => {
   return columns.value.filter(col => col.visible)
@@ -230,40 +263,71 @@ const rawSelectedNode = computed(() => {
 
 function hideColumn(field: string) {
   const col = columns.value.find(c => c.field === field)
-  if (col) col.visible = false
+  if (col) {
+    col.visible = false
+    columnVisibility.value = columns.value.map(c => ({
+      field: c.field,
+      header: c.header,
+      visible: c.visible
+    }))
+  }
 }
 
 function updateColumnVisibility(cols: ColumnVisibility[]) {
   for (const col of cols) {
     const found = columns.value.find(c => c.field === col.field)
-    if (found) found.visible = col.visible
+    if (found) {
+      found.visible = col.visible
+    }
   }
-}
-
-function resetAndShowPopover(event: Event, col: TableColumn) {
-  columnFilterRef.value?.hide()
-  columnFilterRef.value?.resetSize()
-  activeFilterColumn.value = col
-  nextTick(() => columnFilterRef.value?.show(event))
+  // Update columnVisibility ref for the dialog
+  columnVisibility.value = columns.value.map(c => ({
+    field: c.field,
+    header: c.header,
+    visible: c.visible,
+  }))
 }
 
 function showColumnPopover(event: MouseEvent, col: TableColumn) {
+  // Cancel any pending hover timeout
   cancelHoverTimeout()
-  resetAndShowPopover(event, col)
+  
+  // Hide existing popover first, reset size, then show for new column
+  columnFilterRef.value?.hide()
+  columnFilterRef.value?.resetSize()
+  
+  // Set the active column  
+  activeFilterColumn.value = col
+  nextTick(() => {
+    // Use the original event for correct positioning
+    columnFilterRef.value?.show(event)
+  })
 }
 
 function onColumnHeaderMouseEnter(event: MouseEvent, col: TableColumn) {
+  // Store the event target for later use
   const targetElement = event.currentTarget as HTMLElement
+  
+  // Cancel any existing timeout
   cancelHoverTimeout()
   
+  // Start 500ms hover timeout
   hoverTimeout = setTimeout(() => {
-    const fakeEvent = {
-      currentTarget: targetElement,
-      target: targetElement,
-      preventDefault: () => {},
-      stopPropagation: () => {}
-    }
-    resetAndShowPopover(fakeEvent as unknown as Event, col)
+    // Hide existing popover first, reset size
+    columnFilterRef.value?.hide()
+    columnFilterRef.value?.resetSize()
+    
+    activeFilterColumn.value = col
+    nextTick(() => {
+      // Create a fake event object that PrimeVue can use for positioning
+      const fakeEvent = {
+        currentTarget: targetElement,
+        target: targetElement,
+        preventDefault: () => {},
+        stopPropagation: () => {}
+      }
+      columnFilterRef.value?.show(fakeEvent as unknown as Event)
+    })
   }, 500)
 }
 
@@ -282,6 +346,7 @@ function cancelHoverTimeout() {
 
 function updateFieldQuery(query: FieldQuery) {
   if (activeFilterColumn.value) {
+    console.log(`[updateFieldQuery] Field: ${activeFilterColumn.value.field}, patternExtract: "${query.patternExtract}", extendedFields: "${query.extendedFields}"`)
     fieldQueries.value[activeFilterColumn.value.field] = query
   }
 }
@@ -313,27 +378,18 @@ function onChartGroupFilter(field: string, values: string[]) {
 }
 
 
-// Column manager instance for derived column tracking
-const columnManager = new ColumnManager()
+// Track derived columns (both pattern-matched and extended fields)
+const patternExtractedColumns = ref<string[]>([])
+// Track source field for each derived column (persists for column ordering)
+const derivedColumnSourceMap = ref<Map<string, string>>(new Map())
 
 // Data processor instance for testable data transformation logic
 const dataProcessor = new TableDataProcessor(valueToSearchString)
 
-// Sync ColumnManager preset state when preset is loaded
-function syncColumnManagerPreset() {
-  if (presetColumnOrder.value && presetColumnVisibility.value) {
-    columnManager.setPreset(
-      presetColumnOrder.value.map(field => ({
-        field,
-        visible: presetColumnVisibility.value?.get(field) ?? true
-      }))
-    )
-  }
-}
-
 const filteredData = computed(() => {
   logger.log(`Filtering data: initial count=${tableData.value.length}`)
   
+  // Use TableDataProcessor for core data transformation
   const config: ProcessingConfig = {
     fieldQueries: fieldQueries.value,
     columnOrder: columns.value.map(c => c.field),
@@ -342,28 +398,125 @@ const filteredData = computed(() => {
   }
   
   const result = dataProcessor.processData(tableData.value as ProcessorTableRow[], config)
-  const { data, derivedColumns, derivedColumnSources } = result
+  const { data, derivedColumns: newDerivedColumns, derivedColumnSources: derivedColumnSource } = result
   
-  // Sync current columns to ColumnManager
-  columnManager.setColumns(columns.value)
-  columnManager.setDerivedColumnSources(derivedColumnSources)
+  // Update derived columns (unified handling for both pattern and extended field columns)
+  const newDerivedSet = new Set(newDerivedColumns)
+  const derivedColumnsChanged = newDerivedColumns.length !== patternExtractedColumns.value.length ||
+      newDerivedColumns.some((c, i) => patternExtractedColumns.value[i] !== c)
   
-  // Sync preset if available
-  if (presetColumnVisibility.value) {
-    syncColumnManagerPreset()
-  }
-  
-  // Use ColumnManager to update derived columns
-  const changed = columnManager.updateDerivedColumns(derivedColumns, derivedColumnSources)
-  
-  if (changed) {
-    columns.value = columnManager.getColumns()
+  if (derivedColumnsChanged) {
+    console.log('[filteredData] Derived columns changed, new:', newDerivedColumns)
+    patternExtractedColumns.value = [...newDerivedColumns]
     
-    // Clear preset after applying
-    if (presetColumnOrder.value) presetColumnOrder.value = null
-    if (presetColumnVisibility.value) presetColumnVisibility.value = null
+    // Update the global source map with new entries
+    for (const [col, source] of derivedColumnSource) {
+      derivedColumnSourceMap.value.set(col, source)
+    }
+    // Remove entries for columns no longer present
+    for (const key of derivedColumnSourceMap.value.keys()) {
+      if (!newDerivedSet.has(key)) {
+        derivedColumnSourceMap.value.delete(key)
+      }
+    }
+    
+    // Remove old derived columns that are no longer present
+    const columnsToRemove = columns.value.filter(col => 
+      col.isDerived && !newDerivedSet.has(col.field)
+    )
+    if (columnsToRemove.length > 0) {
+      console.log('[filteredData] Removing old derived columns:', columnsToRemove.map(c => c.field))
+      columns.value = columns.value.filter(col => 
+        !col.isDerived || newDerivedSet.has(col.field)
+      )
+    }
+    
+    // Add all derived columns to the columns list
+    for (const colName of newDerivedColumns) {
+      if (!columns.value.find(c => c.field === colName)) {
+        const sourceField = derivedColumnSourceMap.value.get(colName)
+        console.log('[filteredData] Adding derived column:', colName, 'source:', sourceField)
+        
+        // Use preset visibility if available, otherwise default to true
+        const presetVisible = presetColumnVisibility.value?.get(colName)
+        const newCol = {
+          field: colName,
+          header: colName,
+          sortable: true,
+          filterable: true,
+          visible: presetVisible !== undefined ? presetVisible : true,
+          isDerived: true,
+        }
+        
+        // If we have a preset order, check if this column should go at a specific position
+        if (presetColumnOrder.value) {
+          const presetIndex = presetColumnOrder.value.indexOf(colName)
+          if (presetIndex !== -1) {
+            // Find the best position based on preset order
+            let insertIndex = 0
+            for (let i = 0; i < columns.value.length; i++) {
+              const existingPresetIndex = presetColumnOrder.value.indexOf(columns.value[i].field)
+              if (existingPresetIndex !== -1 && existingPresetIndex < presetIndex) {
+                insertIndex = i + 1
+              }
+            }
+            columns.value.splice(insertIndex, 0, newCol)
+            continue
+          }
+        }
+        
+        // Fallback: insert after source field
+        if (sourceField) {
+          const sourceIndex = columns.value.findIndex(c => c.field === sourceField)
+          if (sourceIndex !== -1) {
+            // Find the last consecutive derived column after source to insert after all of them
+            let insertIndex = sourceIndex + 1
+            while (insertIndex < columns.value.length) {
+              const col = columns.value[insertIndex]
+              // Check if this column was also derived from the same source (use global map)
+              if (col.isDerived && derivedColumnSourceMap.value.get(col.field) === sourceField) {
+                insertIndex++
+              } else {
+                break
+              }
+            }
+            columns.value.splice(insertIndex, 0, newCol)
+            continue
+          }
+        }
+        // Final fallback: push to end if source not found
+        columns.value.push(newCol)
+      }
+    }
+    
+    // If we have a preset order, reorder all columns to match it
+    if (presetColumnOrder.value && presetColumnOrder.value.length > 0) {
+      const orderMap = new Map(presetColumnOrder.value.map((field, i) => [field, i]))
+      columns.value.sort((a, b) => {
+        const aOrder = orderMap.get(a.field) ?? Infinity
+        const bOrder = orderMap.get(b.field) ?? Infinity
+        return aOrder - bOrder
+      })
+      // Clear preset order after applying (only apply once)
+      presetColumnOrder.value = null
+    }
+    
+    // Apply preset visibility to all columns (including base columns that were rebuilt)
+    if (presetColumnVisibility.value && presetColumnVisibility.value.size > 0) {
+      for (const col of columns.value) {
+        const presetVisible = presetColumnVisibility.value.get(col.field)
+        if (presetVisible !== undefined) {
+          col.visible = presetVisible
+        }
+      }
+      // Clear preset visibility after applying
+      presetColumnVisibility.value = null
+    }
+    
+    console.log('[filteredData] After adding derived columns, columns count:', columns.value.length)
   }
   
+  // JS query is already applied by the processor
   return data as TableRow[]
 })
 
@@ -436,17 +589,11 @@ function buildTableInternal(node: TDNode | null, restoreState = true) {
   // Save current column visibility and order before rebuilding (for non-restore rebuilds)
   const currentFieldQueries = { ...fieldQueries.value }
   if (!restoreState) {
-    // If we have preset visibility (from loading a preset), use that instead of current columns
-    if (presetColumnVisibility.value && presetColumnVisibility.value.size > 0) {
-      savedColumnVisibility = presetColumnVisibility.value
-      savedColumnOrder = presetColumnOrder.value ? [...presetColumnOrder.value] : null
-    } else {
-      savedColumnVisibility = new Map<string, boolean>()
-      savedColumnOrder = []
-      for (const col of columns.value) {
-        savedColumnVisibility.set(col.field, col.visible)
-        savedColumnOrder.push(col.field)
-      }
+    savedColumnVisibility = new Map<string, boolean>()
+    savedColumnOrder = []
+    for (const col of columns.value) {
+      savedColumnVisibility.set(col.field, col.visible)
+      savedColumnOrder.push(col.field)
     }
   } else {
     savedColumnVisibility = null
@@ -458,7 +605,8 @@ function buildTableInternal(node: TDNode | null, restoreState = true) {
   if (restoreState) {
     fieldQueries.value = {}
     // Clear derived column tracking when starting fresh
-    columnManager.clear()
+    patternExtractedColumns.value = []
+    derivedColumnSourceMap.value = new Map()
   }
   if (!node || !node.children) return
   
@@ -600,10 +748,6 @@ function buildTableInternal(node: TDNode | null, restoreState = true) {
   savedColumnVisibility = null
   savedColumnOrder = null
   
-  // Note: presetColumnVisibility and presetColumnOrder are NOT cleared here
-  // because derived columns (added in filteredData) may still need them
-  // They will be cleared in filteredData after derived columns are processed
-  
   // Note: columnVisibility is auto-updated by the watcher on columns
 }
 
@@ -649,15 +793,7 @@ function onPage(event: { first: number; rows: number }) {
 }
 
 function clearAllFilters() {
-  const newFieldQueries: Record<string, FieldQuery> = {}
-  
-  for (const [field, fq] of Object.entries(fieldQueries.value)) {
-    if (hasExtendedFieldsConfig(fq)) {
-      newFieldQueries[field] = clearFilterFields(fq)
-    }
-  }
-  
-  fieldQueries.value = newFieldQueries
+  fieldQueries.value = {}
 }
 
 function filterCellValue(field: string, value: any, isNegate: boolean) {
@@ -667,11 +803,43 @@ function filterCellValue(field: string, value: any, isNegate: boolean) {
       ? String((value as TDNode).value) 
       : String(value)
   
-  fieldQueries.value[field] = addValueToArrayFilter(
-    fieldQueries.value[field],
-    strValue,
-    isNegate
-  )
+  const currentFq = fieldQueries.value[field]
+  
+  // If existing filter has different negate mode, override it
+  if (currentFq && currentFq.isArray && currentFq.isNegate !== isNegate) {
+    fieldQueries.value[field] = {
+      query: strValue,
+      isRegex: false,
+      isNegate: isNegate,
+      isArray: true,
+      isPattern: false,
+      isDisabled: false,
+      patternFields: []
+    }
+    return
+  }
+  
+  // Add to existing array filter or create new one
+  if (currentFq && currentFq.isArray && currentFq.query) {
+    const existingValues = currentFq.query.split(',').map(v => v.trim())
+    if (!existingValues.includes(strValue)) {
+      existingValues.push(strValue)
+      fieldQueries.value[field] = {
+        ...currentFq,
+        query: existingValues.join(',')
+      }
+    }
+  } else {
+    fieldQueries.value[field] = {
+      query: strValue,
+      isRegex: false,
+      isNegate: isNegate,
+      isArray: true,
+      isPattern: false,
+      isDisabled: false,
+      patternFields: []
+    }
+  }
 }
 
 function shouldShowOpenInNewTab(row: TableRow, field: string): boolean {
@@ -715,24 +883,52 @@ function handleExtendFieldResult(result: ExtendFieldResult) {
   const field = extendFieldColumn.value
   if (!field) return
   
-  const existingQuery = fieldQueries.value[field] || createFieldQuery()
+  const existingQuery = fieldQueries.value[field] || {
+    query: '',
+    isRegex: false,
+    isNegate: false,
+    isArray: false,
+    isPattern: false,
+    isDisabled: false,
+    patternFields: [],
+  }
   
   if (result.type === 'pattern' && result.pattern) {
+    // Append pattern to existing patternExtract (newline separated)
     const existingPattern = existingQuery.patternExtract || ''
     const newPattern = existingPattern 
       ? `${existingPattern}\n${result.pattern}` 
       : result.pattern
     
-    fieldQueries.value[field] = { ...existingQuery, patternExtract: newPattern }
+    fieldQueries.value[field] = {
+      ...existingQuery,
+      patternExtract: newPattern,
+    }
   }
+  // Note: jsonpath is now handled by immediate sync via handleUpdateExtendedFields
 }
 
+// Handle immediate sync of JSON path extended fields from ExtendFieldDialog
 function handleUpdateExtendedFields(fields: string) {
   const field = extendFieldColumn.value
+  console.log('[TableView] handleUpdateExtendedFields called, field:', field, 'fields:', fields)
   if (!field) return
   
-  const existingQuery = fieldQueries.value[field] || createFieldQuery()
-  fieldQueries.value[field] = { ...existingQuery, extendedFields: fields }
+  const existingQuery = fieldQueries.value[field] || {
+    query: '',
+    isRegex: false,
+    isNegate: false,
+    isArray: false,
+    isPattern: false,
+    isDisabled: false,
+    patternFields: [],
+  }
+  
+  fieldQueries.value[field] = {
+    ...existingQuery,
+    extendedFields: fields,
+  }
+  console.log('[TableView] fieldQueries updated:', fieldQueries.value[field])
 }
 
 function rebuildTable() {
@@ -840,11 +1036,32 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
       @update:columns="updateColumnVisibility"
     />
     
+    <!-- Hidden file input for open file -->
+    <input
+      ref="fileInputRef"
+      type="file"
+      accept=".json,.txt,.xml,.yaml,.yml,.csv,.log,*"
+      style="display: none"
+      @change="handleFileSelect"
+    />
+    
     <!-- Full header in normal mode -->
     <div class="table-header">
       <JsonPath :tree-node="rawSelectedNode" @node-clicked="nodeClicked" />
       
       <div class="table-toolbar">
+        <!-- Open file button (only in fullscreen mode) -->
+        <Button
+          v-if="maxPane === 'table'"
+          icon="pi pi-folder-open"
+          size="small"
+          text
+          @click="openFile"
+          v-tooltip.top="'Open File'"
+        />
+        
+        <div v-if="maxPane === 'table'" class="toolbar-separator" />
+        
         <ExpandControl
           v-if="store.hasTreeInTable"
           ref="expandControlRef"
@@ -983,16 +1200,16 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
             :storage-key="STORAGE_KEY_JS_QUERY"
             input-class="query-input"
           />
-          <button
+          <Button
             v-if="jsQuery && jsQuery !== '$'"
-            class="input-clear-btn"
+            icon="pi pi-times"
+            size="small"
+            severity="secondary"
+            text
+            class="clear-btn"
             @click="jsQuery = '$'"
-            type="button"
-            tabindex="-1"
-            title="Clear JS Query"
-          >
-            <i class="pi pi-times"></i>
-          </button>
+            v-tooltip.top="'Clear JS Query'"
+          />
         </div>
       </label>
     </div>
@@ -1009,16 +1226,16 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
             @blur="rebuildTable"
             @enter="rebuildTable"
           />
-          <button
+          <Button
             v-if="extendedFields"
-            class="input-clear-btn"
+            icon="pi pi-times"
+            size="small"
+            severity="secondary"
+            text
+            class="clear-btn"
             @click="extendedFields = ''; rebuildTable()"
-            type="button"
-            tabindex="-1"
-            title="Clear Extended Fields"
-          >
-            <i class="pi pi-times"></i>
-          </button>
+            v-tooltip.top="'Clear Extended Fields'"
+          />
         </div>
       </label>
       <div class="extended-fields-help">
@@ -1264,43 +1481,14 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
 }
 
 .input-with-clear {
-  position: relative;
   display: flex;
   align-items: center;
+  gap: 4px;
   flex: 1;
 }
 
-.input-with-clear :deep(input) {
-  padding-right: 28px;
-}
-
-.input-clear-btn {
-  position: absolute;
-  right: 6px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 20px;
-  height: 20px;
-  border: none;
-  background: transparent;
-  color: var(--tdv-text-muted);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  padding: 0;
-  transition: all 0.15s ease;
-  z-index: 1;
-}
-
-.input-clear-btn:hover {
-  background: var(--tdv-surface-hover);
-  color: var(--tdv-text);
-}
-
-.input-clear-btn i {
-  font-size: 10px;
+.clear-btn {
+  flex-shrink: 0;
 }
 
 .query-input {
@@ -1556,14 +1744,14 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
 }
 
 .cell-action-btn {
-  background: var(--tdv-surface-light);
-  border: 1px solid var(--tdv-surface-border);
+  background: transparent;
+  border: none;
   cursor: pointer;
-  color: var(--tdv-text);
+  color: var(--tdv-text-muted);
   padding: 3px 5px;
   border-radius: 3px;
   font-size: 1rem;
-  transition: color 0.15s, background 0.15s, border-color 0.15s;
+  transition: color 0.15s, background 0.15s;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1571,19 +1759,6 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
 
 .cell-action-btn:hover {
   background: var(--tdv-hover-bg);
-  border-color: var(--tdv-text-muted);
-}
-
-/* Dark mode: higher contrast for cell action buttons */
-:global(.dark-mode) .cell-action-btn {
-  background: #4b5563;
-  border: 1px solid #9ca3af;
-  color: #f3f4f6;
-}
-
-:global(.dark-mode) .cell-action-btn:hover {
-  background: #6b7280;
-  border-color: #d1d5db;
 }
 
 .cell-copy-btn:hover {
