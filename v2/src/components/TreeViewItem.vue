@@ -3,6 +3,7 @@ import { ref, computed, watch, nextTick, toRaw, type ComponentPublicInstance } f
 import type { TDNode } from 'treedoc'
 import { TDNodeType, TDJSONWriter, TDJSONWriterOption } from 'treedoc'
 import SimpleValue from './SimpleValue.vue'
+import HoverButtonBar, { type HoverButton } from './HoverButtonBar.vue'
 import type { ExpandState } from './ExpandControl.vue'
 import TreeUtil from '@/utils/TreeUtil'
 import { Logger } from '@/utils/Logger'
@@ -171,6 +172,23 @@ function copyPath() {
   navigator.clipboard.writeText(path)
 }
 
+// Button definitions for the hover button bar
+const nodeButtons: HoverButton[] = [
+  { id: 'copy-path', icon: 'pi-link', title: 'Copy path', variant: 'link' },
+  { id: 'copy-node', icon: 'pi-copy', title: 'Copy node', variant: 'copy' }
+]
+
+function handleNodeButtonClick(buttonId: string) {
+  switch (buttonId) {
+    case 'copy-path':
+      copyPath()
+      break
+    case 'copy-node':
+      copyNode()
+      break
+  }
+}
+
 function selectNode(path: string[], start: number, action: (node: typeof props) => void) {
   logger.log(`selectNode: start: ${path}, ${start}`)
   if (start === path.length) {
@@ -261,22 +279,12 @@ defineExpose({ selectNode, tnode: rawNode, selected })
           v-html="highlightedKey"
         ></a>
         <span class="node-label">{{ label }}</span>
-        <div v-show="isHovered" class="node-action-bar">
-          <button 
-            class="node-action-btn"
-            title="Copy path"
-            @click.stop="copyPath"
-          >
-            <i class="pi pi-link"></i>
-          </button>
-          <button 
-            class="node-action-btn"
-            title="Copy node"
-            @click.stop="copyNode"
-          >
-            <i class="pi pi-copy"></i>
-          </button>
-        </div>
+        <HoverButtonBar
+          :buttons="nodeButtons"
+          :is-visible="isHovered"
+          layout="inline"
+          @click="handleNodeButtonClick"
+        />
       </div>
       
       <template v-if="open">
@@ -310,22 +318,12 @@ defineExpose({ selectNode, tnode: rawNode, selected })
     >
       <span class="node-key leaf-key" v-html="highlightedKey"></span>:
       <SimpleValue :tnode="rawNode" :filter-query="filterQuery" @node-clicked="emit('nodeClicked', [$event])" />
-      <div v-show="isHovered" class="node-action-bar">
-        <button 
-          class="node-action-btn"
-          title="Copy path"
-          @click.stop="copyPath"
-        >
-          <i class="pi pi-link"></i>
-        </button>
-        <button 
-          class="node-action-btn"
-          title="Copy node"
-          @click.stop="copyNode"
-        >
-          <i class="pi pi-copy"></i>
-        </button>
-      </div>
+      <HoverButtonBar
+        :buttons="nodeButtons"
+        :is-visible="isHovered"
+        layout="inline"
+        @click="handleNodeButtonClick"
+      />
     </div>
   </div>
 </template>
@@ -416,60 +414,6 @@ defineExpose({ selectNode, tnode: rawNode, selected })
 
 .load-more:hover {
   color: var(--tdv-primary-light);
-}
-
-/* Node action button bar */
-.node-action-bar {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  margin-left: 8px;
-  padding: 2px;
-  background: var(--tdv-surface-light);
-  border: 1px solid var(--tdv-surface-border);
-  border-radius: 4px;
-}
-
-.node-action-btn {
-  background: var(--tdv-surface-light);
-  border: 1px solid var(--tdv-surface-border);
-  cursor: pointer;
-  color: var(--tdv-text);
-  padding: 3px 5px;
-  border-radius: 3px;
-  font-size: 0.75rem;
-  transition: color 0.15s, background 0.15s, border-color 0.15s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.node-action-btn:hover {
-  background: var(--tdv-hover-bg);
-  border-color: var(--tdv-text-muted);
-  color: var(--tdv-primary);
-}
-
-.node-action-btn i {
-  font-size: 11px;
-}
-
-/* Dark mode: higher contrast for node action buttons */
-:global(.dark-mode) .node-action-bar {
-  background: #374151;
-  border-color: #6b7280;
-}
-
-:global(.dark-mode) .node-action-btn {
-  background: #4b5563;
-  border: 1px solid #9ca3af;
-  color: #f3f4f6;
-}
-
-:global(.dark-mode) .node-action-btn:hover {
-  background: #6b7280;
-  border-color: #d1d5db;
-  color: #60a5fa;
 }
 
 /* Highlight for matched filter text - use :deep() since v-html content is not affected by scoped styles */

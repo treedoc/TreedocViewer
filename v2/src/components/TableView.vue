@@ -19,6 +19,7 @@ import type { ExtendFieldResult } from './ExtendFieldDialog.vue'
 import AutoCompleteInput from './AutoCompleteInput.vue'
 import PresetSelector from './PresetSelector.vue'
 import TimeSeriesChart from './TimeSeriesChart.vue'
+import HoverButtonBar, { type HoverButton } from './HoverButtonBar.vue'
 import type { QueryPreset, FieldQuery } from '@/models/types'
 import type { ExpandState } from './ExpandControl.vue'
 import type { ColumnVisibility } from './ColumnSelector.vue'
@@ -879,6 +880,38 @@ function openExtendFieldDialog(row: TableRow, field: string) {
   showExtendFieldDialog.value = true
 }
 
+// Generate buttons for cell hover bar
+function getCellButtons(row: TableRow, field: string): HoverButton[] {
+  return [
+    { id: 'copy', icon: 'pi-copy', title: 'Copy cell', variant: 'copy' },
+    { id: 'filter-in', icon: 'pi-filter', title: 'Filter in this value', variant: 'filter-in' },
+    { id: 'filter-out', icon: 'pi-filter-slash', title: 'Filter out this value', variant: 'filter-out' },
+    { id: 'open-new', icon: 'pi-external-link', title: 'Open in new tab', variant: 'link', visible: shouldShowOpenInNewTab(row, field) },
+    { id: 'extend', icon: 'pi-plus-circle', title: 'Create pattern or extract fields', variant: 'extend' }
+  ]
+}
+
+// Handle cell button bar clicks
+function handleCellButtonClick(buttonId: string, row: TableRow, field: string) {
+  switch (buttonId) {
+    case 'copy':
+      copyCellValue(row, field)
+      break
+    case 'filter-in':
+      filterCellValue(field, row[field], false)
+      break
+    case 'filter-out':
+      filterCellValue(field, row[field], true)
+      break
+    case 'open-new':
+      openCellInNewTab(row, field)
+      break
+    case 'extend':
+      openExtendFieldDialog(row, field)
+      break
+  }
+}
+
 function handleExtendFieldResult(result: ExtendFieldResult) {
   const field = extendFieldColumn.value
   if (!field) return
@@ -1336,44 +1369,12 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
                   </template>
                 </div>
               </div>
-              <div class="cell-button-bar">
-                <button 
-                  class="cell-action-btn cell-copy-btn"
-                  title="Copy cell"
-                  @click.stop="copyCellValue(data, col.field)"
-                >
-                  <i class="pi pi-copy"></i>
-                </button>
-                <button 
-                  class="cell-action-btn cell-filter-in"
-                  title="Filter in this value"
-                  @click.stop="filterCellValue(col.field, data[col.field], false)"
-                >
-                  <i class="pi pi-filter"></i>
-                </button>
-                <button 
-                  class="cell-action-btn cell-filter-out"
-                  title="Filter out this value"
-                  @click.stop="filterCellValue(col.field, data[col.field], true)"
-                >
-                  <i class="pi pi-filter-slash"></i>
-                </button>
-                <button 
-                  v-if="shouldShowOpenInNewTab(data, col.field)"
-                  class="cell-action-btn cell-open-new"
-                  title="Open in new tab"
-                  @click.stop="openCellInNewTab(data, col.field)"
-                >
-                  <i class="pi pi-external-link"></i>
-                </button>
-                <button 
-                  class="cell-action-btn cell-extend"
-                  title="Create pattern or extract fields"
-                  @click.stop="openExtendFieldDialog(data, col.field)"
-                >
-                  <i class="pi pi-plus-circle"></i>
-                </button>
-              </div>
+              <HoverButtonBar
+                :buttons="getCellButtons(data, col.field)"
+                layout="absolute"
+                class="cell-button-bar"
+                @click="handleCellButtonClick($event, data, col.field)"
+              />
             </div>
           </template>
         </Column>
@@ -1711,74 +1712,20 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
   width: 100%;
 }
 
-.cell-button-bar {
-  position: absolute;
-  top: 50%;
-  right: 4px;
-  transform: translateY(-50%);
-  display: flex;
-  gap: 2px;
-  padding: 2px 4px;
-  background: rgba(var(--tdv-surface-rgb, 255, 255, 255), 0.5);
-  backdrop-filter: blur(4px);
-  border: 1px solid var(--tdv-surface-border);
-  border-radius: 4px;
-  opacity: 0;
-  transition: opacity 0.15s;
-  transition-delay: 0s;
-  z-index: 10;
-  pointer-events: none;
-}
-
-/* For first column (key column): position to the right of text with offset to expose the link */
+/* For first column (key column): position button bar to the left */
 :deep(.p-datatable-tbody > tr > td:first-child) .cell-button-bar {
   right: auto;
-  left: 1.5em;  /* Leave at least 1-2 characters visible */
+  left: 1.5em;
 }
 
-/* Show button bar when hovering cell outer */
-.cell-outer:hover .cell-button-bar {
-  opacity: 1;
+/* Show button bar when hovering table cell. Use :global() so selector works across
+   DataTable/VirtualScroller component boundaries. Use !important to override
+   HoverButtonBar's default opacity:0 (child component styles can win cascade order). */
+:global(.p-datatable-tbody > tr > td:hover .cell-button-bar),
+:global(.p-datatable-tbody > tr > td:hover .hover-button-bar) {
+  opacity: 1 !important;
   transition-delay: 100ms;
   pointer-events: auto;
-}
-
-.cell-action-btn {
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  color: var(--tdv-text-muted);
-  padding: 3px 5px;
-  border-radius: 3px;
-  font-size: 1rem;
-  transition: color 0.15s, background 0.15s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.cell-action-btn:hover {
-  background: var(--tdv-hover-bg);
-}
-
-.cell-copy-btn:hover {
-  color: var(--tdv-primary);
-}
-
-.cell-filter-in:hover {
-  color: var(--tdv-success);
-}
-
-.cell-filter-out:hover {
-  color: var(--tdv-danger);
-}
-
-.cell-action-btn i {
-  font-size: 11px;
-}
-
-.cell-extend:hover {
-  color: var(--tdv-info, #3b82f6);
 }
 
 /* PrimeVue DataTable overrides */
@@ -1801,6 +1748,12 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
   font-size: 0.85rem;
   border-right: 1px solid var(--tdv-surface-border);
   position: relative;
+  overflow: visible !important; /* Allow hover button bar to overflow cell boundaries */
+}
+
+/* Ensure hovered cell's button bar appears above other cells */
+:deep(.p-datatable-tbody > tr > td:hover) {
+  z-index: 100;
 }
 
 :deep(.p-datatable-tbody > tr > td:last-child) {

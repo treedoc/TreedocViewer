@@ -6,6 +6,7 @@ import InputText from 'primevue/inputtext'
 import Button from 'primevue/button'
 import ToggleButton from 'primevue/togglebutton'
 import ProgressBar from 'primevue/progressbar'
+import HoverButtonBar, { type HoverButton } from './HoverButtonBar.vue'
 import type { TDNode } from 'treedoc'
 import { TDNodeType, TDJSONWriter, TDJSONWriterOption } from 'treedoc'
 import type { FieldQuery } from '@/models/types'
@@ -342,6 +343,41 @@ function addValueToFilter(value: string, isNegate: boolean) {
     localIsJs.value = false
   }
   debouncedApplyFilter()
+}
+
+// Generate buttons for top value hover bar
+function getTopValueButtons(value: string): HoverButton[] {
+  const hasColor = getValueColor(value)
+  return [
+    { 
+      id: 'color', 
+      icon: 'pi-palette', 
+      title: 'Set highlight color', 
+      variant: 'color',
+      style: hasColor ? { backgroundColor: hasColor.bg } : undefined
+    },
+    { id: 'copy', icon: 'pi-copy', title: 'Copy value', variant: 'copy' },
+    { id: 'filter-in', icon: 'pi-filter', title: 'Filter in this value', variant: 'filter-in' },
+    { id: 'filter-out', icon: 'pi-filter-slash', title: 'Filter out this value', variant: 'filter-out' }
+  ]
+}
+
+// Handle top value button bar clicks
+function handleTopValueButtonClick(buttonId: string, value: string) {
+  switch (buttonId) {
+    case 'color':
+      toggleColorPicker(value)
+      break
+    case 'copy':
+      copyValue(value)
+      break
+    case 'filter-in':
+      addValueToFilter(value, false)
+      break
+    case 'filter-out':
+      addValueToFilter(value, true)
+      break
+  }
 }
 
 // Preview of extracted fields from pattern
@@ -750,38 +786,12 @@ user=${userId}, action=$action"
             >
               <div class="top-value-row">
                 <span class="top-value-text" :title="item.val">{{ item.val || '(empty)' }}</span>
-                <div class="top-value-actions">
-                  <button 
-                    class="stat-action-btn stat-color-btn"
-                    :class="{ 'has-color': getValueColor(item.val) }"
-                    :style="getValueColor(item.val) ? { backgroundColor: getValueColor(item.val)!.bg } : {}"
-                    title="Set highlight color"
-                    @click.stop="toggleColorPicker(item.val)"
-                  >
-                    <i class="pi pi-palette"></i>
-                  </button>
-                  <button 
-                    class="stat-action-btn stat-copy-btn"
-                    title="Copy value"
-                    @click="copyValue(item.val)"
-                  >
-                    <i class="pi pi-copy"></i>
-                  </button>
-                  <button 
-                    class="stat-action-btn stat-filter-in"
-                    title="Filter in this value"
-                    @click="addValueToFilter(item.val, false)"
-                  >
-                    <i class="pi pi-filter"></i>
-                  </button>
-                  <button 
-                    class="stat-action-btn stat-filter-out"
-                    title="Filter out this value"
-                    @click="addValueToFilter(item.val, true)"
-                  >
-                    <i class="pi pi-filter-slash"></i>
-                  </button>
-                </div>
+                <HoverButtonBar
+                  :buttons="getTopValueButtons(item.val)"
+                  layout="absolute"
+                  class="top-value-actions"
+                  @click="handleTopValueButtonClick($event, item.val)"
+                />
                 <span class="top-value-count">{{ item.count }}</span>
                 <span class="top-value-percent">{{ item.percent.toFixed(1) }}%</span>
               </div>
@@ -1400,89 +1410,12 @@ user=${userId}, action=$action"
   position: relative;
 }
 
-.top-value-row:hover .top-value-actions {
-  opacity: 1;
+/* Show button bar when hovering top value row. Use !important to override HoverButtonBar's opacity:0 */
+:global(.top-value-row:hover .top-value-actions),
+:global(.top-value-row:hover .hover-button-bar) {
+  opacity: 1 !important;
   transition-delay: 100ms;
   pointer-events: auto;
-}
-
-.top-value-actions {
-  position: absolute;
-  right: 4px;
-  top: 50%;
-  transform: translateY(-50%);
-  display: flex;
-  gap: 2px;
-  padding: 2px 4px;
-  background: rgba(var(--tdv-surface-rgb, 255, 255, 255), 0.5);
-  backdrop-filter: blur(4px);
-  border: 1px solid var(--tdv-surface-border);
-  border-radius: 4px;
-  opacity: 0;
-  transition: opacity 0.15s;
-  transition-delay: 0s;
-  z-index: 10;
-  pointer-events: none;
-}
-
-.stat-action-btn {
-  background: var(--tdv-surface-light);
-  border: 1px solid var(--tdv-surface-border);
-  cursor: pointer;
-  color: var(--tdv-text);
-  padding: 3px 5px;
-  border-radius: 3px;
-  font-size: 0.75rem;
-  transition: color 0.15s, background 0.15s, border-color 0.15s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.stat-action-btn:hover {
-  background: var(--tdv-hover-bg);
-  border-color: var(--tdv-text-muted);
-}
-
-.stat-copy-btn:hover {
-  color: var(--tdv-primary);
-}
-
-.stat-filter-in:hover {
-  color: var(--tdv-success);
-}
-
-.stat-filter-out:hover {
-  color: var(--tdv-danger);
-}
-
-.stat-color-btn:hover {
-  color: var(--tdv-primary);
-}
-
-.stat-color-btn.has-color {
-  border: 1px solid var(--tdv-surface-border);
-}
-
-.stat-action-btn i {
-  font-size: 10px;
-}
-
-/* Dark mode: higher contrast for stat action buttons */
-:global(.dark-mode) .top-value-actions {
-  background: #374151;
-  border-color: #6b7280;
-}
-
-:global(.dark-mode) .stat-action-btn {
-  background: #4b5563;
-  border: 1px solid #9ca3af;
-  color: #f3f4f6;
-}
-
-:global(.dark-mode) .stat-action-btn:hover {
-  background: #6b7280;
-  border-color: #d1d5db;
 }
 
 /* Color picker popup */
