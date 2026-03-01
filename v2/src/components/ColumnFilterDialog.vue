@@ -164,9 +164,10 @@ watch(() => props.fieldQuery, (fq) => {
   showExtendedFields.value = !!(fq.extendedFields || fq.patternExtract)
 }, { immediate: true })
 
-// Reset showStats when column changes to prevent performance issues
+// Auto-expand stats when row count is small (< 5000), otherwise collapse for performance
+const AUTO_EXPAND_THRESHOLD = 5000
 watch(() => props.field, () => {
-  showStats.value = false
+  showStats.value = props.filteredData.length < AUTO_EXPAND_THRESHOLD
 })
 
 // Enlarge popover when stats are shown (to fit 30 values)

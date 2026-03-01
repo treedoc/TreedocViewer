@@ -1,0 +1,45 @@
+---
+description: Vue reactivity patterns to avoid common state management bugs
+globs: **/*.vue
+alwaysApply: false
+---
+
+# Vue Reactivity Patterns
+
+## Don't Modify Reactive State in Computed Properties
+
+Computed properties should be pure - only compute values, never cause side effects.
+
+```typescript
+// ❌ BAD - modifying reactive state inside computed
+const filteredData = computed(() => {
+  const data = processData(tableData.value)
+  columns.value = newColumns  // Side effect!
+  trackingState.value = null  // Side effect!
+  return data
+})
+
+// ✅ GOOD - use watch or watchEffect for side effects
+const filteredData = computed(() => processData(tableData.value))
+
+watch(filteredData, (data) => {
+  columns.value = deriveColumns(data)
+})
+```
+
+## Keep Related State in Sync
+
+When clearing one piece of state, ensure related tracking/derived state is also cleared.
+
+```typescript
+// ❌ BAD - clearing columns but not the tracking array
+columns.value = []
+// patternExtractedColumns still has old values!
+
+// ✅ GOOD - clear both together
+columns.value = []
+patternExtractedColumns.value = []
+derivedColumnSourceMap.value = new Map()
+```
+
+This prevents bugs where change detection (`derivedColumnsChanged`) incorrectly returns `false` because tracking state wasn't reset.

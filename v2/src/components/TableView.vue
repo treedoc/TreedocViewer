@@ -407,7 +407,6 @@ const filteredData = computed(() => {
       newDerivedColumns.some((c, i) => patternExtractedColumns.value[i] !== c)
   
   if (derivedColumnsChanged) {
-    console.log('[filteredData] Derived columns changed, new:', newDerivedColumns)
     patternExtractedColumns.value = [...newDerivedColumns]
     
     // Update the global source map with new entries
@@ -426,7 +425,6 @@ const filteredData = computed(() => {
       col.isDerived && !newDerivedSet.has(col.field)
     )
     if (columnsToRemove.length > 0) {
-      console.log('[filteredData] Removing old derived columns:', columnsToRemove.map(c => c.field))
       columns.value = columns.value.filter(col => 
         !col.isDerived || newDerivedSet.has(col.field)
       )
@@ -436,7 +434,6 @@ const filteredData = computed(() => {
     for (const colName of newDerivedColumns) {
       if (!columns.value.find(c => c.field === colName)) {
         const sourceField = derivedColumnSourceMap.value.get(colName)
-        console.log('[filteredData] Adding derived column:', colName, 'source:', sourceField)
         
         // Use preset visibility if available, otherwise default to true
         const presetVisible = presetColumnVisibility.value?.get(colName)
@@ -489,32 +486,31 @@ const filteredData = computed(() => {
         columns.value.push(newCol)
       }
     }
-    
-    // If we have a preset order, reorder all columns to match it
-    if (presetColumnOrder.value && presetColumnOrder.value.length > 0) {
-      const orderMap = new Map(presetColumnOrder.value.map((field, i) => [field, i]))
-      columns.value.sort((a, b) => {
-        const aOrder = orderMap.get(a.field) ?? Infinity
-        const bOrder = orderMap.get(b.field) ?? Infinity
-        return aOrder - bOrder
-      })
-      // Clear preset order after applying (only apply once)
-      presetColumnOrder.value = null
-    }
-    
-    // Apply preset visibility to all columns (including base columns that were rebuilt)
-    if (presetColumnVisibility.value && presetColumnVisibility.value.size > 0) {
-      for (const col of columns.value) {
-        const presetVisible = presetColumnVisibility.value.get(col.field)
-        if (presetVisible !== undefined) {
-          col.visible = presetVisible
-        }
+  }
+  
+  // Apply preset order and visibility OUTSIDE the derivedColumnsChanged block
+  // This ensures they're applied even when reapplying the same preset
+  if (presetColumnOrder.value && presetColumnOrder.value.length > 0) {
+    const orderMap = new Map(presetColumnOrder.value.map((field, i) => [field, i]))
+    columns.value.sort((a, b) => {
+      const aOrder = orderMap.get(a.field) ?? Infinity
+      const bOrder = orderMap.get(b.field) ?? Infinity
+      return aOrder - bOrder
+    })
+    // Clear preset order after applying (only apply once)
+    presetColumnOrder.value = null
+  }
+  
+  // Apply preset visibility to all columns (including base columns that were rebuilt)
+  if (presetColumnVisibility.value && presetColumnVisibility.value.size > 0) {
+    for (const col of columns.value) {
+      const presetVisible = presetColumnVisibility.value.get(col.field)
+      if (presetVisible !== undefined) {
+        col.visible = presetVisible
       }
-      // Clear preset visibility after applying
-      presetColumnVisibility.value = null
     }
-    
-    console.log('[filteredData] After adding derived columns, columns count:', columns.value.length)
+    // Clear preset visibility after applying
+    presetColumnVisibility.value = null
   }
   
   // JS query is already applied by the processor
@@ -603,11 +599,12 @@ function buildTableInternal(node: TDNode | null, restoreState = true) {
   
   columns.value = []
   tableData.value = []
+  // Always clear derived column tracking when columns are cleared
+  // This ensures derived columns get re-added in filteredData computed
+  patternExtractedColumns.value = []
+  derivedColumnSourceMap.value = new Map()
   if (restoreState) {
     fieldQueries.value = {}
-    // Clear derived column tracking when starting fresh
-    patternExtractedColumns.value = []
-    derivedColumnSourceMap.value = new Map()
   }
   if (!node || !node.children) return
   
