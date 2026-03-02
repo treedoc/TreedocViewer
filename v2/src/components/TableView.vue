@@ -243,6 +243,11 @@ const presetColumnVisibility = ref<Map<string, boolean> | null>(null)
 
 // Apply a loaded preset
 function applyPreset(preset: QueryPreset) {
+  console.log('[TableView] Applying preset:', preset.name, {
+    extendedFields: preset.extendedFields,
+    fieldQueries: preset.fieldQueries,
+  })
+  
   // Save preset column order and visibility for use after rebuild
   presetColumnOrder.value = preset.columns.map(c => c.field)
   presetColumnVisibility.value = new Map(preset.columns.map(c => [c.field, c.visible]))

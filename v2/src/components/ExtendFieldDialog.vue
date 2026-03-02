@@ -355,9 +355,33 @@ const previewPatternFields = computed(() => {
 // Computed for selected JSON paths
 const selectedPaths = computed(() => jsonPaths.value.filter(p => p.selected))
 
+// Get the set of paths visible in current dialog
+const visiblePathSet = computed(() => new Set(jsonPaths.value.map(p => p.path)))
+
+// Merge selected paths with existing fields that aren't visible in current dialog
+function mergeWithExistingFields(): string {
+  // Parse existing extended fields
+  const existingFields = parseExistingExtendedFields(props.currentExtendedFields)
+  
+  // Keep existing fields whose paths are NOT in the current visible list
+  const preservedFields: string[] = []
+  for (const [path, name] of existingFields) {
+    if (!visiblePathSet.value.has(path)) {
+      preservedFields.push(`${name}: ${path}`)
+    }
+  }
+  
+  // Add currently selected paths
+  const selectedFields = selectedPaths.value.map(p => `${p.customName}: ${p.path}`)
+  
+  // Merge: preserved first, then selected
+  const allFields = [...preservedFields, ...selectedFields]
+  return allFields.join(', ')
+}
+
 // Debounced sync to parent to avoid UI lagging
 const debouncedEmitExtendedFields = debounce(() => {
-  const fields = selectedPaths.value.map(p => `${p.customName}: ${p.path}`).join(', ')
+  const fields = mergeWithExistingFields()
   console.log('[ExtendFieldDialog] debouncedEmit emitting:', fields)
   emit('updateExtendedFields', fields)
 }, 500)

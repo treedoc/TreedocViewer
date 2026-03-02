@@ -158,6 +158,13 @@ function doSavePreset(overwrite: boolean) {
       jsQuery: props.currentState.jsQuery,
       expandLevel: props.currentState.expandLevel,
     })
+    
+    toast.add({
+      severity: 'success',
+      summary: 'Preset Created',
+      detail: `Preset "${name}" has been saved`,
+      life: 3000,
+    })
   }
   
   refreshPresets()
@@ -175,13 +182,38 @@ function cancelOverwrite() {
 function updateCurrentPreset() {
   if (!selectedPresetId.value) return
   
-  updatePreset(selectedPresetId.value, {
+  const preset = presets.value.find(p => p.id === selectedPresetId.value)
+  const fieldQueriesWithColors = buildFieldQueriesWithColors()
+  
+  console.log('[PresetSelector] Saving preset, currentState:', {
+    extendedFields: props.currentState.extendedFields,
+    fieldQueries: props.currentState.fieldQueries,
+    fieldQueriesWithColors,
+  })
+  
+  const updated = updatePreset(selectedPresetId.value, {
     columns: props.currentState.columns,
     extendedFields: props.currentState.extendedFields,
-    fieldQueries: buildFieldQueriesWithColors(),
+    fieldQueries: fieldQueriesWithColors,
     jsQuery: props.currentState.jsQuery,
     expandLevel: props.currentState.expandLevel,
   })
+  
+  if (updated) {
+    toast.add({
+      severity: 'success',
+      summary: 'Preset Saved',
+      detail: `Preset "${preset?.name || 'Unknown'}" has been updated`,
+      life: 3000,
+    })
+  } else {
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: 'Failed to update preset',
+      life: 3000,
+    })
+  }
   
   refreshPresets()
 }
