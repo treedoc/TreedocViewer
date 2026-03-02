@@ -90,9 +90,9 @@ const visibleButtons = () => props.buttons.filter(b => b.visible !== false)
 /* Absolute positioning (for table cells, statistics rows) */
 .hover-button-bar.layout-absolute {
   position: absolute;
-  top: 50%;
-  right: 4px;
-  transform: translateY(-50%);
+  top: 0;
+  left: 0;
+  transform: translateY(-100%);
 }
 
 /* 

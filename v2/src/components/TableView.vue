@@ -28,7 +28,6 @@ import {
   getCellValue, 
   getCellNode, 
   isComplexValue, 
-  getCellTimestampHint,
   getComplexValueSummary,
   copyCellValue,
   copyAsJSON,
@@ -1340,7 +1339,7 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
           <template #body="{ data }">
             <div class="cell-outer" :class="{ 'has-color': getCellColorStyle(data, col.field) }" :style="getCellColorStyle(data, col.field)">
               <div class="cell-wrapper">
-                <div class="cell-content" v-tooltip.top="getCellTimestampHint(data, col.field)">
+                <div class="cell-content">
                   <template v-if="isKeyColumn(col.field)">
                     <a 
                       href="#" 
@@ -1655,14 +1654,14 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
 }
 
 .cell-outer {
-  position: static;
+  position: relative;
   display: block;
   width: 100%;
 }
 
 /* When cell has color, create an absolute overlay for the background */
 .cell-outer.has-color {
-  position: static;
+  position: relative;
 }
 
 .cell-outer.has-color::before {
@@ -1717,19 +1716,13 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
   width: 100%;
 }
 
-/* For first column (key column): position button bar to the left */
-:deep(.p-datatable-tbody > tr > td:first-child) .cell-button-bar {
-  right: auto;
-  left: 1.5em;
-}
-
-/* Show button bar when hovering table cell. Use :global() so selector works across
+/* Show button bar when hovering cell-outer (text container). Use :global() so selector works across
    DataTable/VirtualScroller component boundaries. Use !important to override
    HoverButtonBar's default opacity:0 (child component styles can win cascade order). */
-:global(.p-datatable-tbody > tr > td:hover .cell-button-bar),
-:global(.p-datatable-tbody > tr > td:hover .hover-button-bar) {
+:global(.cell-outer:hover .cell-button-bar),
+:global(.cell-outer:hover .hover-button-bar) {
   opacity: 1 !important;
-  transition-delay: 100ms;
+  transition-delay: 300ms;
   pointer-events: auto;
 }
 

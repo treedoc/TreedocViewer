@@ -1415,7 +1415,7 @@ user=${userId}, action=$action"
 :global(.top-value-row:hover .top-value-actions),
 :global(.top-value-row:hover .hover-button-bar) {
   opacity: 1 !important;
-  transition-delay: 100ms;
+  transition-delay: 300ms;
   pointer-events: auto;
 }
 
