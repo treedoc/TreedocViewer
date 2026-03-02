@@ -174,6 +174,13 @@ const currentColumnExtendedFields = computed(() => {
   return fieldQueries.value[field]?.extendedFields || ''
 })
 
+// Computed to get current column's patternExtract for ExtendFieldDialog
+const currentColumnPatternExtract = computed(() => {
+  const field = extendFieldColumn.value
+  if (!field) return ''
+  return fieldQueries.value[field]?.patternExtract || ''
+})
+
 const sortField = ref<string>('')
 const sortOrder = ref<1 | -1 | 0>(0)
 
@@ -1055,6 +1062,7 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
       :cell-value="extendFieldCellValue"
       :column-field="extendFieldColumn"
       :current-extended-fields="currentColumnExtendedFields"
+      :current-pattern-extract="currentColumnPatternExtract"
       @apply="handleExtendFieldResult"
       @update-extended-fields="handleUpdateExtendedFields"
     />

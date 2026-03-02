@@ -13,6 +13,7 @@ import TabPanel from 'primevue/tabpanel'
 import type { TDNode } from 'treedoc'
 import { TDNodeType, TDJSONWriter, TDJSONWriterOption } from 'treedoc'
 import { debounce } from 'lodash-es'
+import { matchPattern } from '@/utils/QueryUtil'
 
 export interface ExtendFieldResult {
   type: 'pattern' | 'jsonpath'
@@ -25,6 +26,7 @@ const props = defineProps<{
   cellValue: any
   columnField: string
   currentExtendedFields?: string
+  currentPatternExtract?: string
 }>()
 
 const emit = defineEmits<{
@@ -295,6 +297,20 @@ const mode = ref<'pattern' | 'jsonpath'>('pattern')
 const patternText = ref('')
 const jsonPaths = ref<JsonPathInfo[]>([])
 
+// Find a matching pattern from existing patterns for the cell value
+function findMatchingPattern(cellValue: string, patternExtract: string | undefined): string | null {
+  if (!patternExtract) return null
+  
+  const patterns = patternExtract.split('\n').map(p => p.trim()).filter(p => p)
+  for (const pattern of patterns) {
+    const result = matchPattern(cellValue, pattern)
+    if (result !== null) {
+      return pattern
+    }
+  }
+  return null
+}
+
 // Initialize when dialog opens
 watch(() => props.visible, (visible) => {
   if (visible) {
@@ -320,7 +336,10 @@ watch(() => props.visible, (visible) => {
       patternText.value = getStringValue(props.cellValue)
     } else {
       mode.value = 'pattern'
-      patternText.value = getStringValue(props.cellValue)
+      const cellStr = getStringValue(props.cellValue)
+      // Check if any existing pattern matches this cell value
+      const matchingPattern = findMatchingPattern(cellStr, props.currentPatternExtract)
+      patternText.value = matchingPattern || cellStr
       // Clear jsonPaths when opening a non-JSON cell to avoid showing stale data
       jsonPaths.value = []
     }
