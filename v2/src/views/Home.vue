@@ -122,11 +122,8 @@ watch(() => store.rawText, (text) => {
       
       <div class="badges">
         <a href="/v1/" class="version-link" title="Switch to legacy version (Vue 2)">v1</a>
-        <a href="https://github.com/treedoc/TreedocViewer" target="_blank" class="badge-link">
-          <img alt="GitHub forks" src="https://img.shields.io/github/forks/treedoc/treedocviewer?style=flat-square" />
-        </a>
-        <a href="https://www.npmjs.com/package/treedoc-viewer" target="_blank" class="badge-link">
-          <img alt="npm" src="https://img.shields.io/npm/v/treedoc-viewer?style=flat-square" />
+        <a href="https://github.com/treedoc/TreedocViewer/issues" target="_blank" class="badge-link">
+          <img alt="GitHub issues" src="https://img.shields.io/github/issues/treedoc/treedocviewer?style=flat-square" />
         </a>
       </div>
     </JsonTreeTable>
