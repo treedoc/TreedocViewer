@@ -98,11 +98,12 @@ const visibleButtons = () => props.buttons.filter(b => b.visible !== false)
 /* 
  * Visibility styles - unscoped so parent components can override via hover rules.
  * Parents should add: .parent:hover .my-button-bar { opacity: 1; pointer-events: auto; }
+ * The 200ms delay here makes the bar stay visible briefly after mouse leaves.
  */
 :global(.hover-button-bar.layout-absolute) {
   opacity: 0;
   transition: opacity 0.15s;
-  transition-delay: 0s;
+  transition-delay: 200ms;
   pointer-events: none;
 }
 

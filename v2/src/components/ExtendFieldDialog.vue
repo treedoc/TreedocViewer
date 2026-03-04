@@ -13,7 +13,7 @@ import TabPanel from 'primevue/tabpanel'
 import type { TDNode } from 'treedoc'
 import { TDNodeType, TDJSONWriter, TDJSONWriterOption } from 'treedoc'
 import { debounce } from 'lodash-es'
-import { matchPattern } from '@/utils/QueryUtil'
+import { matchPattern, parsePatterns, serializePatterns } from '@/utils/QueryUtil'
 
 export interface ExtendFieldResult {
   type: 'pattern' | 'jsonpath'
@@ -301,7 +301,7 @@ const jsonPaths = ref<JsonPathInfo[]>([])
 function findMatchingPattern(cellValue: string, patternExtract: string | undefined): string | null {
   if (!patternExtract) return null
   
-  const patterns = patternExtract.split('\n').map(p => p.trim()).filter(p => p)
+  const patterns = parsePatterns(patternExtract)
   for (const pattern of patterns) {
     const result = matchPattern(cellValue, pattern)
     if (result !== null) {

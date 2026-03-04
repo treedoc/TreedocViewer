@@ -3,6 +3,68 @@
  */
 
 import type { FieldQuery } from '@/models/types'
+import { TDJSONParser, TDJSONWriter, TDJSONWriterOption, TDObjectCoder, TDNodeType } from 'treedoc'
+
+/**
+ * Serialize an array of patterns to a compact string.
+ * Uses TDJSONWriter for compact output - values are only quoted when necessary.
+ * Single patterns without special characters are stored as-is for readability.
+ */
+export function serializePatterns(patterns: string[]): string {
+  if (patterns.length === 0) return ''
+  
+  // For a single pattern without special chars, just return it directly
+  if (patterns.length === 1 && !needsQuoting(patterns[0])) {
+    return patterns[0]
+  }
+  
+  // Use TDJSONWriter with optional quotes for compact output
+  // setQuoteChars enables smart quoting - only quote when value contains special chars
+  const opt = new TDJSONWriterOption()
+    .setAlwaysQuoteKey(false)
+    .setAlwaysQuoteValue(false)
+    .setIndentFactor(1)
+    .setQuoteChars("\"\'")
+  const node = TDObjectCoder.get().encode(patterns)
+  return TDJSONWriter.get().writeAsString(node, opt)
+}
+
+/**
+ * Check if a pattern string needs to be quoted (contains newlines, commas, brackets, etc.)
+ */
+function needsQuoting(pattern: string): boolean {
+  return /[\n\r,\[\]"'\\]/.test(pattern)
+}
+
+/**
+ * Parse a pattern expression string to an array of patterns.
+ * Supports both:
+ * - New format: JSON-like array (e.g., [pattern1, "pattern with\nnewline"])
+ * - Legacy format: newline-separated patterns
+ */
+export function parsePatterns(patternExpr: string): string[] {
+  if (!patternExpr) return []
+  
+  const trimmed = patternExpr.trim()
+  
+  // Check if it looks like a JSON array
+  if (trimmed.startsWith('[')) {
+    try {
+      const node = TDJSONParser.get().parse(trimmed)
+      if (node.type === TDNodeType.ARRAY) {
+        const result = node.toObject() as any
+        if (Array.isArray(result)) {
+          return result.filter(p => typeof p === 'string' && p.trim())
+        }
+      }
+    } catch (e) {
+      // Fall through to legacy parsing
+    }
+  }
+  
+  // Legacy format: newline-separated
+  return trimmed.split('\n').map(p => p.trim()).filter(p => p)
+}
 
 /**
  * Convert a pattern string to a regex with named capture groups
@@ -62,7 +124,8 @@ export function patternToRegex(pattern: string): RegExp | null {
     })
     
     // Make it match the entire string or as a substring
-    return new RegExp(regexStr, 'i')
+    // Use 's' flag (dotAll) so . matches newlines, allowing patterns to span multiple lines
+    return new RegExp(regexStr, 'is')
   } catch (e) {
     console.error('Error creating pattern regex:', e)
     return null

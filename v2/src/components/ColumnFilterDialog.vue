@@ -165,7 +165,7 @@ watch(() => props.fieldQuery, (fq) => {
 }, { immediate: true })
 
 // Auto-expand stats when row count is small (< 5000), otherwise collapse for performance
-const AUTO_EXPAND_THRESHOLD = 5000
+const AUTO_EXPAND_THRESHOLD = 10000
 watch(() => props.field, () => {
   showStats.value = props.filteredData.length < AUTO_EXPAND_THRESHOLD
 })

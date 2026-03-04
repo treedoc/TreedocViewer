@@ -35,7 +35,7 @@ import {
   shouldExpandColumns,
   detectTimeColumns
 } from '@/utils/TableUtil'
-import { matchFieldQuery, matchPattern, createExtendedFieldsFunc } from '@/utils/QueryUtil'
+import { matchFieldQuery, matchPattern, createExtendedFieldsFunc, parsePatterns, serializePatterns } from '@/utils/QueryUtil'
 import { getValueColorStyle, applyValueColorsFromFieldQueries } from '@/utils/ValueColorService'
 import { TableDataProcessor, type TableRow as ProcessorTableRow, type ProcessingConfig } from '@/utils/TableDataProcessor'
 import { ColumnManager, type TableColumn as ManagerTableColumn } from '@/utils/ColumnManager'
@@ -935,15 +935,13 @@ function handleExtendFieldResult(result: ExtendFieldResult) {
   }
   
   if (result.type === 'pattern' && result.pattern) {
-    // Append pattern to existing patternExtract (newline separated)
-    const existingPattern = existingQuery.patternExtract || ''
-    const newPattern = existingPattern 
-      ? `${existingPattern}\n${result.pattern}` 
-      : result.pattern
+    // Append pattern to existing patterns using proper serialization
+    const existingPatterns = parsePatterns(existingQuery.patternExtract || '')
+    const allPatterns = [...existingPatterns, result.pattern]
     
     fieldQueries.value[field] = {
       ...existingQuery,
-      patternExtract: newPattern,
+      patternExtract: serializePatterns(allPatterns),
     }
   }
   // Note: jsonpath is now handled by immediate sync via handleUpdateExtendedFields

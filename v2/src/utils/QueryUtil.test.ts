@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { patternToRegex, matchPattern, matchFieldQuery, createExtendedFieldsFunc } from './QueryUtil'
+import { patternToRegex, matchPattern, matchFieldQuery, createExtendedFieldsFunc, serializePatterns, parsePatterns } from './QueryUtil'
 
 describe('patternToRegex', () => {
   it('should return null for empty pattern', () => {
@@ -370,5 +370,82 @@ describe('createExtendedFieldsFunc', () => {
     const result = func!({ a: 1, b: 2, x: 3 })
     expect(result.arr).toEqual([1, 2])
     expect(result.obj).toEqual({ x: 3 })
+  })
+})
+
+describe('serializePatterns', () => {
+  it('should return empty string for empty array', () => {
+    expect(serializePatterns([])).toBe('')
+  })
+
+  it('should return single pattern as-is if no special chars', () => {
+    expect(serializePatterns(['Order:$orderId'])).toBe('Order:$orderId')
+  })
+
+  it('should serialize single pattern with newline using quotes', () => {
+    const result = serializePatterns(['pattern\nwith\nnewlines'])
+    expect(result.startsWith('[')).toBe(true)
+    expect(parsePatterns(result)).toEqual(['pattern\nwith\nnewlines'])
+  })
+
+  it('should serialize multiple patterns as array', () => {
+    const patterns = ['pattern1', 'pattern2', 'pattern3']
+    const result = serializePatterns(patterns)
+    expect(result.startsWith('[')).toBe(true)
+    expect(parsePatterns(result)).toEqual(patterns)
+  })
+
+  it('should handle patterns with special characters', () => {
+    const patterns = ['pattern, with comma', 'pattern\nwith newline', 'pattern [with] brackets']
+    const result = serializePatterns(patterns)
+    expect(parsePatterns(result)).toEqual(patterns)
+  })
+
+  it('should round-trip complex patterns', () => {
+    const patterns = [
+      'Order:${orderId} status:${status}',
+      'Error:\n  code: $code\n  message: $msg',
+      'User logged in, ip=$ip'
+    ]
+    const serialized = serializePatterns(patterns)
+    expect(parsePatterns(serialized)).toEqual(patterns)
+  })
+})
+
+describe('parsePatterns', () => {
+  it('should return empty array for empty string', () => {
+    expect(parsePatterns('')).toEqual([])
+    expect(parsePatterns('   ')).toEqual([])
+  })
+
+  it('should parse single pattern without array syntax', () => {
+    expect(parsePatterns('Order:$orderId')).toEqual(['Order:$orderId'])
+  })
+
+  it('should parse legacy newline-separated patterns', () => {
+    expect(parsePatterns('pattern1\npattern2\npattern3')).toEqual(['pattern1', 'pattern2', 'pattern3'])
+  })
+
+  it('should parse JSON-like array format', () => {
+    expect(parsePatterns('[pattern1, pattern2, pattern3]')).toEqual(['pattern1', 'pattern2', 'pattern3'])
+  })
+
+  it('should parse array with quoted strings containing newlines', () => {
+    const result = parsePatterns('["pattern\\nwith\\nnewlines"]')
+    expect(result).toEqual(['pattern\nwith\nnewlines'])
+  })
+
+  it('should parse array with mixed quoted and unquoted strings', () => {
+    const result = parsePatterns('[simple, "with, comma", "with\\nnewline"]')
+    expect(result).toEqual(['simple', 'with, comma', 'with\nnewline'])
+  })
+
+  it('should fall back to legacy parsing if array parsing fails', () => {
+    // Invalid JSON-like array (missing closing bracket)
+    expect(parsePatterns('[pattern1')).toEqual(['[pattern1'])
+  })
+
+  it('should filter out empty patterns', () => {
+    expect(parsePatterns('pattern1\n\npattern2\n  \npattern3')).toEqual(['pattern1', 'pattern2', 'pattern3'])
   })
 })

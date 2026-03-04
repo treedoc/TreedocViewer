@@ -5,7 +5,7 @@
  */
 
 import type { FieldQuery } from '@/models/types'
-import { matchFieldQuery, matchPattern, createExtendedFieldsFunc } from './QueryUtil'
+import { matchFieldQuery, matchPattern, createExtendedFieldsFunc, parsePatterns } from './QueryUtil'
 
 /**
  * Represents a row of table data
@@ -286,7 +286,7 @@ export class TableDataProcessor {
     derivedColumns: string[],
     derivedColumnSources: Map<string, string>
   ): TableRow[] {
-    const patterns = patternExpr.split('\n').map(p => p.trim()).filter(p => p)
+    const patterns = parsePatterns(patternExpr)
     if (patterns.length === 0) return data
     
     const processedRows: TableRow[] = []
