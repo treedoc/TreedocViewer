@@ -18,6 +18,7 @@ import { matchPattern, parsePatterns, serializePatterns } from '@/utils/QueryUti
 export interface ExtendFieldResult {
   type: 'pattern' | 'jsonpath'
   pattern?: string
+  originalPattern?: string  // The pattern that was pre-populated (for replacement)
   extendedFields?: string
 }
 
@@ -295,6 +296,7 @@ function extractPatternFields(patternText: string): string[] {
 // Mode: 'pattern' for text, 'jsonpath' for JSON
 const mode = ref<'pattern' | 'jsonpath'>('pattern')
 const patternText = ref('')
+const originalMatchingPattern = ref<string | null>(null)  // Track pre-populated pattern for replacement
 const jsonPaths = ref<JsonPathInfo[]>([])
 
 // Find a matching pattern from existing patterns for the cell value
@@ -339,6 +341,7 @@ watch(() => props.visible, (visible) => {
       const cellStr = getStringValue(props.cellValue)
       // Check if any existing pattern matches this cell value
       const matchingPattern = findMatchingPattern(cellStr, props.currentPatternExtract)
+      originalMatchingPattern.value = matchingPattern  // Store for replacement on apply
       patternText.value = matchingPattern || cellStr
       // Clear jsonPaths when opening a non-JSON cell to avoid showing stale data
       jsonPaths.value = []
@@ -410,7 +413,8 @@ function applyPattern() {
   if (mode.value === 'pattern' && patternText.value) {
     emit('apply', {
       type: 'pattern',
-      pattern: patternText.value
+      pattern: patternText.value,
+      originalPattern: originalMatchingPattern.value || undefined
     })
     dialogVisible.value = false
   }

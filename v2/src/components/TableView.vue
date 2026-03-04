@@ -935,9 +935,20 @@ function handleExtendFieldResult(result: ExtendFieldResult) {
   }
   
   if (result.type === 'pattern' && result.pattern) {
-    // Append pattern to existing patterns using proper serialization
+    const newPattern = result.pattern
     const existingPatterns = parsePatterns(existingQuery.patternExtract || '')
-    const allPatterns = [...existingPatterns, result.pattern]
+    let allPatterns: string[]
+    
+    if (result.originalPattern && existingPatterns.includes(result.originalPattern)) {
+      // Replace the original pattern with the new one (in the same position)
+      allPatterns = existingPatterns.map(p => p === result.originalPattern ? newPattern : p)
+    } else {
+      // Add new pattern to front, skip if already exists
+      if (existingPatterns.includes(newPattern)) {
+        return  // Pattern already exists, nothing to do
+      }
+      allPatterns = [newPattern, ...existingPatterns]
+    }
     
     fieldQueries.value[field] = {
       ...existingQuery,
