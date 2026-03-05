@@ -47,6 +47,7 @@ export interface FieldQuery {
   patternFilter?: boolean
   extendedFields?: string
   jsExpression?: string
+  linkExpression?: string  // JS expression returning URL, can use $ for cell value, $$ for row
 }
 
 export interface Query {

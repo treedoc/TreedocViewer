@@ -888,6 +888,29 @@ function openExtendFieldDialog(row: TableRow, field: string) {
   showExtendFieldDialog.value = true
 }
 
+// Evaluate link expression for a cell
+// Expression can use $ for cell value and $$ for row
+function evaluateLinkExpression(row: TableRow, field: string): string | null {
+  const fq = fieldQueries.value[field]
+  if (!fq?.linkExpression) return null
+  
+  try {
+    const cellValue = getCellValue(row, field)
+    // Create function with $ (cell value) and $$ (row) as parameters
+    const fn = new Function('$', '$$', `return ${fq.linkExpression}`)
+    const result = fn(cellValue, row)
+    return typeof result === 'string' ? result : null
+  } catch (e) {
+    console.warn(`Link expression error for field ${field}:`, e)
+    return null
+  }
+}
+
+// Check if a column has a link expression configured
+function hasLinkExpression(field: string): boolean {
+  return !!fieldQueries.value[field]?.linkExpression
+}
+
 // Generate buttons for cell hover bar
 function getCellButtons(row: TableRow, field: string): HoverButton[] {
   return [
@@ -1321,11 +1344,15 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
         :sortField="sortField"
         :sortOrder="sortOrder"
         @sort="e => { sortField = e.sortField as string; sortOrder = e.sortOrder as 1 | -1 | 0 }"
+        sortMode="multiple"
+        removableSort
         stripedRows
         size="small"
         tableStyle="min-width: 100%"
         resizableColumns
         columnResizeMode="expand"
+        scrollable 
+        scrollHeight="flex"
       >
         <Column
           v-for="col in visibleColumns"
@@ -1375,7 +1402,20 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
                     </a>
                   </template>
                   <template v-else-if="getCellNode(data, col.field)">
+                    <a 
+                      v-if="evaluateLinkExpression(data, col.field)"
+                      :href="evaluateLinkExpression(data, col.field)!"
+                      target="_blank"
+                      class="cell-link"
+                    >
+                      <SimpleValue
+                        :tnode="getCellNode(data, col.field)!"
+                        :is-in-table="true"
+                        :text-wrap="textWrap"
+                      />
+                    </a>
                     <SimpleValue
+                      v-else
                       :tnode="getCellNode(data, col.field)!"
                       :is-in-table="true"
                       :text-wrap="textWrap"
@@ -1383,7 +1423,15 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
                     />
                   </template>
                   <template v-else>
-                    <span class="simple-cell-value" :style="{ whiteSpace: whiteSpaceStyle }">{{ getCellValue(data, col.field) }}</span>
+                    <a 
+                      v-if="evaluateLinkExpression(data, col.field)"
+                      :href="evaluateLinkExpression(data, col.field)!"
+                      target="_blank"
+                      class="cell-link"
+                    >
+                      <span class="simple-cell-value" :style="{ whiteSpace: whiteSpaceStyle }">{{ getCellValue(data, col.field) }}</span>
+                    </a>
+                    <span v-else class="simple-cell-value" :style="{ whiteSpace: whiteSpaceStyle }">{{ getCellValue(data, col.field) }}</span>
                   </template>
                 </div>
               </div>
@@ -1633,6 +1681,15 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
   text-decoration: underline;
 }
 
+.cell-link {
+  color: var(--tdv-primary);
+  text-decoration: none;
+}
+
+.cell-link:hover {
+  text-decoration: underline;
+}
+
 .complex-value-summary {
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.8rem;
@@ -1741,6 +1798,11 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
 }
 
 /* PrimeVue DataTable overrides */
+/* Ensure sticky header stays above hovered cells (z-index: 100) when scrolling */
+:deep(.p-datatable-thead) {
+  z-index: 200 !important;
+}
+
 :deep(.p-datatable-thead > tr > th) {
   background: var(--tdv-surface-light);
   color: var(--tdv-text);

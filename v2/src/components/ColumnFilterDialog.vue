@@ -96,7 +96,9 @@ const localIsJs = ref(!!props.fieldQuery.jsExpression && props.fieldQuery.jsExpr
 const localExtendedFields = ref(props.fieldQuery.extendedFields || '')
 const localPatternExtract = ref(props.fieldQuery.patternExtract || '')
 const localPatternFilter = ref(props.fieldQuery.patternFilter || false)
+const localLinkExpression = ref(props.fieldQuery.linkExpression || '')
 const showExtendedFields = ref(false)
+const showFormat = ref(false)
 
 // Popover size and resize
 const defaultPopoverWidth = 450
@@ -160,8 +162,11 @@ watch(() => props.fieldQuery, (fq) => {
   localExtendedFields.value = fq.extendedFields || ''
   localPatternExtract.value = fq.patternExtract || ''
   localPatternFilter.value = fq.patternFilter || false
+  localLinkExpression.value = fq.linkExpression || ''
   // Auto-show/hide extended fields section based on content
   showExtendedFields.value = !!(fq.extendedFields || fq.patternExtract)
+  // Auto-show format section if it has content
+  showFormat.value = !!fq.linkExpression
 }, { immediate: true })
 
 // Auto-expand stats when row count is small (< 5000), otherwise collapse for performance
@@ -249,6 +254,7 @@ function applyFilter() {
     patternExtract: localPatternExtract.value || undefined,
     patternFilter: localPatternFilter.value,
     jsExpression,
+    linkExpression: localLinkExpression.value || undefined,
   })
 }
 
@@ -702,6 +708,49 @@ user=${userId}, action=$action"
             </div>
           </div>
           
+        </div>
+      </div>
+      
+      <!-- Format Section -->
+      <div class="format-section">
+        <div class="format-header" @click="showFormat = !showFormat">
+          <Button
+            :icon="showFormat ? 'pi pi-chevron-down' : 'pi pi-chevron-right'"
+            size="small"
+            text
+            severity="secondary"
+          />
+          <span class="format-title">
+            Format
+            <span v-if="localLinkExpression" class="has-value-indicator">●</span>
+          </span>
+        </div>
+        <div v-if="showFormat" class="format-content">
+          <!-- Link Expression -->
+          <div class="link-expression-section">
+            <span class="link-expression-label">Link URL Expression</span>
+            <div class="link-expression-hint">
+              JS expression returning URL. Use <code>$</code> for cell value, <code>$$</code> for row.
+            </div>
+            <div class="textarea-wrapper">
+              <textarea
+                v-model="localLinkExpression"
+                placeholder="E.g.: `https://example.com/id/${$}` or `https://app.com/${$$.userId}`"
+                class="link-expression-input"
+                rows="2"
+                @input="debouncedApplyFilter"
+              />
+              <button
+                v-if="localLinkExpression"
+                class="textarea-clear-btn"
+                @click="localLinkExpression = ''; applyFilter()"
+                type="button"
+                tabindex="-1"
+              >
+                <i class="pi pi-times"></i>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
       
@@ -1256,6 +1305,80 @@ user=${userId}, action=$action"
   padding: 1px 4px;
   border-radius: 2px;
   font-size: 0.8rem;
+}
+
+/* Format Section */
+.format-section {
+  margin-top: 4px;
+  border: 1px solid var(--tdv-surface-border);
+  border-radius: var(--tdv-radius);
+}
+
+.format-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.format-header:hover {
+  background: var(--tdv-surface-light);
+}
+
+.format-title {
+  font-size: 0.85rem;
+  color: var(--tdv-text-muted);
+}
+
+.format-content {
+  padding: 8px;
+  border-top: 1px solid var(--tdv-surface-border);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.link-expression-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.link-expression-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--tdv-text-muted);
+}
+
+.link-expression-hint {
+  font-size: 0.75rem;
+  color: var(--tdv-text-muted);
+}
+
+.link-expression-hint code {
+  background: var(--tdv-surface-light);
+  padding: 1px 4px;
+  border-radius: 2px;
+  font-size: 0.75rem;
+}
+
+.link-expression-input {
+  width: 100%;
+  font-family: var(--tdv-font-mono);
+  font-size: 0.85rem;
+  padding: 8px;
+  border: 1px solid var(--tdv-surface-border);
+  border-radius: var(--tdv-radius);
+  background: var(--tdv-surface);
+  color: var(--tdv-text);
+  resize: vertical;
+}
+
+.link-expression-input:focus {
+  outline: none;
+  border-color: var(--tdv-primary);
 }
 
 /* JS mode input styling */
