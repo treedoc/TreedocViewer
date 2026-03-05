@@ -27,7 +27,7 @@ export default class TreeUtil {
   }
 
   static getTypeSizeLabel(node: TDNode, includeSummary = false) {
-    logger.log(`getTypeSizeLabel: start`)
+    // logger.log(`getTypeSizeLabel: start`)
     let label = node.type === TDNodeType.ARRAY ? `[${node.getChildrenSize()}]` : `{${node.getChildrenSize()}}`;
     let tl = this.getTypeLabel(node);
     const id = node.getChildValue(TreeUtil.KEY_ID);
@@ -40,7 +40,7 @@ export default class TreeUtil {
     if (includeSummary)
       label = node.toStringInternal(label, false, false, 100);
 
-    logger.log(`getTypeSizeLabel: end`)
+    // logger.log(`getTypeSizeLabel: end`)
     return label
   }
 }

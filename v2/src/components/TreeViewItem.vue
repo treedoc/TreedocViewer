@@ -246,7 +246,7 @@ watch(
 )
 
 watch(selected, (isSelected) => {
-  logger.log(`watch: selected: start`)
+  // logger.log(`watch: selected: start`)
   if (isSelected) {
     nextTick(() => {
       const el = document.querySelector('.node-key.selected')

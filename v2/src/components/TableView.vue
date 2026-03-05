@@ -1601,21 +1601,62 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
 .table-content {
   flex: 1;
   min-height: 0;
-  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.table-content :deep(.p-datatable) {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.table-content :deep(.p-datatable-table-container) {
+  flex: 1;
+  min-height: 0;
 }
 
 .table-content :deep(.p-paginator) {
   border-top: 1px solid var(--tdv-surface-border);
-  padding: 8px;
+  padding: 4px 8px;
   background: var(--tdv-surface);
   flex-shrink: 0;
+  min-height: auto;
+  gap: 2px;
+}
+
+.table-content :deep(.p-paginator .p-paginator-first),
+.table-content :deep(.p-paginator .p-paginator-prev),
+.table-content :deep(.p-paginator .p-paginator-next),
+.table-content :deep(.p-paginator .p-paginator-last),
+.table-content :deep(.p-paginator .p-paginator-page) {
+  min-width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  font-size: 0.75rem;
+}
+
+.table-content :deep(.p-paginator .p-select) {
+  height: 1.5rem;
+  font-size: 0.75rem;
+}
+
+.table-content :deep(.p-paginator .p-select-label) {
+  padding: 0 0.5rem;
+  font-size: 0.75rem;
+}
+
+.table-content :deep(.p-paginator .p-select-dropdown) {
+  width: 1.5rem;
 }
 
 .paginator-total {
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 0.85rem;
+  font-size: 0.75rem;
   color: var(--tdv-text-muted);
   margin-left: 8px;
 }
