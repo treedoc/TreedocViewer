@@ -3,7 +3,7 @@
  */
 
 import type { TDNode } from 'treedoc'
-import { TDNodeType, TDJSONWriter, TDJSONWriterOption, TD } from 'treedoc'
+import { TDNodeType, TDJSONWriter, TDJSONWriterOption, TD, NodeFilter } from 'treedoc'
 import { toRaw } from 'vue'
 import { getTimestampHint, tryDate } from './DateUtil'
 
@@ -74,10 +74,16 @@ export function getCellTimestampHint(row: TableRow, field: string): string | nul
 
 /**
  * Generate a summary string for complex JSON values
+ * Excludes TDNode internal metadata ($$-prefixed keys)
  */
 export function getComplexValueSummary(row: TableRow, field: string): string {
   const node = getCellNode(row, field) as TDNode
-  return node.toStringInternal('', false, false, 100)
+  // Use TDJSONWriter with NodeFilter to exclude $$-prefixed keys
+  const opt = new TDJSONWriterOption()
+    .addNodeFilter(NodeFilter.exclude('.*/\\$\\$.*'))
+  const str = TDJSONWriter.get().writeAsString(node, opt)
+  // Truncate if too long
+  return str.length > 100 ? str.substring(0, 100) + '...' : str
 }
 
 /**

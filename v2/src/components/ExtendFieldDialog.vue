@@ -173,8 +173,8 @@ function extractJsonPaths(obj: any, prefix: string = '$', depth: number = 0, vis
     visited.add(obj)
     
     for (const [key, value] of Object.entries(obj)) {
-      // Skip internal/circular properties
-      if (skipKeys.has(key)) continue
+      // Skip internal/circular properties and TDNode metadata ($$-prefixed keys)
+      if (skipKeys.has(key) || key.startsWith('$$')) continue
       
       const path = `${prefix}.${key}`
       const sampleValue = formatSampleValue(value)

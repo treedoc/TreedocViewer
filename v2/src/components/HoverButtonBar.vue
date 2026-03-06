@@ -33,8 +33,11 @@ const props = withDefaults(defineProps<{
   isVisible?: boolean
   /** Positioning mode: 'absolute' (default) or 'inline' */
   layout?: 'absolute' | 'inline'
+  /** Position bar below instead of above (for first row to avoid header overlap) */
+  positionBelow?: boolean
 }>(), {
-  layout: 'absolute'
+  layout: 'absolute',
+  positionBelow: false
 })
 
 const emit = defineEmits<{
@@ -56,7 +59,8 @@ const visibleButtons = () => props.buttons.filter(b => b.visible !== false)
     class="hover-button-bar"
     :class="{ 
       'layout-inline': layout === 'inline',
-      'layout-absolute': layout === 'absolute'
+      'layout-absolute': layout === 'absolute',
+      'position-below': positionBelow
     }"
     v-show="layout === 'absolute' || isVisible"
   >
@@ -84,15 +88,23 @@ const visibleButtons = () => props.buttons.filter(b => b.visible !== false)
   backdrop-filter: blur(4px);
   border: 1px solid var(--tdv-surface-border);
   border-radius: 4px;
-  z-index: 300; /* Higher than sticky header (z-index: 200) to appear on hover */
+  z-index: 100; /* High z-index to appear above table cells */
 }
 
 /* Absolute positioning (for table cells, statistics rows) */
+/* Default: position above the cell */
 .hover-button-bar.layout-absolute {
   position: absolute;
   top: 0;
   left: 0;
   transform: translateY(-100%);
+}
+
+/* When cell is near top of viewport, position below instead */
+.hover-button-bar.layout-absolute.position-below {
+  top: auto;
+  bottom: 0;
+  transform: translateY(100%);
 }
 
 /* 

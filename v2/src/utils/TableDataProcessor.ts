@@ -8,6 +8,25 @@ import type { FieldQuery } from '@/models/types'
 import { matchFieldQuery, matchPattern, createExtendedFieldsFunc, parsePatterns } from './QueryUtil'
 
 /**
+ * Recursively remove $$-prefixed keys from an object (TDNode internal metadata)
+ */
+function cleanInternalKeys(obj: any): any {
+  if (obj === null || typeof obj !== 'object') {
+    return obj
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(cleanInternalKeys)
+  }
+  const result: Record<string, any> = {}
+  for (const [key, value] of Object.entries(obj)) {
+    if (!key.startsWith('$$')) {
+      result[key] = cleanInternalKeys(value)
+    }
+  }
+  return result
+}
+
+/**
  * Represents a row of table data
  */
 export interface TableRow {
@@ -250,9 +269,10 @@ export class TableDataProcessor {
           const newRow = { ...row }
           for (const [key, val] of Object.entries(extracted)) {
             // Convert objects/arrays to JSON string to avoid [object Object]
+            // Clean $$-prefixed internal keys before stringifying
             if (val !== null && typeof val === 'object') {
               try {
-                newRow[key] = JSON.stringify(val)
+                newRow[key] = JSON.stringify(cleanInternalKeys(val))
               } catch {
                 newRow[key] = String(val)
               }

@@ -49,6 +49,27 @@ const COL_KEY = '@key'
 const STORAGE_KEY_JS_QUERY = 'tdv_recent_js_queries'
 const STORAGE_KEY_EXTENDED_FIELDS = 'tdv_recent_extended_fields'
 
+// Recursively remove $$-prefixed keys from an object (TDNode internal metadata)
+function cleanInternalKeys(obj: any): any {
+  if (obj === null || typeof obj !== 'object') {
+    return obj
+  }
+  // Check if it's a TDNode (has 'type' and 'key' properties)
+  if ('type' in obj && 'key' in obj) {
+    return obj // Return TDNode as-is
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(cleanInternalKeys)
+  }
+  const result: Record<string, any> = {}
+  for (const [key, value] of Object.entries(obj)) {
+    if (!key.startsWith('$$')) {
+      result[key] = cleanInternalKeys(value)
+    }
+  }
+  return result
+}
+
 // Convert a cell value to a searchable string representation
 // For complex objects (TDNode or plain objects), this includes all descendants
 function valueToSearchString(value: any): string {
@@ -64,9 +85,9 @@ function valueToSearchString(value: any): string {
     return TDJSONWriter.get().writeAsString(node, new TDJSONWriterOption())
   }
   
-  // Handle plain objects/arrays
+  // Handle plain objects/arrays - clean $$-prefixed keys
   if (typeof value === 'object') {
-    return JSON.stringify(value)
+    return JSON.stringify(cleanInternalKeys(value))
   }
   
   return String(value)
@@ -533,6 +554,18 @@ const paginatedData = computed(() => {
 })
 
 
+// Get the value for an extended field, preferring TDNode if available
+function getExtValue(val: any): any {
+  if (!val || typeof val !== 'object') return val
+  // If $$tdNode exists and is a TDNode (has 'type' property), use it
+  const tdNode = val.$$tdNode
+  if (tdNode && typeof tdNode === 'object' && 'type' in tdNode) {
+    return tdNode
+  }
+  // Otherwise clean $$-prefixed keys from the object
+  return cleanInternalKeys(val)
+}
+
 // Add extended object to row, handling spread notation (keys ending with _)
 function addExtObject(key: string, val: any, row: TableRow) {
   if (key.endsWith('_') && val) {
@@ -541,7 +574,7 @@ function addExtObject(key: string, val: any, row: TableRow) {
       for (let i = 0; i < val.length; i++) {
         const field = key + i
         addColumn(field, field, true)
-        row[field] = val[i]?.$$tdNode || val[i]
+        row[field] = getExtValue(val[i])
       }
       return
     } else if (typeof val === 'object') {
@@ -549,14 +582,14 @@ function addExtObject(key: string, val: any, row: TableRow) {
         if (k.startsWith('$$')) continue
         const field = key + k
         addColumn(field, field, true)
-        row[field] = val[k]?.$$tdNode || val[k]
+        row[field] = getExtValue(val[k])
       }
       return
     }
   }
   // Regular field
   addColumn(key, key, true)
-  row[key] = val?.$$tdNode || val
+  row[key] = getExtValue(val)
 }
 
 // Used during rebuild to preserve column visibility and order
@@ -1377,7 +1410,7 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
               />
             </div>
           </template>
-          <template #body="{ data }">
+          <template #body="{ data, index }">
             <div class="cell-outer" :class="{ 'has-color': getCellColorStyle(data, col.field) }" :style="getCellColorStyle(data, col.field)">
               <div class="cell-wrapper">
                 <div class="cell-content">
@@ -1436,8 +1469,10 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
                 </div>
               </div>
               <HoverButtonBar
+                v-if="data[col.field] != null"
                 :buttons="getCellButtons(data, col.field)"
                 layout="absolute"
+                :position-below="index === 0"
                 class="cell-button-bar"
                 @click="handleCellButtonClick($event, data, col.field)"
               />
@@ -1866,9 +1901,9 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
   overflow: visible !important; /* Allow hover button bar to overflow cell boundaries */
 }
 
-/* Ensure hovered cell's button bar appears above other cells and header */
+/* Ensure hovered cell's button bar appears above other cells */
 :deep(.p-datatable-tbody > tr > td:hover) {
-  z-index: 300;
+  z-index: 100;
 }
 
 :deep(.p-datatable-tbody > tr > td:last-child) {
