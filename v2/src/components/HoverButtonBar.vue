@@ -84,7 +84,7 @@ const visibleButtons = () => props.buttons.filter(b => b.visible !== false)
   backdrop-filter: blur(4px);
   border: 1px solid var(--tdv-surface-border);
   border-radius: 4px;
-  z-index: 100; /* High z-index to appear above table cells */
+  z-index: 300; /* Higher than sticky header (z-index: 200) to appear on hover */
 }
 
 /* Absolute positioning (for table cells, statistics rows) */

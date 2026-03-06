@@ -1866,9 +1866,9 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
   overflow: visible !important; /* Allow hover button bar to overflow cell boundaries */
 }
 
-/* Ensure hovered cell's button bar appears above other cells */
+/* Ensure hovered cell's button bar appears above other cells and header */
 :deep(.p-datatable-tbody > tr > td:hover) {
-  z-index: 100;
+  z-index: 300;
 }
 
 :deep(.p-datatable-tbody > tr > td:last-child) {
