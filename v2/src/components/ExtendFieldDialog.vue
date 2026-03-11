@@ -5,6 +5,7 @@ import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Checkbox from 'primevue/checkbox'
 import Textarea from 'primevue/textarea'
+import HoverButtonBar, { type HoverButton } from './HoverButtonBar.vue'
 import Tabs from 'primevue/tabs'
 import TabList from 'primevue/tablist'
 import Tab from 'primevue/tab'
@@ -142,9 +143,12 @@ function getStringValue(value: any): string {
 interface JsonPathInfo {
   path: string
   name: string
+  depth: number
   customName: string
   selected: boolean
   sampleValue: string
+  rawValue: any
+  isArray: boolean
 }
 
 function extractJsonPaths(obj: any, prefix: string = '$', depth: number = 0, visited: WeakSet<object> = new WeakSet()): JsonPathInfo[] {
@@ -185,18 +189,24 @@ function extractJsonPaths(obj: any, prefix: string = '$', depth: number = 0, vis
         paths.push({
           path,
           name: key,
+          depth,
           customName: key,
           selected: false,
-          sampleValue
+          sampleValue,
+          rawValue: value,
+          isArray: false,
         })
       } else if (Array.isArray(value)) {
         // Array - add the array itself and recurse into first item
         paths.push({
           path,
           name: key,
+          depth,
           customName: key,
           selected: false,
-          sampleValue: `[${value.length} items]`
+          sampleValue: formatSampleValue(value),
+          rawValue: value,
+          isArray: true,
         })
         if (value.length > 0 && typeof value[0] === 'object' && value[0] !== null) {
           if (!visited.has(value[0])) {
@@ -209,9 +219,12 @@ function extractJsonPaths(obj: any, prefix: string = '$', depth: number = 0, vis
         paths.push({
           path,
           name: key,
+          depth,
           customName: key,
           selected: false,
-          sampleValue: '{...}'
+          sampleValue: '{...}',
+          rawValue: value,
+          isArray: false,
         })
         if (!visited.has(value)) {
           const childPaths = extractJsonPaths(value, path, depth + 1, visited)
@@ -234,7 +247,18 @@ function formatSampleValue(value: any): string {
     return String(value)
   }
   if (Array.isArray(value)) {
-    return `[${value.length} items]`
+    if (value.length === 0) return '[]'
+    const preview = value
+      .slice(0, 3)
+      .map((item) => {
+        if (item === null) return 'null'
+        if (typeof item === 'object') return '{...}'
+        const text = String(item)
+        return text.length > 20 ? `${text.substring(0, 20)}...` : text
+      })
+      .join(', ')
+    const suffix = value.length > 3 ? ', ...' : ''
+    return `[${preview}${suffix}] (${value.length})`
   }
   if (typeof value === 'object') {
     return '{...}'
@@ -404,6 +428,34 @@ function onCustomNameChange() {
   }
 }
 
+function getPathButtons(): HoverButton[] {
+  return [
+    { id: 'copy-path', icon: 'pi-link', title: 'Copy JSON path', variant: 'link' },
+    { id: 'copy-value', icon: 'pi-copy', title: 'Copy value', variant: 'copy' },
+  ]
+}
+
+function copyPathValue(pathInfo: JsonPathInfo) {
+  const text = typeof pathInfo.rawValue === 'object' && pathInfo.rawValue !== null
+    ? JSON.stringify(pathInfo.rawValue)
+    : String(pathInfo.rawValue ?? '')
+  navigator.clipboard.writeText(text)
+}
+
+function copyJsonPath(pathInfo: JsonPathInfo) {
+  navigator.clipboard.writeText(pathInfo.path)
+}
+
+function handlePathButtonClick(buttonId: string, pathInfo: JsonPathInfo) {
+  if (buttonId === 'copy-value') {
+    copyPathValue(pathInfo)
+    return
+  }
+  if (buttonId === 'copy-path') {
+    copyJsonPath(pathInfo)
+  }
+}
+
 function toggleAllPaths(selected: boolean) {
   jsonPaths.value.forEach(p => p.selected = selected)
   onPathSelectionChange()
@@ -443,7 +495,7 @@ function formatPathForDisplay(path: string): string {
     modal
     dismissableMask
     header="Extend Fields"
-    :style="{ width: '600px', maxHeight: '80vh' }"
+    :style="{ width: '680px', maxHeight: '80vh' }"
     class="extend-field-dialog"
   >
     <Tabs :value="mode" @update:value="(v: any) => mode = v">
@@ -525,10 +577,17 @@ function formatPathForDisplay(path: string): string {
                   @update:model-value="onPathSelectionChange"
                 />
                 <label :for="pathInfo.path" class="path-label">
-                  <span class="path-name">{{ formatPathForDisplay(pathInfo.path) }}</span>
+                  <span class="path-name" :style="{ paddingLeft: `${pathInfo.depth * 14}px` }">{{ pathInfo.name }}</span>
                   <span class="path-sample">=</span>
                   <span class="path-value">{{ pathInfo.sampleValue }}</span>
                 </label>
+                <HoverButtonBar
+                  :buttons="getPathButtons()"
+                  layout="absolute"
+                  class="path-actions-hover"
+                  :style="{ '--path-action-left': `${30 + pathInfo.depth * 14}px` }"
+                  @click="handlePathButtonClick($event, pathInfo)"
+                />
                 <InputText
                   v-if="pathInfo.selected"
                   v-model="pathInfo.customName"
@@ -666,6 +725,7 @@ function formatPathForDisplay(path: string): string {
   padding: 0.2rem 0;
   border-bottom: 1px solid var(--surface-100);
   min-height: 28px;
+  position: relative;
 }
 
 .path-item:last-child {
@@ -678,12 +738,14 @@ function formatPathForDisplay(path: string): string {
   gap: 0.75rem;
   cursor: pointer;
   font-size: 0.85rem;
+  min-width: 0;
 }
 
 .path-name {
   font-family: monospace;
   color: var(--tdv-text);
   font-weight: 500;
+  white-space: nowrap;
 }
 
 .path-sample {
@@ -697,7 +759,7 @@ function formatPathForDisplay(path: string): string {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 200px;
+  max-width: 260px;
 }
 
 .path-custom-name {
@@ -708,5 +770,27 @@ function formatPathForDisplay(path: string): string {
   padding: 0.2rem 0.4rem;
   font-size: 0.8rem;
   height: 24px;
+}
+
+:global(.path-item:hover .path-actions-hover),
+:global(.path-item:hover .hover-button-bar) {
+  opacity: 1 !important;
+  transition-delay: 300ms;
+  pointer-events: auto;
+}
+
+.path-actions-hover {
+  left: var(--path-action-left, 30px) !important;
+  top: 0 !important;
+  right: auto !important;
+  transform: translateY(-100%) !important;
+  width: max-content;
+}
+
+.extend-field-dialog :deep(.p-dialog) {
+  resize: both;
+  overflow: auto;
+  min-width: 560px;
+  min-height: 420px;
 }
 </style>

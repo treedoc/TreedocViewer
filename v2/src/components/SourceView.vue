@@ -6,6 +6,8 @@ import { xml } from '@codemirror/lang-xml'
 import { yaml } from '@codemirror/lang-yaml'
 import { EditorView } from '@codemirror/view'
 import { EditorState, StateEffect, StateField } from '@codemirror/state'
+import { syntaxHighlighting, HighlightStyle } from '@codemirror/language'
+import { tags } from '@lezer/highlight'
 import { useTreeStore } from '../stores/treeStore'
 import { useThemeStore } from '../stores/themeStore'
 import { storeToRefs } from 'pinia'
@@ -24,6 +26,19 @@ const { isDarkMode } = storeToRefs(themeStore)
 
 const localText = ref(rawText.value)
 const editorRef = ref<any>(null)
+
+const syntaxTheme = computed(() => syntaxHighlighting(HighlightStyle.define([
+  { tag: tags.keyword, color: 'var(--tdv-key)' },
+  { tag: [tags.name, tags.variableName], color: 'var(--tdv-text)' },
+  { tag: [tags.propertyName, tags.labelName], color: 'var(--tdv-key)' },
+  { tag: [tags.string, tags.special(tags.string)], color: 'var(--tdv-string)' },
+  { tag: tags.number, color: 'var(--tdv-number)' },
+  { tag: [tags.bool, tags.null], color: 'var(--tdv-boolean)' },
+  { tag: [tags.comment, tags.lineComment, tags.blockComment], color: 'var(--tdv-text-muted)', fontStyle: 'italic' },
+  { tag: [tags.bracket, tags.punctuation, tags.separator], color: 'var(--tdv-text)' },
+  { tag: [tags.operator, tags.compareOperator, tags.logicOperator], color: 'var(--tdv-accent)' },
+  { tag: tags.invalid, color: 'var(--tdv-error)' },
+])))
 
 // Theme for CodeMirror that uses CSS variables
 const editorTheme = computed(() => EditorView.theme({
@@ -65,7 +80,7 @@ const editorTheme = computed(() => EditorView.theme({
 }, { dark: isDarkMode.value }))
 
 const extensions = computed(() => {
-  const exts = [editorTheme.value]
+  const exts = [editorTheme.value, syntaxTheme.value]
   
   const syntax = selectedParser.value?.syntax || 'json'
   switch (syntax) {
