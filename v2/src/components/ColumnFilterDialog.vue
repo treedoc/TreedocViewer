@@ -99,6 +99,7 @@ const localPatternFilter = ref(props.fieldQuery.patternFilter || false)
 const localLinkExpression = ref(props.fieldQuery.linkExpression || '')
 const showExtendedFields = ref(false)
 const showFormat = ref(false)
+const selectedValues = ref<string[]>([])
 
 // Popover size and resize
 const defaultPopoverWidth = 450
@@ -169,11 +170,12 @@ watch(() => props.fieldQuery, (fq) => {
   showFormat.value = !!fq.linkExpression
 }, { immediate: true })
 
-// Auto-expand stats when row count is small (< 5000), otherwise collapse for performance
+// Auto-expand stats when row count is small (< 10000), otherwise collapse for performance
 const AUTO_EXPAND_THRESHOLD = 10000
 watch(() => props.field, () => {
   showStats.value = props.filteredData.length < AUTO_EXPAND_THRESHOLD
-})
+  selectedValues.value = []
+}, { immediate: true })
 
 // Enlarge popover when stats are shown (to fit 30 values)
 const statsExpandedHeight = 600
@@ -298,6 +300,43 @@ function clearFilter() {
   localIsDisabled.value = false
   localIsJs.value = false
   // Don't clear extendedFields - user requested to preserve them
+  applyFilter()
+}
+
+function isTopValueSelected(value: string): boolean {
+  return selectedValues.value.includes(value)
+}
+
+function isTopValueSelectable(value: string): boolean {
+  return value !== ''
+}
+
+function toggleTopValueSelection(value: string, checked: boolean) {
+  if (!isTopValueSelectable(value)) return
+  if (checked) {
+    if (!selectedValues.value.includes(value)) {
+      selectedValues.value = [...selectedValues.value, value]
+    }
+    return
+  }
+  selectedValues.value = selectedValues.value.filter(v => v !== value)
+}
+
+function clearTopValueSelection() {
+  selectedValues.value = []
+}
+
+function applySelectedValuesFilter(isNegate: boolean) {
+  const values = selectedValues.value.filter(v => isTopValueSelectable(v))
+  if (!values.length) return
+
+  localQuery.value = values.join(', ')
+  localIsArray.value = true
+  localIsNegate.value = isNegate
+  localIsRegex.value = false
+  localIsPattern.value = false
+  localIsJs.value = false
+  debouncedApplyFilter.cancel()
   applyFilter()
 }
 
@@ -460,6 +499,11 @@ const columnStats = computed<ColumnStatistic>(() => {
   }))
   
   return stat
+})
+
+watch(() => columnStats.value.topValues.map(item => item.val).join('\u0000'), (topValuesKey) => {
+  const allowed = new Set(topValuesKey ? topValuesKey.split('\u0000') : [])
+  selectedValues.value = selectedValues.value.filter(value => allowed.has(value) && isTopValueSelectable(value))
 })
 
 const hasNumericStats = computed(() => columnStats.value.sum !== 0)
@@ -822,7 +866,40 @@ user=${userId}, action=$action"
         
         <!-- Top Values -->
         <div class="top-values">
-          <div class="top-values-header">Top Values</div>
+          <div class="top-values-header-row">
+            <div class="top-values-header">Top Values</div>
+            <div class="top-values-selection-actions" :class="{ 'is-inactive': selectedValues.length === 0 }">
+              <Button
+                label="Filter In"
+                icon="pi pi-filter"
+                size="small"
+                outlined
+                class="top-values-filter-btn"
+                :disabled="selectedValues.length === 0"
+                @click="applySelectedValuesFilter(false)"
+              />
+              <Button
+                label="Filter Out"
+                icon="pi pi-filter-slash"
+                size="small"
+                severity="secondary"
+                outlined
+                class="top-values-filter-btn"
+                :disabled="selectedValues.length === 0"
+                @click="applySelectedValuesFilter(true)"
+              />
+              <Button
+                icon="pi pi-times"
+                size="small"
+                text
+                severity="secondary"
+                class="top-values-filter-btn top-values-clear-btn"
+                :disabled="selectedValues.length === 0"
+                v-tooltip.top="'Clear selection'"
+                @click="clearTopValueSelection"
+              />
+            </div>
+          </div>
           <div class="top-values-list">
             <div
               v-for="(item, idx) in columnStats.topValues"
@@ -835,6 +912,16 @@ user=${userId}, action=$action"
               } : {}"
             >
               <div class="top-value-row">
+                <input
+                  v-if="isTopValueSelectable(item.val)"
+                  type="checkbox"
+                  class="top-value-checkbox"
+                  :checked="isTopValueSelected(item.val)"
+                  @change="toggleTopValueSelection(item.val, ($event.target as HTMLInputElement).checked)"
+                  :aria-label="`Select ${item.val}`"
+                  @click.stop
+                />
+                <span v-else class="top-value-checkbox-placeholder" aria-hidden="true"></span>
                 <span class="top-value-text" :title="item.val">{{ item.val || '(empty)' }}</span>
                 <HoverButtonBar
                   :buttons="getTopValueButtons(item.val)"
@@ -1505,8 +1592,43 @@ user=${userId}, action=$action"
 .top-values-header {
   font-weight: 600;
   font-size: 0.85rem;
-  margin-bottom: 8px;
   color: var(--tdv-text);
+}
+
+.top-values-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.top-values-selection-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+}
+
+.top-values-selection-actions.is-inactive {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.top-values-filter-btn :deep(.p-button) {
+  min-height: 22px;
+  padding: 0.15rem 0.4rem;
+  font-size: 0.72rem;
+}
+
+.top-values-filter-btn :deep(.p-button .p-button-icon) {
+  font-size: 0.72rem;
+}
+
+.top-values-clear-btn :deep(.p-button) {
+  min-width: 22px;
+  padding: 0.1rem;
 }
 
 .top-values-list {
@@ -1532,6 +1654,20 @@ user=${userId}, action=$action"
   gap: 8px;
   font-size: 0.8rem;
   position: relative;
+}
+
+.top-value-checkbox {
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+  accent-color: var(--tdv-primary);
+  flex-shrink: 0;
+}
+
+.top-value-checkbox-placeholder {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
 }
 
 /* Show button bar when hovering top value row. Use !important to override HoverButtonBar's opacity:0 */

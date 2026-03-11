@@ -49,6 +49,8 @@ const fileInputRef = ref<HTMLInputElement>()
 const urlDialogVisible = ref(false)
 const urlInput = ref('')
 const defaultUrl = 'https://www.googleapis.com/discovery/v1/apis/vision/v1p1beta1/rest'
+const isDragOver = ref(false)
+const dragDepth = ref(0)
 
 const sourceViewRef = ref<InstanceType<typeof SourceView>>()
 const treeViewRef = ref<InstanceType<typeof TreeView>>()
@@ -154,11 +156,7 @@ function openFile() {
   fileInputRef.value?.click()
 }
 
-function handleFileSelect(event: Event) {
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-  if (!file) return
-  
+function loadFile(file: File) {
   const reader = new FileReader()
   reader.onload = (e) => {
     if (e.target?.result) {
@@ -167,7 +165,51 @@ function handleFileSelect(event: Event) {
     }
   }
   reader.readAsText(file)
+}
+
+function handleFileSelect(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+
+  loadFile(file)
   input.value = '' // Reset for same file selection
+}
+
+function onDragEnter(event: DragEvent) {
+  if (!event.dataTransfer?.types.includes('Files')) return
+  event.preventDefault()
+  dragDepth.value += 1
+  isDragOver.value = true
+}
+
+function onDragOver(event: DragEvent) {
+  if (!event.dataTransfer?.types.includes('Files')) return
+  event.preventDefault()
+  if (event.dataTransfer) {
+    event.dataTransfer.dropEffect = 'copy'
+  }
+  isDragOver.value = true
+}
+
+function onDragLeave(event: DragEvent) {
+  if (!event.dataTransfer?.types.includes('Files')) return
+  event.preventDefault()
+  dragDepth.value = Math.max(0, dragDepth.value - 1)
+  if (dragDepth.value === 0) {
+    isDragOver.value = false
+  }
+}
+
+function onDropFile(event: DragEvent) {
+  if (!event.dataTransfer?.files?.length) return
+  event.preventDefault()
+  isDragOver.value = false
+  dragDepth.value = 0
+  const file = event.dataTransfer.files[0]
+  if (file) {
+    loadFile(file)
+  }
 }
 
 /**
@@ -372,7 +414,20 @@ defineExpose({ openUrl })
 </script>
 
 <template>
-  <div class="json-tree-table">
+  <div
+    class="json-tree-table"
+    @dragenter="onDragEnter"
+    @dragover="onDragOver"
+    @dragleave="onDragLeave"
+    @drop="onDropFile"
+  >
+    <div v-if="isDragOver" class="file-drop-overlay" @dragover.prevent @drop="onDropFile">
+      <div class="file-drop-card">
+        <i class="pi pi-upload"></i>
+        <div class="file-drop-title">Drop file to open</div>
+      </div>
+    </div>
+
     <input
       ref="fileInputRef"
       type="file"
@@ -529,6 +584,44 @@ defineExpose({ openUrl })
   height: 100%;
   background: var(--tdv-bg-gradient);
   background-attachment: fixed;
+  position: relative;
+}
+
+.file-drop-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1000;
+  background: color-mix(in srgb, var(--tdv-surface) 70%, transparent);
+  backdrop-filter: blur(1px);
+  border: 2px dashed var(--tdv-accent);
+  border-radius: var(--tdv-radius);
+  margin: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+}
+
+.file-drop-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 20px;
+  border-radius: var(--tdv-radius);
+  background: var(--tdv-surface);
+  border: 1px solid var(--tdv-surface-border);
+  color: var(--tdv-text);
+}
+
+.file-drop-card i {
+  font-size: 1.4rem;
+  color: var(--tdv-accent);
+}
+
+.file-drop-title {
+  font-size: 0.95rem;
+  font-weight: 600;
 }
 
 .tdv-toolbar {

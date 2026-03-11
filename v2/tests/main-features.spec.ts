@@ -83,7 +83,7 @@ test.describe('TreeDoc Viewer - Main UI Features', () => {
 
     test('should have action buttons in tree nodes', async ({ page }) => {
       // Action buttons exist in the DOM (shown on hover via CSS)
-      await expect(page.locator('.node-action-btn, .node-action-bar').first()).toBeAttached();
+      await expect(page.locator('.tree-item .hover-button-bar').first()).toBeAttached();
     });
   });
 
@@ -287,6 +287,59 @@ test.describe('TreeDoc Viewer - Main UI Features', () => {
       await filterInput.press('Enter');
       
       await expect(page.locator('.p-datatable-tbody tr')).toHaveCount(1, { timeout: 5000 });
+    });
+  });
+
+  test.describe('Selection Filter', () => {
+    test.beforeEach(async ({ page }) => {
+      await enterJsonData(page, sampleData);
+      await ensureTableViewVisible(page);
+    });
+
+    test('should show checkboxes for top values', async ({ page }) => {
+      const header = page.locator('.column-header').filter({ hasText: 'name' });
+      await header.scrollIntoViewIfNeeded();
+      await header.click();
+      await page.locator('.p-popover').waitFor({ state: 'visible' });
+      
+      // Checkboxes should be visible in the top values list
+      await expect(page.locator('.top-value-checkbox').first()).toBeVisible();
+    });
+
+    test('should filter multiple selected values', async ({ page }) => {
+      const header = page.locator('.column-header').filter({ hasText: 'name' });
+      await header.scrollIntoViewIfNeeded();
+      await header.click();
+      await page.locator('.p-popover').waitFor({ state: 'visible' });
+      
+      // Select 'Alice' and 'Bob'
+      const aliceRow = page.locator('.top-value-item').filter({ hasText: 'Alice' });
+      await aliceRow.locator('.top-value-checkbox').click();
+      
+      const bobRow = page.locator('.top-value-item').filter({ hasText: 'Bob' });
+      await bobRow.locator('.top-value-checkbox').click();
+      
+      // Click 'Filter In' button
+      await page.getByRole('button', { name: 'Filter In' }).click();
+      
+      // Should show rows with name Alice or Bob (1, 2)
+      await expect(page.locator('.p-datatable-tbody tr')).toHaveCount(2);
+    });
+
+    test('should filter out multiple selected values', async ({ page }) => {
+      const header = page.locator('.column-header').filter({ hasText: 'name' });
+      await header.scrollIntoViewIfNeeded();
+      await header.click();
+      await page.locator('.p-popover').waitFor({ state: 'visible' });
+      
+      const aliceRow = page.locator('.top-value-item').filter({ hasText: 'Alice' });
+      await aliceRow.locator('.top-value-checkbox').click();
+      
+      // Click 'Filter Out' button
+      await page.getByRole('button', { name: 'Filter Out' }).click();
+      
+      // Should show rows WITHOUT name Alice (Bob, Charlie, David, Eve)
+      await expect(page.locator('.p-datatable-tbody tr')).toHaveCount(4);
     });
   });
 
