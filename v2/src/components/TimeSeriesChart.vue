@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, onBeforeUnmount } from 'vue'
 import { Bar } from 'vue-chartjs'
 import {
   Chart as ChartJS,
@@ -47,6 +47,8 @@ const props = defineProps<{
   groupColumnModel?: string
   bucketSizeModel?: TimeBucket
   hiddenGroupsModel?: Set<string>
+  timeSelectionStartModel?: number | null
+  timeSelectionEndModel?: number | null
 }>()
 
 const emit = defineEmits<{
@@ -57,6 +59,7 @@ const emit = defineEmits<{
   'update:groupColumn': [value: string]
   'update:bucketSize': [value: TimeBucket]
   'update:hiddenGroups': [value: Set<string>]
+  'update:time-range': [payload: { timeColumn: string; startMs: number | null; endMs: number | null }]
 }>()
 
 // State - use props if provided, otherwise use local state
@@ -67,6 +70,12 @@ const bucketSize = ref<TimeBucket>(props.bucketSizeModel || 'minute')
 const autoDetectBucket = ref(!props.bucketSizeModel) // Auto-detect only if no saved bucket
 const isMaximized = ref(false)
 const hiddenGroups = ref<Set<string>>(props.hiddenGroupsModel ? new Set(props.hiddenGroupsModel) : new Set())
+const timeSelectionStart = ref<number | null>(props.timeSelectionStartModel ?? null)
+const timeSelectionEnd = ref<number | null>(props.timeSelectionEndModel ?? null)
+const chartRef = ref<any>(null)
+const isDraggingSelection = ref(false)
+const dragStartClientX = ref(0)
+const dragCurrentClientX = ref(0)
 
 // Emit state changes to parent
 watch(timeColumn, (val) => emit('update:timeColumn', val))
@@ -74,6 +83,18 @@ watch(valueColumn, (val) => emit('update:valueColumn', val))
 watch(groupColumn, (val) => emit('update:groupColumn', val))
 watch(bucketSize, (val) => emit('update:bucketSize', val))
 watch(hiddenGroups, (val) => emit('update:hiddenGroups', val))
+
+watch(
+  [timeSelectionStart, timeSelectionEnd],
+  () => {
+    emit('update:time-range', {
+      timeColumn: timeColumn.value,
+      startMs: timeSelectionStart.value,
+      endMs: timeSelectionEnd.value
+    })
+  },
+  { immediate: true }
+)
 
 // Detect columns
 const timeColumns = computed(() => detectTimeColumns(props.data, props.columns))
@@ -101,6 +122,10 @@ watch(groupColumn, (newCol, oldCol) => {
   if (oldCol) {
     emit('update:groupFilter', oldCol, [])
   }
+})
+
+watch(timeColumn, () => {
+  resetTimeSelection()
 })
 
 // Aggregate data
@@ -201,6 +226,18 @@ const timeRange = computed(() => {
   }
 })
 
+const effectiveTimeRange = computed(() => {
+  if (timeSelectionStart.value == null || timeSelectionEnd.value == null) {
+    return timeRange.value
+  }
+  const start = Math.min(timeSelectionStart.value, timeSelectionEnd.value)
+  const end = Math.max(timeSelectionStart.value, timeSelectionEnd.value)
+  return {
+    min: start,
+    max: end
+  }
+})
+
 // Chart.js data
 const chartJsData = computed<ChartData<'bar'>>(() => {
   const datasets: any[] = []
@@ -267,7 +304,7 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => {
       legend: {
         position: 'top',
         onClick: (evt: any, legendItem: any, legend: any) => {
-          // Track hidden groups and emit filter
+            // Track hidden groups, then let user sync these selections on demand
           if (groupColumn.value && uniqueGroups.value.length > 0) {
             const groupName = legendItem.text
             const newHiddenGroups = new Set(hiddenGroups.value)
@@ -285,18 +322,9 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => {
             if (visibleGroups.length === 0) {
               // All groups hidden - reset to show all
               hiddenGroups.value = new Set()
-              emit('update:groupFilter', groupColumn.value, [])
             } else {
               // Replace the Set to trigger reactivity
               hiddenGroups.value = newHiddenGroups
-              
-              // Emit visible groups to sync with table filter
-              if (newHiddenGroups.size > 0) {
-                emit('update:groupFilter', groupColumn.value, visibleGroups)
-              } else {
-                // All visible - clear the filter
-                emit('update:groupFilter', groupColumn.value, [])
-              }
             }
           } else {
             // No grouping - use default Chart.js behavior
@@ -316,8 +344,8 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => {
       x: {
         type: 'time',
         stacked: isStacked,
-        min: timeRange.value.min,
-        max: timeRange.value.max,
+        min: effectiveTimeRange.value.min,
+        max: effectiveTimeRange.value.max,
         time: {
           unit: timeUnit,
           displayFormats: {
@@ -385,6 +413,106 @@ const bucketOptions = [
 function onBucketChange() {
   autoDetectBucket.value = false
 }
+
+function syncGroupsToTable() {
+  if (!groupColumn.value) return
+  const visibleGroups = uniqueGroups.value.filter(g => !hiddenGroups.value.has(g))
+  if (visibleGroups.length === uniqueGroups.value.length) {
+    emit('update:groupFilter', groupColumn.value, [])
+    return
+  }
+  emit('update:groupFilter', groupColumn.value, visibleGroups)
+}
+
+function getChartTimeFromClientX(clientX: number): number | null {
+  const chart = chartRef.value?.chart
+  const xScale = chart?.scales?.x
+  const canvas: HTMLCanvasElement | undefined = chart?.canvas
+  if (!xScale || !canvas) return null
+
+  const rect = canvas.getBoundingClientRect()
+  const pixelInCanvas = clientX - rect.left
+  const clampedPixel = Math.max(xScale.left, Math.min(xScale.right, pixelInCanvas))
+  const value = xScale.getValueForPixel(clampedPixel)
+  if (typeof value === 'number' && !Number.isNaN(value)) return value
+  if (value instanceof Date) return value.getTime()
+  return null
+}
+
+function resetTimeSelection() {
+  timeSelectionStart.value = null
+  timeSelectionEnd.value = null
+}
+
+const hasTimeSelection = computed(() => timeSelectionStart.value != null && timeSelectionEnd.value != null)
+
+const dragOverlayStyle = computed(() => {
+  if (!isDraggingSelection.value) return { display: 'none' }
+  const left = Math.min(dragStartClientX.value, dragCurrentClientX.value)
+  const width = Math.abs(dragCurrentClientX.value - dragStartClientX.value)
+  return {
+    left: `${left}px`,
+    width: `${width}px`
+  }
+})
+
+function startTimeSelectionDrag(event: MouseEvent) {
+  if (event.button !== 0 || !timeColumn.value || chartData.value.length === 0) return
+  const chart = chartRef.value?.chart
+  const canvas: HTMLCanvasElement | undefined = chart?.canvas
+  const chartArea = chart?.chartArea
+  if (!canvas || !chartArea) return
+
+  const rect = canvas.getBoundingClientRect()
+  const x = Math.max(0, Math.min(rect.width, event.clientX - rect.left))
+  const y = Math.max(0, Math.min(rect.height, event.clientY - rect.top))
+
+  // Only start drag inside the plot area; legend/title clicks should be ignored.
+  if (x < chartArea.left || x > chartArea.right || y < chartArea.top || y > chartArea.bottom) {
+    return
+  }
+
+  dragStartClientX.value = x
+  dragCurrentClientX.value = dragStartClientX.value
+  isDraggingSelection.value = true
+
+  window.addEventListener('mousemove', updateTimeSelectionDrag)
+  window.addEventListener('mouseup', endTimeSelectionDrag)
+  event.preventDefault()
+}
+
+function updateTimeSelectionDrag(event: MouseEvent) {
+  if (!isDraggingSelection.value) return
+  const chart = chartRef.value?.chart
+  const canvas: HTMLCanvasElement | undefined = chart?.canvas
+  if (!canvas) return
+
+  const rect = canvas.getBoundingClientRect()
+  dragCurrentClientX.value = Math.max(0, Math.min(rect.width, event.clientX - rect.left))
+}
+
+function endTimeSelectionDrag() {
+  if (!isDraggingSelection.value) return
+  isDraggingSelection.value = false
+
+  window.removeEventListener('mousemove', updateTimeSelectionDrag)
+  window.removeEventListener('mouseup', endTimeSelectionDrag)
+
+  const rectLeft = chartRef.value?.chart?.canvas?.getBoundingClientRect().left
+  if (rectLeft == null) return
+
+  const startMs = getChartTimeFromClientX(dragStartClientX.value + rectLeft)
+  const endMs = getChartTimeFromClientX(dragCurrentClientX.value + rectLeft)
+
+  if (startMs == null || endMs == null || startMs === endMs) return
+  timeSelectionStart.value = Math.min(startMs, endMs)
+  timeSelectionEnd.value = Math.max(startMs, endMs)
+}
+
+onBeforeUnmount(() => {
+  window.removeEventListener('mousemove', updateTimeSelectionDrag)
+  window.removeEventListener('mouseup', endTimeSelectionDrag)
+})
 </script>
 
 <template>
@@ -431,6 +559,30 @@ function onBucketChange() {
           class="control-select"
         />
       </div>
+
+      <div class="control-group">
+        <Button
+          icon="pi pi-refresh"
+          size="small"
+          text
+          severity="secondary"
+          :disabled="!hasTimeSelection"
+          @click="resetTimeSelection"
+          v-tooltip.top="'Reset time selection'"
+        />
+      </div>
+
+      <div class="control-group">
+        <Button
+          icon="pi pi-sync"
+          size="small"
+          text
+          severity="secondary"
+          :disabled="!groupColumn"
+          @click="syncGroupsToTable"
+          v-tooltip.top="'Sync group selection to table'"
+        />
+      </div>
       
       <div class="chart-actions">
         <Button
@@ -450,8 +602,18 @@ function onBucketChange() {
       </div>
     </div>
     
-    <div class="chart-container" :class="{ maximized: isMaximized }" v-if="timeColumn && chartData.length > 0">
-      <Bar :data="chartJsData" :options="chartOptions" />
+    <div
+      class="chart-container"
+      :class="{ maximized: isMaximized }"
+      v-if="timeColumn && chartData.length > 0"
+      @mousedown.capture="startTimeSelectionDrag"
+    >
+      <Bar
+        ref="chartRef"
+        :data="chartJsData"
+        :options="chartOptions"
+      />
+      <div v-if="isDraggingSelection" class="selection-overlay" :style="dragOverlayStyle" />
     </div>
     
     <div class="no-data" v-else-if="timeColumns.length === 0">
@@ -501,6 +663,7 @@ function onBucketChange() {
   min-width: 120px;
 }
 
+
 .chart-actions {
   margin-left: auto;
   display: flex;
@@ -508,9 +671,20 @@ function onBucketChange() {
 }
 
 .chart-container {
+  position: relative;
   height: 250px;
   padding: 12px;
   transition: height 0.2s ease;
+}
+
+.selection-overlay {
+  position: absolute;
+  top: 12px;
+  bottom: 12px;
+  background: rgba(37, 99, 235, 0.2);
+  border: 1px solid rgba(37, 99, 235, 0.6);
+  z-index: 3;
+  pointer-events: none;
 }
 
 .chart-container.maximized {

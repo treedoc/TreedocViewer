@@ -75,6 +75,9 @@ export interface ChartState {
   groupColumn?: string
   bucketSize?: string
   hiddenGroups?: string[]
+  timeSelectionStart?: number | null
+  timeSelectionEnd?: number | null
+  timeSelectionColumn?: string
 }
 
 export interface TableNodeState {

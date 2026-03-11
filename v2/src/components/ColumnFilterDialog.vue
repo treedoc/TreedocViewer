@@ -63,6 +63,45 @@ function valueToSearchString(value: any): string {
 
 // Popover ref for programmatic control
 const popoverRef = ref()
+let autoCloseTimer: ReturnType<typeof setTimeout> | null = null
+const isPopoverVisible = ref(false)
+
+function getPopoverElement(): HTMLElement | null {
+  const fromInstance = (popoverRef.value as any)?.container as HTMLElement | undefined
+  if (fromInstance) return fromInstance
+  const candidates = document.querySelectorAll('.column-filter-popover.p-popover')
+  return (candidates[candidates.length - 1] as HTMLElement) || null
+}
+
+function cancelAutoClose() {
+  if (autoCloseTimer) {
+    clearTimeout(autoCloseTimer)
+    autoCloseTimer = null
+  }
+}
+
+function scheduleAutoClose() {
+  if (!isPopoverVisible.value) return
+  cancelAutoClose()
+  autoCloseTimer = setTimeout(() => {
+    hide()
+    autoCloseTimer = null
+  }, 2000)
+}
+
+function handleDocumentMouseMove(event: MouseEvent) {
+  if (!isPopoverVisible.value) return
+  const popoverEl = getPopoverElement()
+  if (!popoverEl) return
+
+  const target = event.target as Node | null
+  const isInside = !!target && popoverEl.contains(target)
+  if (isInside) {
+    cancelAutoClose()
+  } else {
+    scheduleAutoClose()
+  }
+}
 
 // Expose methods for parent to control popover
 function show(event: Event) {
@@ -70,6 +109,9 @@ function show(event: Event) {
 }
 
 function hide() {
+  cancelAutoClose()
+  isPopoverVisible.value = false
+  document.removeEventListener('mousemove', handleDocumentMouseMove)
   popoverRef.value?.hide()
 }
 
@@ -139,6 +181,9 @@ function stopResize() {
 }
 
 onBeforeUnmount(() => {
+  isPopoverVisible.value = false
+  cancelAutoClose()
+  document.removeEventListener('mousemove', handleDocumentMouseMove)
   document.removeEventListener('mousemove', onResize)
   document.removeEventListener('mouseup', stopResize)
 })
@@ -221,6 +266,9 @@ function extractPatternFields(patternText: string): string[] {
 
 // Focus input when popover shows
 function onPopoverShow() {
+  isPopoverVisible.value = true
+  cancelAutoClose()
+  document.addEventListener('mousemove', handleDocumentMouseMove)
   // Use setTimeout to ensure the popover is fully rendered
   setTimeout(() => {
     // Find the input element - PrimeVue Popover teleports content, so search document
@@ -230,6 +278,12 @@ function onPopoverShow() {
       inputEl?.focus()
     }
   }, 50)
+}
+
+function onPopoverHide() {
+  isPopoverVisible.value = false
+  cancelAutoClose()
+  document.removeEventListener('mousemove', handleDocumentMouseMove)
 }
 
 function applyFilter() {
@@ -571,6 +625,7 @@ function toggleColorPicker(value: string) {
     appendTo="body"
     :baseZIndex="1100"
     @show="onPopoverShow"
+    @hide="onPopoverHide"
     :style="{ width: popoverWidth + 'px', height: popoverHeight + 'px' }"
     class="column-filter-popover"
     :pt="{ content: { style: 'height: 100%; display: flex; flex-direction: column;' } }"

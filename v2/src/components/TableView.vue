@@ -39,12 +39,13 @@ import { matchFieldQuery, matchPattern, createExtendedFieldsFunc, parsePatterns,
 import { getValueColorStyle, applyValueColorsFromFieldQueries } from '@/utils/ValueColorService'
 import { TableDataProcessor, type TableRow as ProcessorTableRow, type ProcessingConfig } from '@/utils/TableDataProcessor'
 import { ColumnManager, type TableColumn as ManagerTableColumn } from '@/utils/ColumnManager'
-import { isFilterActive, isFilterDisabled } from '@/utils/FieldQueryUtils'
+import { isFilterActive, isFilterDisabled, clearFilterFields } from '@/utils/FieldQueryUtils'
 
 const logger = new Logger('TableView')
 const COL_VALUE = '@value'
 const COL_NO = '#'
 const COL_KEY = '@key'
+const CHART_TIME_RANGE_MARKER = '/*tdv_chart_time_range*/'
 
 const STORAGE_KEY_JS_QUERY = 'tdv_recent_js_queries'
 const STORAGE_KEY_EXTENDED_FIELDS = 'tdv_recent_extended_fields'
@@ -114,6 +115,9 @@ const chartValueColumn = ref('')
 const chartGroupColumn = ref('')
 const chartBucketSize = ref<import('@/utils/TableUtil').TimeBucket>('minute')
 const chartHiddenGroups = ref<Set<string>>(new Set())
+const chartTimeSelectionStart = ref<number | null>(null)
+const chartTimeSelectionEnd = ref<number | null>(null)
+const chartTimeSelectionColumn = ref('')
 
 const activeFilterColumn = ref<TableColumn | null>(null)
 const columnFilterRef = ref<InstanceType<typeof ColumnFilterDialog> | null>(null)
@@ -234,7 +238,9 @@ function hasDisabledFilter(field: string): boolean {
 }
 
 const activeFilterCount = computed(() => {
-  return Object.values(fieldQueries.value).filter(fq => fq.query?.length > 0 && !fq.isDisabled).length
+  const columnFilterCount = Object.values(fieldQueries.value).filter(fq => isFilterActive(fq)).length
+  const hasJsQueryFilter = jsQuery.value.trim() !== '$'
+  return columnFilterCount + (hasJsQueryFilter ? 1 : 0)
 })
 
 const visibleColumns = computed(() => {
@@ -408,6 +414,53 @@ function onChartGroupFilter(field: string, values: string[]) {
       patternFields: [],
     }
   }
+}
+
+function onChartTimeRange(payload: { timeColumn: string; startMs: number | null; endMs: number | null }) {
+  const prevColumn = chartTimeSelectionColumn.value
+
+  chartTimeSelectionColumn.value = payload.timeColumn
+  chartTimeSelectionStart.value = payload.startMs
+  chartTimeSelectionEnd.value = payload.endMs
+
+  if (prevColumn && prevColumn !== payload.timeColumn) {
+    clearChartTimeRangeFilter(prevColumn)
+  }
+
+  if (!payload.timeColumn || payload.startMs == null || payload.endMs == null) {
+    if (payload.timeColumn) {
+      clearChartTimeRangeFilter(payload.timeColumn)
+    }
+    return
+  }
+
+  const lower = Math.min(payload.startMs, payload.endMs)
+  const upper = Math.max(payload.startMs, payload.endMs)
+  const rangeExpression = buildChartTimeRangeExpression(lower, upper)
+  const existing = fieldQueries.value[payload.timeColumn] || createFieldQuery()
+
+  fieldQueries.value[payload.timeColumn] = {
+    ...existing,
+    jsExpression: rangeExpression,
+    isDisabled: false,
+  }
+}
+
+function isChartTimeRangeExpression(jsExpression?: string): boolean {
+  return !!jsExpression && jsExpression.includes(CHART_TIME_RANGE_MARKER)
+}
+
+function clearChartTimeRangeFilter(field: string) {
+  const existing = fieldQueries.value[field]
+  if (!existing || !isChartTimeRangeExpression(existing.jsExpression)) return
+  fieldQueries.value[field] = {
+    ...existing,
+    jsExpression: undefined,
+  }
+}
+
+function buildChartTimeRangeExpression(startMs: number, endMs: number): string {
+  return `${CHART_TIME_RANGE_MARKER} Number($) >= ${startMs} && Number($) <= ${endMs}`
 }
 
 
@@ -682,6 +735,9 @@ function buildTableInternal(node: TDNode | null, restoreState = true) {
       chartGroupColumn.value = cachedState.chartState.groupColumn ?? ''
       chartBucketSize.value = (cachedState.chartState.bucketSize as import('@/utils/TableUtil').TimeBucket) ?? 'minute'
       chartHiddenGroups.value = new Set(cachedState.chartState.hiddenGroups ?? [])
+      chartTimeSelectionStart.value = cachedState.chartState.timeSelectionStart ?? null
+      chartTimeSelectionEnd.value = cachedState.chartState.timeSelectionEnd ?? null
+      chartTimeSelectionColumn.value = cachedState.chartState.timeSelectionColumn ?? ''
     }
   } else if (!cachedState) {
     // First time visiting this node - auto-detect
@@ -835,7 +891,13 @@ function onPage(event: { first: number; rows: number }) {
 }
 
 function clearAllFilters() {
-  fieldQueries.value = {}
+  // Clear only filtering state; preserve other configuration (extended fields, chart, layout, etc.)
+  const nextQueries: Record<string, FieldQuery> = {}
+  for (const [field, fq] of Object.entries(fieldQueries.value)) {
+    nextQueries[field] = clearFilterFields(fq)
+  }
+  fieldQueries.value = nextQueries
+  jsQuery.value = '$'
 }
 
 function filterCellValue(field: string, value: any, isNegate: boolean) {
@@ -1066,7 +1128,10 @@ function saveCurrentTableState() {
         valueColumn: chartValueColumn.value,
         groupColumn: chartGroupColumn.value,
         bucketSize: chartBucketSize.value,
-        hiddenGroups: Array.from(chartHiddenGroups.value)
+        hiddenGroups: Array.from(chartHiddenGroups.value),
+        timeSelectionStart: chartTimeSelectionStart.value,
+        timeSelectionEnd: chartTimeSelectionEnd.value,
+        timeSelectionColumn: chartTimeSelectionColumn.value
       }
     })
   }
@@ -1362,6 +1427,8 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
       :group-column-model="chartGroupColumn"
       :bucket-size-model="chartBucketSize"
       :hidden-groups-model="chartHiddenGroups"
+      :time-selection-start-model="chartTimeSelectionStart"
+      :time-selection-end-model="chartTimeSelectionEnd"
       @close="showChart = false"
       @update:group-filter="onChartGroupFilter"
       @update:time-column="chartTimeColumn = $event"
@@ -1369,6 +1436,7 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
       @update:group-column="chartGroupColumn = $event"
       @update:bucket-size="chartBucketSize = $event"
       @update:hidden-groups="chartHiddenGroups = $event"
+      @update:time-range="onChartTimeRange"
     />
     
     <div class="table-content">
