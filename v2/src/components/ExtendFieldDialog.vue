@@ -585,7 +585,6 @@ function formatPathForDisplay(path: string): string {
                   :buttons="getPathButtons()"
                   layout="absolute"
                   class="path-actions-hover"
-                  :style="{ '--path-action-left': `${30 + pathInfo.depth * 14}px` }"
                   @click="handlePathButtonClick($event, pathInfo)"
                 />
                 <InputText
@@ -780,10 +779,10 @@ function formatPathForDisplay(path: string): string {
 }
 
 .path-actions-hover {
-  left: var(--path-action-left, 30px) !important;
-  top: 0 !important;
-  right: auto !important;
-  transform: translateY(-100%) !important;
+  left: auto !important;
+  top: 50% !important;
+  right: 112px !important;
+  transform: translateY(-50%) !important;
   width: max-content;
 }
 
