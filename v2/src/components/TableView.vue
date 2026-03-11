@@ -331,9 +331,9 @@ function showColumnPopover(event: MouseEvent, col: TableColumn) {
   // Cancel any pending hover timeout
   cancelHoverTimeout()
   
-  // Hide existing popover first, reset size, then show for new column
+  // Hide existing popover first, then show for new column.
+  // Keep user-resized popover dimensions.
   columnFilterRef.value?.hide()
-  columnFilterRef.value?.resetSize()
   
   // Set the active column  
   activeFilterColumn.value = col
@@ -352,9 +352,8 @@ function onColumnHeaderMouseEnter(event: MouseEvent, col: TableColumn) {
   
   // Start 500ms hover timeout
   hoverTimeout = setTimeout(() => {
-    // Hide existing popover first, reset size
+    // Hide existing popover first; keep user-resized popover dimensions.
     columnFilterRef.value?.hide()
-    columnFilterRef.value?.resetSize()
     
     activeFilterColumn.value = col
     nextTick(() => {

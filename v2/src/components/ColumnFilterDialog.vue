@@ -122,6 +122,7 @@ function toggle(event: Event) {
 function resetSize() {
   popoverWidth.value = defaultPopoverWidth
   popoverHeight.value = defaultPopoverHeight
+  savePopoverSize(defaultPopoverWidth, defaultPopoverHeight)
 }
 
 defineExpose({ show, hide, toggle, resetSize })
@@ -146,8 +147,36 @@ const selectedValues = ref<string[]>([])
 // Popover size and resize
 const defaultPopoverWidth = 450
 const defaultPopoverHeight = 420
-const popoverWidth = ref(defaultPopoverWidth)
-const popoverHeight = ref(defaultPopoverHeight)
+const POPOVER_SIZE_STORAGE_KEY = 'tdv_column_filter_popover_size_v1'
+
+function loadSavedPopoverSize(): { width: number; height: number } | null {
+  try {
+    const raw = localStorage.getItem(POPOVER_SIZE_STORAGE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as { width?: number; height?: number }
+    const width = Number(parsed.width)
+    const height = Number(parsed.height)
+    if (!Number.isFinite(width) || !Number.isFinite(height)) return null
+    return {
+      width: Math.max(350, width),
+      height: Math.max(350, height),
+    }
+  } catch {
+    return null
+  }
+}
+
+function savePopoverSize(width: number, height: number) {
+  try {
+    localStorage.setItem(POPOVER_SIZE_STORAGE_KEY, JSON.stringify({ width, height }))
+  } catch {
+    // Ignore storage errors.
+  }
+}
+
+const savedPopoverSize = loadSavedPopoverSize()
+const popoverWidth = ref(savedPopoverSize?.width ?? defaultPopoverWidth)
+const popoverHeight = ref(savedPopoverSize?.height ?? defaultPopoverHeight)
 const isResizing = ref(false)
 const resizeStartX = ref(0)
 const resizeStartY = ref(0)
@@ -178,6 +207,7 @@ function stopResize() {
   isResizing.value = false
   document.removeEventListener('mousemove', onResize)
   document.removeEventListener('mouseup', stopResize)
+  savePopoverSize(popoverWidth.value, popoverHeight.value)
 }
 
 onBeforeUnmount(() => {
