@@ -47,6 +47,13 @@ export const yamlStr = `
       - erlang
 `
 
+export const yamlMultiDocStr = `document: 1
+name: 'John'
+---
+document: 2
+name: 'config'
+`
+
 export const xmlStr = `<?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0">
   <modelVersion>4.0.0</modelVersion>
@@ -72,6 +79,66 @@ v11,v12,v13
 v21, "v2l1
 V2l2" ,v23
 "v31""v31","v32""""v32",v33
+`
+
+export const prometheusStr = String.raw`
+# Sample from: https://prometheus.io/docs/instrumenting/exposition_formats/#text-based-format
+# HELP http_requests_total The total number of HTTP requests.
+# TYPE http_requests_total counter
+http_requests_total{method="post",code="200"} 1027 1395066363000
+http_requests_total{method="post",code="400"}    3 1395066363000
+
+# Escaping in label values:
+msdos_file_access_time_seconds{path="C:\\DIR\\FILE.TXT",error="Cannot find file:\n\"FILE.TXT\""} 1.458255915e9
+
+# Minimalistic line:
+metric_without_timestamp_and_labels 12.47
+
+# Minimalistic line:
+# HELP metric_without_timestamp_and_labels The total number of HTTP requests.
+# TYPE metric_without_timestamp_and_labels counter
+metric_without_timestamp_and_labels{} 12.47
+
+# A weird metric from before the epoch:
+something_weird{problem="division by zero"} +Inf -3982045
+
+# A histogram, which has a pretty complex representation in the text format:
+# HELP http_request_duration_seconds A histogram of the request duration.
+# TYPE http_request_duration_seconds histogram
+http_request_duration_seconds_bucket{le="0.05"} 24054
+http_request_duration_seconds_bucket{le="0.1"} 33444
+http_request_duration_seconds_bucket{le="0.2"} 100392
+http_request_duration_seconds_bucket{le="0.5"} 129389
+http_request_duration_seconds_bucket{le="1"} 133988
+http_request_duration_seconds_bucket{le="+Inf"} 144320
+http_request_duration_seconds_sum 53423
+http_request_duration_seconds_count 144320
+
+# HELP thanos_objstore_bucket_operation_duration_seconds Duration of successful operations against the bucket
+# TYPE thanos_objstore_bucket_operation_duration_seconds histogram
+thanos_objstore_bucket_operation_duration_seconds_bucket{bucket="thanos",operation="attributes",le="0.01"} 0
+thanos_objstore_bucket_operation_duration_seconds_bucket{bucket="thanos",operation="attributes",le="0.1"} 0
+
+# HELP go_gc_duration_seconds A summary of the pause duration of garbage collection cycles.
+# TYPE go_gc_duration_seconds summary
+go_gc_duration_seconds{quantile="0"} 0
+go_gc_duration_seconds{quantile="0.25"} 0
+go_gc_duration_seconds{quantile="0.5"} 0
+go_gc_duration_seconds{quantile="0.75"} 0
+go_gc_duration_seconds{quantile="1"} 0
+go_gc_duration_seconds_sum 0
+go_gc_duration_seconds_count 0
+
+# Finally a summary, which has a complex representation, too:
+# HELP rpc_duration_seconds A summary of the RPC duration in seconds.
+# TYPE rpc_duration_seconds summary
+rpc_duration_seconds{quantile="0.01"} 3102
+rpc_duration_seconds{quantile="0.05"} 3272
+rpc_duration_seconds{quantile="0.5"} 4773
+rpc_duration_seconds{quantile="0.9"} 9001
+rpc_duration_seconds{quantile="0.99"} 76656
+rpc_duration_seconds_sum 1.7560473e+07
+rpc_duration_seconds_count 2693
 `
 
 export interface SampleDataItem {
@@ -128,6 +195,7 @@ export const sampleData: SampleDataItem[] = [
 }`,
   },
   { text: 'YAML', value: yamlStr },
+  { text: 'YAML Multi-Doc', value: yamlMultiDocStr },
   { text: 'XML', value: xmlStr },
   { text: 'CSV', value: csvStr },
   { text: 'Map.toString', value: '{K1=v1, k2=123, k3={c=Test with ,in}, k4=[ab,c, def]}' },
@@ -135,6 +203,7 @@ export const sampleData: SampleDataItem[] = [
     text: 'Lombok.toString',
     value: "TestBean(treeMap={key1=value1}, linkedList1=[value1], intField=100, floatField=1.4)",
   },
+  { text: 'Prometheus', value: prometheusStr },
 ]
 
 export default sampleData

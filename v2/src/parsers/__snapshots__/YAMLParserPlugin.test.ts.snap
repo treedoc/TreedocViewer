@@ -1,0 +1,5 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`YAMLParser.ts > parse 1`] = `"[{martin: {name: 'Martin D\\'vloper', job: 'Developer', skills: ['python', 'perl', 'pascal']}}, {tabitha: {name: 'Tabitha Bitumen', job: 'Developer', skills: ['lisp', 'fortran', 'erlang']}}]"`;
+
+exports[`YAMLParser.ts > parse multiple documents 1`] = `"[{document: 1}, {document: 2}]"`;

@@ -23,8 +23,8 @@ export default class YAMLParserPlugin implements ParserPlugin<YAMLParserOption> 
     // Check if it has YAML-like structure (key: value without braces)
     const lines = trimmed.split('\n').slice(0, 5)
     const hasYamlPattern = lines.some(line => {
-      const match = line.match(/^\s*[\w-]+:\s*/)
-      return match && !line.includes('{') && !line.includes('[')
+      const match = line.match(/^\s*[\w-]+:(?:\s+|$)/)
+      return match && !line.includes('{') && !line.includes('[') && !line.includes('<') && !line.includes('>')
     })
     
     return hasYamlPattern

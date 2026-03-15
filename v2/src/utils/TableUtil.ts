@@ -3,7 +3,7 @@
  */
 
 import type { TDNode } from 'treedoc'
-import { TDNodeType, TDJSONWriter, TDJSONWriterOption, TD, NodeFilter } from 'treedoc'
+import { TDNodeType, TDJSONWriter, TDJSONWriterOption, TD, NodeFilter, TDObjectCoder, CSVWriter } from 'treedoc'
 import { toRaw } from 'vue'
 import { getTimestampHint, tryDate } from './DateUtil'
 
@@ -109,7 +109,7 @@ export function copyCellValue(row: TableRow, field: string): void {
 /**
  * Copy table data as JSON to clipboard
  */
-export function copyAsJSON(data: TableRow[], columns: TableColumn[]): void {
+export function copyAsJSON(data: TableRow[], columns: TableColumn[], asCSV = false): void {
   const fields = columns.map(c => c.field)
   const jsonData = data.map(row => {
     const obj: any = {}
@@ -125,38 +125,44 @@ export function copyAsJSON(data: TableRow[], columns: TableColumn[]): void {
     }
     return obj
   })
-  navigator.clipboard.writeText(TD.stringify(jsonData))
+  navigator.clipboard.writeText(asCSV ? toCSV(jsonData) : TD.stringify(jsonData))
 }
 
-/**
- * Copy table data as CSV to clipboard
- */
-export function copyAsCSV(data: TableRow[], columns: TableColumn[]): void {
-  const header = columns.map(c => c.header).join(',')
-  const csvRows = data.map(row => {
-    return columns.map(col => {
-      const val = row[col.field]
-      if (val === undefined || val === null) return ''
-      if (typeof val === 'object' && 'value' in val) {
-        const v = (val as TDNode).value
-        return typeof v === 'string' ? `"${v.replace(/"/g, '""')}"` : String(v)
-      }
-      return String(val)
-    }).join(',')
-  })
-  const csv = [header, ...csvRows].join('\n')
-  navigator.clipboard.writeText(csv)
+// /**
+//  * Copy table data as CSV to clipboard
+//  */
+// export function copyAsCSV(data: TableRow[], columns: TableColumn[]): void {
+//   const header = columns.map(c => c.header).join(',')
+//   const csvRows = data.map(row => {
+//     return columns.map(col => {
+//       const val = row[col.field]
+//       if (val === undefined || val === null) return ''
+//       if (typeof val === 'object' && 'value' in val) {
+//         const v = (val as TDNode).value
+//         return typeof v === 'string' ? `"${v.replace(/"/g, '""')}"` : String(v)
+//       }
+//       return String(val)
+//     }).join(',')
+//   })
+//   const csv = [header, ...csvRows].join('\n')
+//   navigator.clipboard.writeText(csv)
+// }
+
+export function toCSV(val: any) {
+  const obj = TDObjectCoder.encode(val);
+  return CSVWriter.instance.writeAsString(obj);
 }
+
 
 /**
  * Determine if columns should be auto-expanded based on data structure
  */
 export function shouldExpandColumns(node: TDNode): boolean {
   if (!node.children || node.children.length === 0) return false
-  
+
   const cols = new Set<string>()
   let cellCount = 0
-  
+
   for (const child of node.children) {
     if (child.children) {
       for (const grandChild of child.children) {
@@ -165,13 +171,13 @@ export function shouldExpandColumns(node: TDNode): boolean {
       }
     }
   }
-  
+
   const rowCount = node.children.length
   const colCount = cols.size
   if (colCount === 0 || colCount > 30) {
     return false
   }
-  
+
   // Threshold: at least 50% fill rate
   const threshold = 0.5
   const maxCells = rowCount * colCount
@@ -206,13 +212,13 @@ function parseTimestamp(val: number): Date | null {
 export function detectTimeColumns(data: TableRow[], columns: TableColumn[]): string[] {
   const timeColumns: string[] = []
   const sampleSize = Math.min(data.length, 20)
-  
+
   for (const col of columns) {
     if (col.field === '__node') continue
-    
+
     let validCount = 0
     let totalSampled = 0
-    
+
     for (let i = 0; i < sampleSize && i < data.length; i++) {
       const num = getNumericValue(data[i], col.field)
       if (num !== null) {
@@ -221,13 +227,13 @@ export function detectTimeColumns(data: TableRow[], columns: TableColumn[]): str
         if (date) validCount++
       }
     }
-    
+
     // If at least 80% of sampled numeric values are valid timestamps
     if (totalSampled > 0 && validCount / totalSampled >= 0.8) {
       timeColumns.push(col.field)
     }
   }
-  
+
   return timeColumns
 }
 
@@ -237,13 +243,13 @@ export function detectTimeColumns(data: TableRow[], columns: TableColumn[]): str
 export function detectNumericColumns(data: TableRow[], columns: TableColumn[]): string[] {
   const numericColumns: string[] = []
   const sampleSize = Math.min(data.length, 20)
-  
+
   for (const col of columns) {
     if (col.field === '__node') continue
-    
+
     let numericCount = 0
     let totalSampled = 0
-    
+
     for (let i = 0; i < sampleSize && i < data.length; i++) {
       const val = data[i][col.field]
       if (val !== undefined && val !== null && val !== '') {
@@ -252,13 +258,13 @@ export function detectNumericColumns(data: TableRow[], columns: TableColumn[]): 
         if (num !== null) numericCount++
       }
     }
-    
+
     // If at least 80% of sampled values are numeric
     if (totalSampled > 0 && numericCount / totalSampled >= 0.8) {
       numericColumns.push(col.field)
     }
   }
-  
+
   return numericColumns
 }
 
@@ -266,18 +272,18 @@ export function detectNumericColumns(data: TableRow[], columns: TableColumn[]): 
  * Detect columns suitable for grouping (with limited unique values)
  */
 export function detectGroupableColumns(
-  data: TableRow[], 
-  columns: TableColumn[], 
+  data: TableRow[],
+  columns: TableColumn[],
   maxUniqueValues: number = 100
 ): string[] {
   const groupableColumns: string[] = []
-  
+
   for (const col of columns) {
     if (col.field === '__node') continue
-    
+
     const uniqueValues = new Set<string>()
     let exceededLimit = false
-    
+
     for (const row of data) {
       const node = getCellNode(row, col.field)
       let val: string
@@ -291,20 +297,20 @@ export function detectGroupableColumns(
           val = String(rawVal)
         }
       }
-      
+
       uniqueValues.add(val)
-      
+
       if (uniqueValues.size > maxUniqueValues) {
         exceededLimit = true
         break
       }
     }
-    
+
     if (!exceededLimit) {
       groupableColumns.push(col.field)
     }
   }
-  
+
   return groupableColumns
 }
 
@@ -314,7 +320,7 @@ export function detectGroupableColumns(
 export function detectBucketSize(data: TableRow[], timeColumn: string): TimeBucket {
   let minTime = Infinity
   let maxTime = -Infinity
-  
+
   for (const row of data) {
     const num = getNumericValue(row, timeColumn)
     if (num !== null) {
@@ -326,11 +332,11 @@ export function detectBucketSize(data: TableRow[], timeColumn: string): TimeBuck
       }
     }
   }
-  
+
   if (minTime === Infinity || maxTime === -Infinity) {
     return 'minute'
   }
-  
+
   const rangeMs = maxTime - minTime
   const secondMs = 1000
   const minuteMs = 60 * secondMs
@@ -338,7 +344,7 @@ export function detectBucketSize(data: TableRow[], timeColumn: string): TimeBuck
   const dayMs = 24 * hourMs
   const weekMs = 7 * dayMs
   const monthMs = 30 * dayMs
-  
+
   if (rangeMs < 2 * minuteMs) return 'second'
   if (rangeMs < 30 * minuteMs) return 'minute'
   if (rangeMs < 2 * hourMs) return '5min'
@@ -359,7 +365,7 @@ function getBucketKey(date: Date, bucket: TimeBucket): string {
   const day = String(date.getDate()).padStart(2, '0')
   const hour = String(date.getHours()).padStart(2, '0')
   const minute = date.getMinutes()
-  
+
   switch (bucket) {
     case 'second': {
       const second = String(date.getSeconds()).padStart(2, '0')
@@ -463,29 +469,29 @@ export function aggregateByTime(
   groupColumn?: string
 ): TimeSeriesDataPoint[] {
   const buckets = new Map<string, { count: number; sum: number; valueCount: number; groups: Record<string, number> }>()
-  
+
   for (const row of data) {
     const num = getNumericValue(row, timeColumn)
     if (num === null) continue
-    
+
     const date = parseTimestamp(num)
     if (!date) continue
-    
+
     const key = getBucketKey(date, bucket)
-    
+
     if (!buckets.has(key)) {
       buckets.set(key, { count: 0, sum: 0, valueCount: 0, groups: {} })
     }
-    
+
     const bucketData = buckets.get(key)!
     bucketData.count++
-    
+
     // Track group counts
     if (groupColumn) {
       const groupValue = getStringValue(row, groupColumn) || '(empty)'
       bucketData.groups[groupValue] = (bucketData.groups[groupValue] || 0) + 1
     }
-    
+
     if (valueColumn) {
       const val = getNumericValue(row, valueColumn)
       if (val !== null) {
@@ -494,7 +500,7 @@ export function aggregateByTime(
       }
     }
   }
-  
+
   // Convert to array and sort by time
   const result: TimeSeriesDataPoint[] = []
   for (const [key, data] of buckets) {
@@ -506,7 +512,7 @@ export function aggregateByTime(
       groups: groupColumn ? data.groups : undefined
     })
   }
-  
+
   result.sort((a, b) => a.time.getTime() - b.time.getTime())
   return result
 }

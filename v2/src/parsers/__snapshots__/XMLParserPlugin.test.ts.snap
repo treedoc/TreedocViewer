@@ -1,0 +1,5 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`XMLParser.ts > parse 1`] = `"{@xmlns: 'http://maven.apache.org/POM/4.0.0', modelVersion: '4.0.0', groupId: 'com.jsonex', artifactId: 'jcParent', version: '0.0.1-SNAPSHOT', name: 'JSONCoder Parent', developers: {developer: {id: 'jianwu', name: 'Jianwu Chen', roles: {role: ['architect', 'developer']}}}}"`;
+
+exports[`XMLParser.ts > parse Compacted 1`] = `"{project: {@xmlns: 'http://maven.apache.org/POM/4.0.0', modelVersion: '4.0.0', groupId: 'com.jsonex', artifactId: 'jcParent', version: '0.0.1-SNAPSHOT', name: 'JSONCoder Parent', developers: {developer: {id: 'jianwu', name: 'Jianwu Chen', roles: {role: ['architect', 'developer']}}}}}"`;

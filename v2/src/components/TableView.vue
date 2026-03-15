@@ -30,8 +30,7 @@ import {
   isComplexValue, 
   getComplexValueSummary,
   copyCellValue,
-  copyAsJSON,
-  copyAsCSV,
+  copyAsJSON as copy,
   shouldExpandColumns,
   detectTimeColumns
 } from '@/utils/TableUtil'
@@ -1271,7 +1270,7 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
           icon="pi pi-copy"
           size="small"
           text
-          @click="copyAsJSON(filteredData as any, visibleColumns as any)"
+          @click="copy(filteredData as any, visibleColumns as any, false)"
           v-tooltip.top="'Copy as JSON'"
         />
         
@@ -1279,7 +1278,7 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
           icon="pi pi-file-export"
           size="small"
           text
-          @click="copyAsCSV(filteredData as any, visibleColumns as any)"
+          @click="copy(filteredData as any, visibleColumns as any, true)"
           v-tooltip.top="'Copy as CSV'"
         />
         

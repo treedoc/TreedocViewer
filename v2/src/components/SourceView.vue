@@ -179,6 +179,39 @@ function format() {
   store.format()
   toast.add({ severity: 'success', summary: 'Formatted', life: 2000 })
 }
+
+function saveAs() {
+  try {
+    const textToSave = rawText.value;
+    if (!textToSave) return;
+    
+    // Automatically determine filename/extension based on the selected parser
+    let extension = 'json';
+    if (selectedParser.value) {
+      const syntax = selectedParser.value.syntax?.toLowerCase();
+      if (syntax === 'xml') extension = 'xml';
+      else if (syntax === 'yaml') extension = 'yaml';
+      else if (syntax === 'csv') extension = 'csv';
+      else if (selectedParser.value.name.toLowerCase().includes('prometheus')) extension = 'prom';
+      else if (selectedParser.value.name.toLowerCase().includes('textproto')) extension = 'textproto';
+    }
+
+    const blob = new Blob([textToSave], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `treedoc-data.${extension}`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    
+    toast.add({ severity: 'success', summary: 'Saved to file', life: 2000 })
+  } catch (error) {
+    toast.add({ severity: 'error', summary: 'Failed to save', life: 3000 })
+    console.error('Failed to save file:', error)
+  }
+}
 </script>
 
 <template>
@@ -186,6 +219,14 @@ function format() {
     <div class="source-header">
       <span class="panel-title">Source View</span>
       <div class="source-controls">
+        <Button
+          icon="pi pi-save"
+          size="small"
+          text
+          :disabled="!rawText"
+          @click="saveAs"
+          v-tooltip.top="'Save As File'"
+        />
         <Button
           icon="pi pi-copy"
           size="small"
