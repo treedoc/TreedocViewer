@@ -79,15 +79,15 @@ export function getCellObject(cellValue: any): any {
     // Try to parse as JSON if it looks like JSON
     const trimmed = cellValue.trim()
     if ((trimmed.startsWith('{') && trimmed.endsWith('}')) ||
-        (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+      (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
       try {
         return JSON.parse(trimmed)
       } catch {
-        return null
+        return cellValue
       }
     }
   }
-  return null
+  return cellValue
 }
 
 /**
@@ -104,7 +104,7 @@ const TDNodeTypeEnum = {
  */
 export function defaultValueToString(value: any): string {
   if (value === undefined || value === null) return ''
-  
+
   if (typeof value === 'object') {
     // Check for TDNode-like structure
     if ('type' in value && 'key' in value) {
@@ -125,7 +125,7 @@ export function defaultValueToString(value: any): string {
       return String(value)
     }
   }
-  
+
   return String(value)
 }
 
@@ -134,11 +134,11 @@ export function defaultValueToString(value: any): string {
  */
 export class TableDataProcessor {
   private valueToString: (value: any) => string
-  
+
   constructor(valueToString?: (value: any) => string) {
     this.valueToString = valueToString ?? defaultValueToString
   }
-  
+
   /**
    * Process data through all field queries with fixed-point iteration
    * to handle recursive dependencies between derived fields
@@ -148,11 +148,11 @@ export class TableDataProcessor {
     config: ProcessingConfig
   ): ProcessingResult {
     let data = [...inputData]
-    
+
     const derivedColumns: string[] = []
     const derivedColumnsSet = new Set<string>()
     const derivedColumnSources = new Map<string, string>()
-    
+
     // Collect fields to process in order
     const configuredFields = [...config.columnOrder]
     for (const field of Object.keys(config.fieldQueries)) {
@@ -160,29 +160,29 @@ export class TableDataProcessor {
         configuredFields.push(field)
       }
     }
-    
+
     // Track which field+operation combinations have been processed
     const processedFields = new Set<string>()
-    
+
     const MAX_ITERATIONS = 10
     let iteration = 0
-    
+
     while (iteration < MAX_ITERATIONS) {
       iteration++
       const columnsBeforeIteration = derivedColumns.length
-      
+
       for (const field of configuredFields) {
         const fq = config.fieldQueries[field]
         if (!fq || fq.isDisabled) continue
-        
+
         // Check if field exists in data
         const fieldExistsInData = data.length > 0 && data.some(row => row[field] !== undefined)
         if (!fieldExistsInData) continue
-        
+
         const extKey = `${field}:ext`
         const patternKey = `${field}:pattern`
         const queryKey = `${field}:query`
-        
+
         // Apply extended fields
         if (fq.extendedFields && !processedFields.has(extKey)) {
           data = this.applyExtendedFields(
@@ -191,7 +191,7 @@ export class TableDataProcessor {
           )
           processedFields.add(extKey)
         }
-        
+
         // Apply pattern extraction
         if (fq.patternExtract && !processedFields.has(patternKey)) {
           data = this.applyPatternExtract(
@@ -200,7 +200,7 @@ export class TableDataProcessor {
           )
           processedFields.add(patternKey)
         }
-        
+
         // Apply query filter
         // For derived columns, undefined values should be filtered out (not kept)
         if (fq.query && !processedFields.has(queryKey)) {
@@ -208,7 +208,7 @@ export class TableDataProcessor {
           data = this.applyQueryFilter(data, field, fq, isDerivedColumn)
           processedFields.add(queryKey)
         }
-        
+
         // Apply JS expression filter
         const jsKey = `${field}:js`
         if (fq.jsExpression && !processedFields.has(jsKey)) {
@@ -216,12 +216,12 @@ export class TableDataProcessor {
           processedFields.add(jsKey)
         }
       }
-      
+
       // Check if any new columns were created
       if (derivedColumns.length === columnsBeforeIteration) {
         break
       }
-      
+
       // Add new derived columns to configuredFields for next iteration
       for (const col of derivedColumns) {
         if (!configuredFields.includes(col) && config.fieldQueries[col]) {
@@ -229,19 +229,19 @@ export class TableDataProcessor {
         }
       }
     }
-    
+
     // Apply JS query if specified
     if (config.jsQuery && config.jsQuery !== '$') {
       data = this.applyJsQuery(data, config.jsQuery)
     }
-    
+
     return {
       data,
       derivedColumns,
       derivedColumnSources
     }
   }
-  
+
   /**
    * Apply extended fields extraction to data
    */
@@ -255,14 +255,14 @@ export class TableDataProcessor {
   ): TableRow[] {
     const extFunc = createExtendedFieldsFunc(extendedFieldsExpr)
     if (!extFunc) return data
-    
+
     return data.map(row => {
       const cellValue = row[field]
       if (cellValue === undefined) return row
-      
+
       const obj = getCellObject(cellValue)
       if (!obj) return row
-      
+
       try {
         const extracted = extFunc(obj)
         if (extracted && Object.keys(extracted).length > 0) {
@@ -293,7 +293,7 @@ export class TableDataProcessor {
       return row
     })
   }
-  
+
   /**
    * Apply pattern extraction to data
    */
@@ -308,18 +308,18 @@ export class TableDataProcessor {
   ): TableRow[] {
     const patterns = parsePatterns(patternExpr)
     if (patterns.length === 0) return data
-    
+
     const processedRows: TableRow[] = []
-    
+
     for (const row of data) {
       const value = row[field]
       if (value === undefined) {
         if (!patternFilter) processedRows.push(row)
         continue
       }
-      
+
       const strValue = this.valueToString(value)
-      
+
       let matched = false
       for (const pattern of patterns) {
         const extracted = matchPattern(strValue, pattern)
@@ -338,37 +338,37 @@ export class TableDataProcessor {
           break
         }
       }
-      
+
       if (!matched && !patternFilter) {
         processedRows.push(row)
       }
     }
-    
+
     return processedRows
   }
-  
+
   /**
    * Apply query filter to data
    * @param isDerivedColumn - If true, undefined values are filtered out (derived columns should have values)
    */
   applyQueryFilter(data: TableRow[], field: string, fq: FieldQuery, isDerivedColumn = false): TableRow[] {
     if (!fq.query) return data
-    
+
     return data.filter(row => {
       const value = row[field]
-      
+
       // Handle undefined values:
       // - For base columns: keep rows where field doesn't exist (don't filter by missing fields)
       // - For derived columns: filter out rows where extraction didn't produce a value
       if (value === undefined) {
         return !isDerivedColumn
       }
-      
+
       const strValue = this.valueToString(value)
       return matchFieldQuery(strValue, fq)
     })
   }
-  
+
   /**
    * Apply JS expression filter for a specific field
    * $ references the field value
@@ -380,8 +380,8 @@ export class TableDataProcessor {
         try {
           const value = row[field]
           // For TDNode values, convert to plain object
-          const plainValue = value?.__node?.toObject?.(true) ?? 
-                            (value?.toObject ? value.toObject(true) : value)
+          const plainValue = value?.__node?.toObject?.(true) ??
+            (value?.toObject ? value.toObject(true) : value)
           return filterFn(plainValue)
         } catch {
           return true
@@ -392,7 +392,7 @@ export class TableDataProcessor {
       return data
     }
   }
-  
+
   /**
    * Apply JS query filter
    */
@@ -419,7 +419,7 @@ export class TableDataProcessor {
  */
 export function extractPatternFields(pattern: string): string[] {
   const fields: string[] = []
-  
+
   // Match ${name} style
   const bracketMatches = pattern.matchAll(/\$\{(\w+)\}/g)
   for (const match of bracketMatches) {
@@ -427,7 +427,7 @@ export function extractPatternFields(pattern: string): string[] {
       fields.push(match[1])
     }
   }
-  
+
   // Match $name style (not followed by {)
   const simpleMatches = pattern.matchAll(/\$(\w+)(?!\{)/g)
   for (const match of simpleMatches) {
@@ -435,6 +435,6 @@ export function extractPatternFields(pattern: string): string[] {
       fields.push(match[1])
     }
   }
-  
+
   return fields
 }
