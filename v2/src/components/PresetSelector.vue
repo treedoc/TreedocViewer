@@ -17,6 +17,8 @@ import {
 } from '@/utils/PresetService'
 import { useToast } from 'primevue/usetoast'
 import { getFieldValueColors } from '@/utils/ValueColorService'
+import { TD } from 'treedoc'
+import { onMounted } from 'vue'
 
 export interface CurrentState {
   columns: Column[]
@@ -44,6 +46,11 @@ const newPresetDescription = ref('')
 const editingPreset = ref<QueryPreset | null>(null)
 const showOverwriteConfirm = ref(false)
 const existingPresetToOverwrite = ref<QueryPreset | null>(null)
+
+// Import from URL state
+const showImportDialog = ref(false)
+const sharedPreset = ref<QueryPreset | null>(null)
+const importConflict = ref(false)
 
 // Computed
 const selectedPreset = computed(() => {
@@ -245,8 +252,130 @@ function removePreset(id: string) {
 function exportPresetToClipboard(preset: QueryPreset) {
   const json = exportPreset(preset)
   navigator.clipboard.writeText(json)
-  alert('Preset copied to clipboard!')
+  toast.add({
+    severity: 'info',
+    summary: 'Exported',
+    detail: 'Preset JSON copied to clipboard',
+    life: 2000
+  })
 }
+
+function sharePreset(preset: QueryPreset) {
+  try {
+    const clean: QueryPreset = {
+      ...preset,
+      columns: preset.columns.map(cleanColumnForSave) as Column[],
+    }
+    // Deeply removing id, timestamps for cleaner share
+    const toShare = JSON.parse(JSON.stringify(clean))
+    delete toShare.id
+    delete toShare.createdAt
+    delete toShare.updatedAt
+
+    const encoded = TD.stringify(toShare, {
+      jsonOption: {
+        alwaysQuoteKey: false,
+        alwaysQuoteValue: false,
+        indentFactor: 0
+      }
+    })
+    
+    const url = new URL(window.location.href)
+    url.searchParams.set('sharePreset', encoded)
+    
+    navigator.clipboard.writeText(url.toString())
+    toast.add({
+      severity: 'success',
+      summary: 'Link Copied',
+      detail: 'Shareable link copied to clipboard',
+      life: 3000
+    })
+  } catch (e) {
+    console.error('Error sharing preset:', e)
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: 'Failed to generate share link',
+      life: 3000
+    })
+  }
+}
+
+function handleImport(overwrite: boolean) {
+  if (!sharedPreset.value) return
+
+  const name = sharedPreset.value.name
+  const existing = getPresetByName(name)
+
+  if (existing && overwrite) {
+    updatePreset(existing.id, {
+      description: sharedPreset.value.description,
+      columns: sharedPreset.value.columns,
+      jsQuery: sharedPreset.value.jsQuery,
+      expandLevel: sharedPreset.value.expandLevel,
+    })
+    toast.add({
+      severity: 'success',
+      summary: 'Imported',
+      detail: `Preset "${name}" overwritten`,
+      life: 3000
+    })
+  } else if (existing && !overwrite) {
+    // Save as new with renamed name
+    const newName = `${name} (imported)`
+    savePreset({
+      ...sharedPreset.value,
+      name: newName
+    })
+    toast.add({
+      severity: 'success',
+      summary: 'Imported',
+      detail: `Preset saved as "${newName}"`,
+      life: 3000
+    })
+  } else {
+    // Simple save
+    savePreset(sharedPreset.value)
+    toast.add({
+      severity: 'success',
+      summary: 'Imported',
+      detail: `Preset "${name}" saved`,
+      life: 3000
+    })
+  }
+
+  refreshPresets()
+  showImportDialog.value = false
+  sharedPreset.value = null
+  
+  // Clean up URL
+  const url = new URL(window.location.href)
+  url.searchParams.delete('sharePreset')
+  window.history.replaceState({}, '', url.toString())
+}
+
+onMounted(() => {
+  const urlParams = new URLSearchParams(window.location.search)
+  const sharedData = urlParams.get('sharePreset')
+  if (sharedData) {
+    try {
+      const preset = TD.parse(sharedData)
+      if (preset && preset.name && preset.columns) {
+        sharedPreset.value = preset
+        importConflict.value = !!getPresetByName(preset.name)
+        showImportDialog.value = true
+      }
+    } catch (e) {
+      console.error('Failed to parse shared preset:', e)
+      toast.add({
+        severity: 'error',
+        summary: 'Import Error',
+        detail: 'The shared link is invalid or corrupted',
+        life: 5000
+      })
+    }
+  }
+})
 
 function importFromClipboard() {
   navigator.clipboard.readText().then(text => {
@@ -435,12 +564,43 @@ function formatDate(timestamp: number): string {
           </div>
           <div class="preset-actions">
             <Button icon="pi pi-pencil" size="small" text @click.stop="startEdit(preset)" v-tooltip.top="'Edit'" />
+            <Button icon="pi pi-share-alt" size="small" text @click.stop="sharePreset(preset)" v-tooltip.top="'Share link'" />
             <Button icon="pi pi-copy" size="small" text @click.stop="exportPresetToClipboard(preset)" v-tooltip.top="'Copy to clipboard'" />
             <Button icon="pi pi-trash" size="small" text severity="danger" @click.stop="removePreset(preset.id)" v-tooltip.top="'Delete'" />
           </div>
         </div>
       </div>
     </div>
+  </Dialog>
+
+  <!-- Import Shared Preset Dialog -->
+  <Dialog
+    v-model:visible="showImportDialog"
+    header="Import Shared Preset"
+    :modal="true"
+    :style="{ width: '450px' }"
+  >
+    <div class="import-dialog-content">
+      <div v-if="sharedPreset">
+        <p>You've opened a shared preset: <strong>{{ sharedPreset.name }}</strong></p>
+        <p v-if="sharedPreset.description" class="preset-description">{{ sharedPreset.description }}</p>
+        
+        <div v-if="importConflict" class="import-warning">
+          <i class="pi pi-exclamation-triangle"></i>
+          <span>A preset with this name already exists.</span>
+        </div>
+      </div>
+    </div>
+    <template #footer>
+      <Button label="Cancel" severity="secondary" text @click="showImportDialog = false" />
+      <template v-if="importConflict">
+        <Button label="Overwrite" severity="warning" @click="handleImport(true)" />
+        <Button label="Save as New" @click="handleImport(false)" />
+      </template>
+      <template v-else>
+        <Button label="Import" @click="handleImport(false)" />
+      </template>
+    </template>
   </Dialog>
 </template>
 
@@ -593,5 +753,24 @@ function formatDate(timestamp: number): string {
 
 .overwrite-confirm-content strong {
   color: var(--tdv-text-primary);
+}
+
+.import-dialog-content {
+  padding: 8px 0;
+}
+
+.import-warning {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+  padding: 12px;
+  background: var(--tdv-surface-light);
+  border-left: 4px solid var(--orange-500);
+  color: var(--orange-700);
+}
+
+.import-warning i {
+  font-size: 1.25rem;
 }
 </style>

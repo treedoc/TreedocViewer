@@ -4,6 +4,7 @@
 
 import type { QueryPreset, Column } from '@/models/types'
 import { cleanColumnForSave } from '@/models/types'
+import { TD } from 'treedoc'
 
 const STORAGE_KEY = 'tdv-query-presets'
 
@@ -150,7 +151,19 @@ export function exportPreset(preset: QueryPreset): string {
     ...preset,
     columns: preset.columns.map(cleanColumnForSave) as Column[],
   }
-  return JSON.stringify(clean, null, 2)
+  // Remove id and timestamps for a cleaner export/share
+  const toExport = JSON.parse(JSON.stringify(clean))
+  delete toExport.id
+  delete toExport.createdAt
+  delete toExport.updatedAt
+
+  return TD.stringify(toExport, {
+    jsonOption: {
+      alwaysQuoteKey: false,
+      alwaysQuoteValue: false,
+      indentFactor: 2
+    }
+  })
 }
 
 /**
