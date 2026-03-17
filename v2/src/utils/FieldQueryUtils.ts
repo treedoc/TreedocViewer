@@ -1,31 +1,23 @@
 /**
- * FieldQueryUtils - Utilities for working with FieldQuery objects
+ * FieldQueryUtils - Utilities for working with Column filter state (FieldQuery)
  */
 
-import type { FieldQuery } from '@/models/types'
+import type { Column, FieldQuery } from '@/models/types'
+import { createDefaultColumn } from '@/models/types'
 
 /**
- * Create an empty FieldQuery with default values
+ * Create a Column with default filter/query state (no filter active).
+ * @deprecated Use createDefaultColumn() from types.ts instead.
  */
-export function createFieldQuery(): FieldQuery {
-  return {
-    query: '',
-    isRegex: false,
-    isNegate: false,
-    isArray: false,
-    isPattern: false,
-    isDisabled: false,
-    patternFields: [],
-    patternExtract: undefined,
-    patternFilter: false,
-  }
+export function createFieldQuery(field = ''): FieldQuery {
+  return createDefaultColumn(field)
 }
 
 /**
- * Check if a FieldQuery has an active filter (query or JS expression)
- * Excludes 'true' JS expression which means "no filter"
+ * Check if a Column has an active filter (query or JS expression).
+ * Excludes 'true' JS expression which means "no filter".
  */
-export function hasQueryOrExpression(fq: FieldQuery | undefined): boolean {
+export function hasQueryOrExpression(fq: Column | undefined): boolean {
   if (!fq) return false
   const hasQuery = (fq.query?.length ?? 0) > 0
   const hasJsExpression = !!fq.jsExpression && fq.jsExpression !== 'true'
@@ -33,32 +25,32 @@ export function hasQueryOrExpression(fq: FieldQuery | undefined): boolean {
 }
 
 /**
- * Check if a field has an active (enabled) filter
+ * Check if a column has an active (enabled) filter.
  */
-export function isFilterActive(fq: FieldQuery | undefined): boolean {
+export function isFilterActive(fq: Column | undefined): boolean {
   return hasQueryOrExpression(fq) && !fq?.isDisabled
 }
 
 /**
- * Check if a field has a disabled filter
+ * Check if a column has a disabled filter.
  */
-export function isFilterDisabled(fq: FieldQuery | undefined): boolean {
+export function isFilterDisabled(fq: Column | undefined): boolean {
   return hasQueryOrExpression(fq) && !!fq?.isDisabled
 }
 
 /**
- * Count active filters in a field queries map
+ * Count active filters in a columns array or field queries map.
  */
-export function countActiveFilters(fieldQueries: Record<string, FieldQuery>): number {
+export function countActiveFilters(fieldQueries: Record<string, Column>): number {
   return Object.values(fieldQueries).filter(isFilterActive).length
 }
 
 /**
- * Clear filter-related fields while preserving extended field configuration
+ * Clear filter-related fields from a Column while preserving extended field configuration.
  */
-export function clearFilterFields(fq: FieldQuery): FieldQuery {
+export function clearFilterFields(col: Column): Column {
   return {
-    ...fq,
+    ...col,
     query: '',
     isRegex: false,
     isNegate: false,
@@ -70,21 +62,22 @@ export function clearFilterFields(fq: FieldQuery): FieldQuery {
 }
 
 /**
- * Check if a FieldQuery has extended fields configuration
+ * Check if a Column has extended fields configuration.
  */
-export function hasExtendedFieldsConfig(fq: FieldQuery): boolean {
-  return !!(fq.patternExtract || fq.extendedFields)
+export function hasExtendedFieldsConfig(col: Column): boolean {
+  return !!(col.patternExtract || col.extendedFields)
 }
 
 /**
- * Add a value to an array filter, handling negate mode
+ * Add a value to an array filter on a Column, handling negate mode.
  */
 export function addValueToArrayFilter(
-  currentFq: FieldQuery | undefined,
+  current: Column | undefined,
   value: string,
   isNegate: boolean
-): FieldQuery {
-  const baseQuery: FieldQuery = {
+): Column {
+  const baseQuery: Column = {
+    field: current?.field ?? '',
     query: value,
     isRegex: false,
     isNegate: isNegate,
@@ -94,27 +87,27 @@ export function addValueToArrayFilter(
     patternFields: [],
   }
 
-  if (!currentFq) {
+  if (!current) {
     return baseQuery
   }
 
   // If existing filter has different negate mode, override it
-  if (currentFq.isArray && currentFq.isNegate !== isNegate) {
-    return baseQuery
+  if (current.isArray && !!current.isNegate !== isNegate) {
+    return { ...baseQuery, field: current.field }
   }
 
   // Add to existing array filter
-  if (currentFq.isArray && currentFq.query) {
-    const existingValues = currentFq.query.split(',').map(v => v.trim())
+  if (current.isArray && current.query) {
+    const existingValues = current.query.split(',').map(v => v.trim())
     if (!existingValues.includes(value)) {
       existingValues.push(value)
       return {
-        ...currentFq,
+        ...current,
         query: existingValues.join(','),
       }
     }
-    return currentFq
+    return current
   }
 
-  return baseQuery
+  return { ...baseQuery, field: current.field }
 }

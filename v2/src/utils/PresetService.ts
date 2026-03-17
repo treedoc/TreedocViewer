@@ -2,7 +2,8 @@
  * Service for managing query presets in localStorage
  */
 
-import type { QueryPreset, FieldQuery } from '@/models/types'
+import type { QueryPreset, Column } from '@/models/types'
+import { cleanColumnForSave } from '@/models/types'
 
 const STORAGE_KEY = 'tdv-query-presets'
 
@@ -14,18 +15,51 @@ function generateId(): string {
 }
 
 /**
- * Get all saved presets
+ * Get all saved presets.
+ * Handles migration from the old format (fieldQueries/extendedFields) to the new unified Column format.
  */
 export function getAllPresets(): QueryPreset[] {
   try {
     const data = localStorage.getItem(STORAGE_KEY)
     if (!data) return []
-    const presets = JSON.parse(data) as QueryPreset[]
+    const presets = JSON.parse(data) as any[]
     // Sort by most recently updated
-    return presets.sort((a, b) => b.updatedAt - a.updatedAt)
+    return presets.map(migratePreset).sort((a, b) => b.updatedAt - a.updatedAt)
   } catch (e) {
     console.error('Error loading presets:', e)
     return []
+  }
+}
+
+/**
+ * Migrate a preset from the old format to the new unified Column format.
+ * Old format had: columns[], fieldQueries{}, extendedFields string.
+ * New format has: columns[] (with filter state embedded), jsQuery.
+ */
+function migratePreset(raw: any): QueryPreset {
+  if (!raw.fieldQueries && !raw.extendedFields) {
+    // Already in new format (or no migration needed)
+    return raw as QueryPreset
+  }
+
+  // Merge old fieldQueries into columns
+  const colMap: Record<string, Column> = {}
+  for (const col of (raw.columns || [])) {
+    colMap[col.field] = { ...col }
+  }
+  for (const [field, fq] of Object.entries(raw.fieldQueries || {})) {
+    colMap[field] = { ...colMap[field], ...(fq as Column), field }
+  }
+
+  return {
+    id: raw.id,
+    name: raw.name,
+    description: raw.description,
+    createdAt: raw.createdAt,
+    updatedAt: raw.updatedAt,
+    columns: Object.values(colMap),
+    jsQuery: raw.jsQuery,
+    expandLevel: raw.expandLevel,
   }
 }
 
@@ -47,43 +81,49 @@ export function getPresetByName(name: string): QueryPreset | null {
 }
 
 /**
- * Save a new preset
+ * Save a new preset. Columns are cleaned to remove default values (compact JSON).
  */
 export function savePreset(preset: Omit<QueryPreset, 'id' | 'createdAt' | 'updatedAt'>): QueryPreset {
   const presets = getAllPresets()
   const now = Date.now()
-  
+
   const newPreset: QueryPreset = {
     ...preset,
+    columns: preset.columns.map(cleanColumnForSave) as Column[],
     id: generateId(),
     createdAt: now,
     updatedAt: now,
   }
-  
+
   presets.push(newPreset)
   localStorage.setItem(STORAGE_KEY, JSON.stringify(presets))
-  
+
   return newPreset
 }
 
 /**
- * Update an existing preset
+ * Update an existing preset. Columns are cleaned to remove default values.
  */
 export function updatePreset(id: string, updates: Partial<Omit<QueryPreset, 'id' | 'createdAt'>>): QueryPreset | null {
   const presets = getAllPresets()
   const index = presets.findIndex(p => p.id === id)
-  
+
   if (index === -1) return null
-  
+
+  const cleanUpdates = { ...updates }
+  if (cleanUpdates.columns) {
+    cleanUpdates.columns = cleanUpdates.columns.map(cleanColumnForSave) as Column[]
+  }
+
   const updated: QueryPreset = {
     ...presets[index],
-    ...updates,
+    ...cleanUpdates,
     updatedAt: Date.now(),
   }
-  
+
   presets[index] = updated
   localStorage.setItem(STORAGE_KEY, JSON.stringify(presets))
-  
+
   return updated
 }
 
@@ -93,46 +133,51 @@ export function updatePreset(id: string, updates: Partial<Omit<QueryPreset, 'id'
 export function deletePreset(id: string): boolean {
   const presets = getAllPresets()
   const filtered = presets.filter(p => p.id !== id)
-  
+
   if (filtered.length === presets.length) {
     return false
   }
-  
+
   localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered))
   return true
 }
 
 /**
- * Export a preset as JSON string
+ * Export a preset as compact JSON string (no default values)
  */
 export function exportPreset(preset: QueryPreset): string {
-  return JSON.stringify(preset, null, 2)
+  const clean: QueryPreset = {
+    ...preset,
+    columns: preset.columns.map(cleanColumnForSave) as Column[],
+  }
+  return JSON.stringify(clean, null, 2)
 }
 
 /**
- * Import a preset from JSON string
+ * Import a preset from JSON string.
+ * Accepts both old (fieldQueries/extendedFields) and new (unified columns) format.
  */
 export function importPreset(json: string): QueryPreset | null {
   try {
     const data = JSON.parse(json)
-    
+
     // Validate required fields
     if (!data.name || !data.columns) {
       console.error('Invalid preset format: missing required fields')
       return null
     }
-    
-    // Create a new preset with the imported data
+
+    // Migrate if needed, then save
+    const migrated = migratePreset(data)
+
     const preset = savePreset({
-      name: data.name,
-      description: data.description,
-      columns: data.columns,
-      extendedFields: data.extendedFields || '',
-      fieldQueries: data.fieldQueries || {},
-      jsQuery: data.jsQuery || '$',
-      expandLevel: data.expandLevel,
+      name: migrated.name,
+      description: migrated.description,
+      columns: migrated.columns,
+      jsQuery: migrated.jsQuery,
+      expandLevel: migrated.expandLevel,
     })
-    
+
     return preset
   } catch (e) {
     console.error('Error importing preset:', e)
@@ -146,13 +191,11 @@ export function importPreset(json: string): QueryPreset | null {
 export function duplicatePreset(id: string, newName: string): QueryPreset | null {
   const original = getPreset(id)
   if (!original) return null
-  
+
   return savePreset({
     name: newName,
     description: original.description,
     columns: [...original.columns],
-    extendedFields: original.extendedFields,
-    fieldQueries: { ...original.fieldQueries },
     jsQuery: original.jsQuery,
     expandLevel: original.expandLevel,
   })

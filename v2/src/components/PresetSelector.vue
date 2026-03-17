@@ -4,7 +4,8 @@ import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
-import type { QueryPreset, FieldQuery } from '@/models/types'
+import type { QueryPreset, Column } from '@/models/types'
+import { cleanColumnForSave } from '@/models/types'
 import {
   getAllPresets,
   savePreset,
@@ -18,9 +19,7 @@ import { useToast } from 'primevue/usetoast'
 import { getFieldValueColors } from '@/utils/ValueColorService'
 
 export interface CurrentState {
-  columns: { field: string; visible: boolean }[]
-  extendedFields: string
-  fieldQueries: Record<string, FieldQuery>
+  columns: Column[]
   jsQuery: string
   expandLevel?: number
 }
@@ -86,16 +85,15 @@ function openSaveDialog() {
   showSaveDialog.value = true
 }
 
-// Build fieldQueries with valueColors included
-function buildFieldQueriesWithColors() {
-  const result: Record<string, any> = {}
-  for (const [field, fq] of Object.entries(props.currentState.fieldQueries)) {
-    result[field] = {
-      ...fq,
-      valueColors: getFieldValueColors(field),
+// Build columns array with value colors merged in (from ValueColorService)
+function buildColumnsWithColors(): Column[] {
+  return props.currentState.columns.map(col => {
+    const colors = getFieldValueColors(col.field)
+    if (colors && Object.keys(colors).length > 0) {
+      return { ...col, valueColors: colors }
     }
-  }
-  return result
+    return { ...col }
+  })
 }
 
 function saveCurrentAsPreset() {
@@ -123,9 +121,7 @@ function doSavePreset(overwrite: boolean) {
     const updated = updatePreset(existingPresetToOverwrite.value.id, {
       name,
       description,
-      columns: props.currentState.columns,
-      extendedFields: props.currentState.extendedFields,
-      fieldQueries: buildFieldQueriesWithColors(),
+      columns: buildColumnsWithColors().map(cleanColumnForSave) as Column[],
       jsQuery: props.currentState.jsQuery,
       expandLevel: props.currentState.expandLevel,
     })
@@ -152,9 +148,7 @@ function doSavePreset(overwrite: boolean) {
     preset = savePreset({
       name,
       description,
-      columns: props.currentState.columns,
-      extendedFields: props.currentState.extendedFields,
-      fieldQueries: buildFieldQueriesWithColors(),
+      columns: buildColumnsWithColors().map(cleanColumnForSave) as Column[],
       jsQuery: props.currentState.jsQuery,
       expandLevel: props.currentState.expandLevel,
     })
@@ -181,20 +175,12 @@ function cancelOverwrite() {
 
 function updateCurrentPreset() {
   if (!selectedPresetId.value) return
-  
+
   const preset = presets.value.find(p => p.id === selectedPresetId.value)
-  const fieldQueriesWithColors = buildFieldQueriesWithColors()
-  
-  console.log('[PresetSelector] Saving preset, currentState:', {
-    extendedFields: props.currentState.extendedFields,
-    fieldQueries: props.currentState.fieldQueries,
-    fieldQueriesWithColors,
-  })
+  console.log('[PresetSelector] Saving preset, currentState columns:', props.currentState.columns.length)
   
   const updated = updatePreset(selectedPresetId.value, {
-    columns: props.currentState.columns,
-    extendedFields: props.currentState.extendedFields,
-    fieldQueries: fieldQueriesWithColors,
+    columns: buildColumnsWithColors().map(cleanColumnForSave) as Column[],
     jsQuery: props.currentState.jsQuery,
     expandLevel: props.currentState.expandLevel,
   })
@@ -279,9 +265,9 @@ function importFromClipboard() {
 
 function countPresetColors(preset: QueryPreset): number {
   let count = 0
-  for (const fq of Object.values(preset.fieldQueries)) {
-    if (fq.valueColors) {
-      count += Object.keys(fq.valueColors).length
+  for (const col of preset.columns) {
+    if (col.valueColors) {
+      count += Object.keys(col.valueColors).length
     }
   }
   return count
@@ -441,9 +427,9 @@ function formatDate(timestamp: number): string {
               {{ preset.description }}
             </div>
             <div class="preset-meta">
-              <span>{{ preset.columns.filter(c => c.visible).length }} columns</span>
-              <span v-if="preset.extendedFields">• Extended fields</span>
-              <span v-if="Object.keys(preset.fieldQueries).length">• {{ Object.keys(preset.fieldQueries).length }} filters</span>
+              <span>{{ preset.columns.filter(c => c.visible !== false).length }} columns</span>
+              <span v-if="preset.columns.some(c => c.extendedFields)">• Extended fields</span>
+              <span v-if="preset.columns.some(c => c.query || c.jsExpression)">• {{ preset.columns.filter(c => c.query || c.jsExpression).length }} filters</span>
               <span v-if="countPresetColors(preset) > 0">• {{ countPresetColors(preset) }} colors</span>
             </div>
           </div>

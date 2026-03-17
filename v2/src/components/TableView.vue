@@ -3,7 +3,7 @@ import { ref, computed, watch, reactive, toRaw, shallowRef, onBeforeUnmount, nex
 import type { TDNode } from 'treedoc'
 import { TDNodeType, TDJSONWriter, TDJSONWriterOption } from 'treedoc'
 import DataTable from 'primevue/datatable'
-import Column from 'primevue/column'
+import PVColumn from 'primevue/column'
 import InputText from 'primevue/inputtext'
 import Button from 'primevue/button'
 import Paginator from 'primevue/paginator'
@@ -20,7 +20,8 @@ import AutoCompleteInput from './AutoCompleteInput.vue'
 import PresetSelector from './PresetSelector.vue'
 import TimeSeriesChart from './TimeSeriesChart.vue'
 import HoverButtonBar, { type HoverButton } from './HoverButtonBar.vue'
-import type { QueryPreset, FieldQuery } from '@/models/types'
+import type { QueryPreset, FieldQuery, Column } from '@/models/types'
+import { columnsToFieldQueries } from '@/models/types'
 import type { ExpandState } from './ExpandControl.vue'
 import type { ColumnVisibility } from './ColumnSelector.vue'
 import { Logger } from '@/utils/Logger'
@@ -35,7 +36,7 @@ import {
   detectTimeColumns
 } from '@/utils/TableUtil'
 import { matchFieldQuery, matchPattern, createExtendedFieldsFunc, parsePatterns, serializePatterns } from '@/utils/QueryUtil'
-import { getValueColorStyle, applyValueColorsFromFieldQueries } from '@/utils/ValueColorService'
+import { getValueColorStyle, applyValueColorsFromColumns } from '@/utils/ValueColorService'
 import { TableDataProcessor, type TableRow as ProcessorTableRow, type ProcessingConfig } from '@/utils/TableDataProcessor'
 import { ColumnManager, type TableColumn as ManagerTableColumn } from '@/utils/ColumnManager'
 import { isFilterActive, isFilterDisabled, clearFilterFields } from '@/utils/FieldQueryUtils'
@@ -207,15 +208,9 @@ const currentColumnPatternExtract = computed(() => {
 const sortField = ref<string>('')
 const sortOrder = ref<1 | -1 | 0>(0)
 
-function createFieldQuery(): FieldQuery {
+function createFieldQuery(field: string): FieldQuery {
   return {
-    query: '',
-    isRegex: false,
-    isNegate: false,
-    isArray: false,
-    isPattern: false,
-    isDisabled: false,
-    patternFields: [],
+    field,
     patternExtract: undefined,
     patternFilter: false,
   }
@@ -223,7 +218,7 @@ function createFieldQuery(): FieldQuery {
 
 function getFieldQuery(field: string): FieldQuery {
   if (!fieldQueries.value[field]) {
-    fieldQueries.value[field] = createFieldQuery()
+    fieldQueries.value[field] = createFieldQuery(field)
   }
   return fieldQueries.value[field]
 }
@@ -257,9 +252,11 @@ const hasTimeColumns = computed(() => {
 
 // Current state for preset selector
 const currentPresetState = computed(() => ({
-  columns: columns.value.map(c => ({ field: c.field, visible: c.visible })),
-  extendedFields: extendedFields.value,
-  fieldQueries: { ...fieldQueries.value },
+  columns: columns.value.map(c => ({
+    field: c.field,
+    visible: c.visible,
+    ...(fieldQueries.value[c.field] ? { ...fieldQueries.value[c.field] } : {}),
+  })),
   jsQuery: jsQuery.value,
   expandLevel: expandControlRef.value?.state?.expandLevel,
 }))
@@ -269,27 +266,29 @@ const presetColumnVisibility = ref<Map<string, boolean> | null>(null)
 
 // Apply a loaded preset
 function applyPreset(preset: QueryPreset) {
-  console.log('[TableView] Applying preset:', preset.name, {
-    extendedFields: preset.extendedFields,
-    fieldQueries: preset.fieldQueries,
-  })
-  
+  console.log('[TableView] Applying preset:', preset.name, { columns: preset.columns })
+
   // Save preset column order and visibility for use after rebuild
   presetColumnOrder.value = preset.columns.map(c => c.field)
-  presetColumnVisibility.value = new Map(preset.columns.map(c => [c.field, c.visible]))
-  
-  // Apply extended fields
-  extendedFields.value = preset.extendedFields || ''
-  
-  // Apply field queries
-  fieldQueries.value = { ...preset.fieldQueries }
-  
+  presetColumnVisibility.value = new Map(
+    preset.columns
+      .filter(c => c.visible !== undefined)
+      .map(c => [c.field, c.visible as boolean])
+  )
+
+  // Derive extendedFields from the first column that has one (global)
+  const colWithExt = preset.columns.find(c => c.extendedFields)
+  extendedFields.value = colWithExt?.extendedFields || ''
+
+  // Apply field queries from preset columns
+  fieldQueries.value = columnsToFieldQueries(preset.columns)
+
   // Apply JS query
   jsQuery.value = preset.jsQuery || '$'
-  
-  // Apply value colors from field queries
-  applyValueColorsFromFieldQueries(preset.fieldQueries)
-  
+
+  // Apply value colors from preset columns
+  applyValueColorsFromColumns(preset.columns)
+
   // Rebuild table to apply changes (derived columns will be positioned using presetColumnOrder)
   rebuildTable()
 }
@@ -403,6 +402,7 @@ function onChartGroupFilter(field: string, values: string[]) {
   } else {
     // Set array filter with selected values
     fieldQueries.value[field] = {
+      field,
       query: values.join(','),
       isRegex: false,
       isNegate: false,
@@ -435,7 +435,7 @@ function onChartTimeRange(payload: { timeColumn: string; startMs: number | null;
   const lower = Math.min(payload.startMs, payload.endMs)
   const upper = Math.max(payload.startMs, payload.endMs)
   const rangeExpression = buildChartTimeRangeExpression(lower, upper)
-  const existing = fieldQueries.value[payload.timeColumn] || createFieldQuery()
+  const existing = fieldQueries.value[payload.timeColumn] || createFieldQuery(payload.timeColumn)
 
   fieldQueries.value[payload.timeColumn] = {
     ...existing,
@@ -709,17 +709,16 @@ function buildTableInternal(node: TDNode | null, restoreState = true) {
     isColumnExpanded.value = cachedState.isColumnExpanded
     // Restore query state
     jsQuery.value = cachedState.query.jsQuery || '$'
-    extendedFields.value = cachedState.query.extendedFields || ''
-    // Restore field queries
-    if (cachedState.query.fieldQueries) {
-      for (const [field, fq] of Object.entries(cachedState.query.fieldQueries)) {
-        fieldQueries.value[field] = { ...fq }
-      }
+    // Restore field queries and extendedFields from cached columns
+    const cachedColumns = cachedState.query.columns || []
+    for (const col of cachedColumns) {
+      fieldQueries.value[col.field] = { ...col }
+      if (col.extendedFields) extendedFields.value = col.extendedFields
     }
     // Set up column visibility from cache for addColumn to use
-    if (cachedState.columns) {
+    if (cachedColumns.length > 0) {
       savedColumnVisibility = new Map<string, boolean>()
-      for (const col of cachedState.columns) {
+      for (const col of cachedColumns) {
         if (col.visible !== undefined) {
           savedColumnVisibility.set(col.field, col.visible)
         }
@@ -908,8 +907,9 @@ function filterCellValue(field: string, value: any, isNegate: boolean) {
   const currentFq = fieldQueries.value[field]
   
   // If existing filter has different negate mode, override it
-  if (currentFq && currentFq.isArray && currentFq.isNegate !== isNegate) {
+  if (currentFq && currentFq.isArray && !!currentFq.isNegate !== isNegate) {
     fieldQueries.value[field] = {
+      field,
       query: strValue,
       isRegex: false,
       isNegate: isNegate,
@@ -933,6 +933,7 @@ function filterCellValue(field: string, value: any, isNegate: boolean) {
     }
   } else {
     fieldQueries.value[field] = {
+      field,
       query: strValue,
       isRegex: false,
       isNegate: isNegate,
@@ -1108,17 +1109,18 @@ function saveCurrentTableState() {
   if (node) {
     const sortDir = sortOrder.value === 1 ? 'asc' : sortOrder.value === -1 ? 'desc' : ''
     store.saveTableState(toRaw(node), {
-      query: { 
-        limit: rows.value, 
-        offset: first.value, 
+      query: {
+        limit: rows.value,
+        offset: first.value,
         sortField: sortField.value,
         sortDir,
         jsQuery: jsQuery.value,
-        extendedFields: extendedFields.value,
-        fieldQueries: { ...fieldQueries.value }
+        columns: columns.value.map(c => ({
+          ...c,
+          ...(fieldQueries.value[c.field] ? { ...fieldQueries.value[c.field] } : {}),
+        })),
       },
       expandedLevel: expandState.expandLevel,
-      columns: columns.value.map(c => ({ field: c.field, visible: c.visible })),
       isColumnExpanded: isColumnExpanded.value,
       chartState: {
         showChart: showChart.value,
@@ -1453,7 +1455,7 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
         scrollable 
         scrollHeight="flex"
       >
-        <Column
+        <PVColumn
           v-for="col in visibleColumns"
           :key="col.field"
           :field="col.field"
@@ -1544,7 +1546,7 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
               />
             </div>
           </template>
-        </Column>
+        </PVColumn>
         
         <template #empty>
           <div class="empty-table">

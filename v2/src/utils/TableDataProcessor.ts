@@ -83,11 +83,12 @@ export function getCellObject(cellValue: any): any {
       try {
         return JSON.parse(trimmed)
       } catch {
-        return cellValue
+        return null  // Looks like JSON but failed to parse
       }
     }
+    return null  // Plain string, not JSON
   }
-  return cellValue
+  return null  // Primitive (number, boolean, null, undefined)
 }
 
 /**

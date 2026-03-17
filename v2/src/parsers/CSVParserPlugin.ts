@@ -38,9 +38,7 @@ export default class CSVParserPlugin implements ParserPlugin<CSVParserOption> {
     } catch (e) {
       return false;
     }
-    return false;
   }
-
 
   private escapeRegExp(str: string): string {
     return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')

@@ -4,7 +4,7 @@
  */
 
 import { ref } from 'vue'
-import type { ValueColor } from '@/models/types'
+import type { ValueColor, Column } from '@/models/types'
 
 // Re-export ValueColor type for convenience
 export type { ValueColor }
@@ -94,12 +94,28 @@ export function setFieldValueColors(field: string, colors: Record<string, ValueC
 }
 
 /**
- * Apply all value colors from field queries (when loading a preset)
+ * Apply all value colors from a Column array (when loading a preset).
+ */
+export function applyValueColorsFromColumns(columns: Column[]) {
+  // Clear existing colors
+  fieldValueColors.value = {}
+
+  // Apply colors from each column
+  for (const col of columns) {
+    if (col.valueColors && Object.keys(col.valueColors).length > 0) {
+      fieldValueColors.value[col.field] = { ...col.valueColors }
+    }
+  }
+  saveToStorage()
+}
+
+/**
+ * @deprecated Use applyValueColorsFromColumns() instead.
  */
 export function applyValueColorsFromFieldQueries(fieldQueries: Record<string, { valueColors?: Record<string, ValueColor> }>) {
   // Clear existing colors
   fieldValueColors.value = {}
-  
+
   // Apply colors from each field query
   for (const [field, fq] of Object.entries(fieldQueries)) {
     if (fq.valueColors && Object.keys(fq.valueColors).length > 0) {
