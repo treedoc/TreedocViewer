@@ -1,5 +1,6 @@
 import type { ParserPlugin, ParseResult, ParserSyntax } from '../models/types'
 import { ParseStatus } from '../models/types'
+import { topLines } from '../utils/Util'
 import { CSVOption, CSVWriter, TDNode } from 'treedoc'
 import { TDObjectCoder, TDJSONWriter, TDJSONWriterOption, CSVParser } from 'treedoc'
 
@@ -21,17 +22,25 @@ export default class CSVParserPlugin implements ParserPlugin<CSVParserOption> {
   }
 
   looksLike(str: string): boolean {
-    const lines = str.trim().split('\n')
-    if (lines.length < 2) return false
-
-    // Check if first line looks like a header with consistent delimiters
-    const delimCount = (lines[0].match(new RegExp(this.escapeRegExp(this.delimiter), 'g')) || []).length
-    if (delimCount === 0) return false
-
-    // Check consistency with second line
-    const secondDelimCount = (lines[1].match(new RegExp(this.escapeRegExp(this.delimiter), 'g')) || []).length
-    return Math.abs(delimCount - secondDelimCount) <= 1
+    const tps = topLines(str, 5000);
+    if (tps.numLines <= 1)
+      return false;  // Single line 
+    try {
+      const node = CSVParser.get().parse(str.substr(0, tps.length), this.csvOption);
+      const columnSize = node.children![0].getChildrenSize();
+      if (columnSize < 2)
+        return false;
+      for (let row = 1; row < node.getChildrenSize(); row++) {
+        if (node.children![row].getChildrenSize() !== columnSize)
+          return false;
+      }
+      return true;
+    } catch (e) {
+      return false;
+    }
+    return false;
   }
+
 
   private escapeRegExp(str: string): string {
     return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
