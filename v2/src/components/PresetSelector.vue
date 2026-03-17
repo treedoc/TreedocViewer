@@ -386,20 +386,12 @@ onMounted(() => {
         preset = JSON.parse(sharedData)
       }
 
-      // Some treedoc versions might return a TDNode, some might return a plain object
-      // We need a plain object with name and columns
+      // Convert TDNode to plain object if necessary
       let dataObject = preset
-      if (preset && typeof preset.toJS === 'function') {
+      if (preset && typeof preset.toObject === 'function') {
+        dataObject = preset.toObject()
+      } else if (preset && typeof preset.toJS === 'function') {
         dataObject = preset.toJS()
-      } else if (preset && typeof preset.getValue === 'function') {
-        // Handle TDNode
-        dataObject = {
-          name: preset.getChildValue('name'),
-          columns: preset.getChildValue('columns'),
-          description: preset.getChildValue('description'),
-          jsQuery: preset.getChildValue('jsQuery'),
-          expandLevel: preset.getChildValue('expandLevel')
-        }
       }
 
       if (dataObject && dataObject.name && dataObject.columns) {
@@ -407,15 +399,17 @@ onMounted(() => {
         importConflict.value = !!getPresetByName(dataObject.name)
         showImportDialog.value = true
       } else {
-        throw new Error('Invalid preset structure: ' + JSON.stringify(dataObject).slice(0, 100))
+        const structure = dataObject ? Object.keys(dataObject).join(', ') : 'null'
+        throw new Error(`Invalid preset structure. Keys found: ${structure}`)
       }
     } catch (e) {
+      const errorMsg = e instanceof Error ? e.message : String(e)
       console.error('[PresetSelector] Failed to parse shared preset:', e, 'Data:', sharedData)
       toast.add({
         severity: 'error',
         summary: 'Import Error',
-        detail: 'The shared link is invalid or corrupted. See console for details.',
-        life: 5000
+        detail: `The shared link is invalid: ${errorMsg}. Data length: ${sharedData.length}`,
+        life: 10000
       })
     }
   }
