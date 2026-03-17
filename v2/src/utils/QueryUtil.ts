@@ -215,131 +215,44 @@ export function matchFieldQuery(value: string, fq: FieldQuery): boolean {
  * Create an evaluator function for extended fields expression
  */
 /**
- * Parse extended fields expression into individual field definitions
- * e.g., "fullName: $.first + ' ' + $.last, tags_: $.metadata.tags" 
- * -> [{ name: 'fullName', expr: "$.first + ' ' + $.last" }, { name: 'tags_', expr: '$.metadata.tags' }]
+ * Create an evaluator function for extended fields expression
+ * Treats the expression as a valid JS object literal expression
  */
-function parseExtendedFields(expression: string): { name: string; expr: string }[] {
-  if (!expression || !expression.trim()) return []
-
-  const fields: { name: string; expr: string }[] = []
-  let current = ''
-  let depth = 0  // Track parentheses/brackets depth
-  let inString = false
-  let stringChar = ''
-
-  for (let i = 0; i < expression.length; i++) {
-    const char = expression[i]
-    const prevChar = i > 0 ? expression[i - 1] : ''
-
-    // Handle string boundaries
-    if ((char === '"' || char === "'" || char === '`') && prevChar !== '\\') {
-      if (!inString) {
-        inString = true
-        stringChar = char
-      } else if (char === stringChar) {
-        inString = false
-      }
-    }
-
-    // Track depth for nested structures
-    if (!inString) {
-      if (char === '(' || char === '[' || char === '{') depth++
-      if (char === ')' || char === ']' || char === '}') depth--
-    }
-
-    // Split on comma only at top level
-    if (char === ',' && depth === 0 && !inString) {
-      if (current.trim()) {
-        const parsed = parseFieldDefinition(current.trim())
-        if (parsed) fields.push(parsed)
-      }
-      current = ''
-    } else {
-      current += char
-    }
-  }
-
-  // Don't forget the last field
-  if (current.trim()) {
-    const parsed = parseFieldDefinition(current.trim())
-    if (parsed) fields.push(parsed)
-  }
-
-  return fields
-}
-
-function parseFieldDefinition(def: string): { name: string; expr: string } | null {
-  // Find the first colon that's not inside a string or ternary
-  let colonIdx = -1
-  let inString = false
-  let stringChar = ''
-
-  for (let i = 0; i < def.length; i++) {
-    const char = def[i]
-    const prevChar = i > 0 ? def[i - 1] : ''
-
-    if ((char === '"' || char === "'" || char === '`') && prevChar !== '\\') {
-      if (!inString) {
-        inString = true
-        stringChar = char
-      } else if (char === stringChar) {
-        inString = false
-      }
-    }
-
-    if (char === ':' && !inString) {
-      colonIdx = i
-      break
-    }
-  }
-
-  if (colonIdx === -1) return null
-
-  const name = def.slice(0, colonIdx).trim()
-  const expr = def.slice(colonIdx + 1).trim()
-
-  if (!name || !expr) return null
-  return { name, expr }
-}
-
 export function createExtendedFieldsFunc(expression: string): ((obj: any) => Record<string, any>) | null {
-  const fields = parseExtendedFields(expression)
-  if (fields.length === 0) return null
+  if (!expression || !expression.trim()) return null
 
-  // Create individual functions for each field
-  const fieldFuncs: { name: string; func: (obj: any) => any }[] = []
+  try {
+    // Wrap the expression in {} to treat it as an object literal
+    const exp = `
+      with($) {
+        return { ${expression} }
+      }
+    `
+    const func = new Function('$', exp) as (obj: any) => any
 
-  for (const field of fields) {
-    try {
-      const exp = `
-        with($) {
-          return ${field.expr}
-        }
-      `
-      const func = new Function('$', exp) as (obj: any) => any
-      fieldFuncs.push({ name: field.name, func })
-    } catch (e) {
-      console.warn(`Error parsing extended field "${field.name}":`, field.expr, e)
-      // Skip this field but continue with others
-    }
-  }
-
-  if (fieldFuncs.length === 0) return null
-
-  // Return a function that evaluates each field independently
-  return (obj: any) => {
-    const result: Record<string, any> = {}
-    for (const { name, func } of fieldFuncs) {
+    return (obj: any) => {
       try {
-        result[name] = func(obj)
+        const evaluated = func(obj)
+        if (!evaluated || typeof evaluated !== 'object') return {}
+
+        const result: Record<string, any> = {}
+        for (const [key, value] of Object.entries(evaluated)) {
+          // Support spread if the key ends with "_"
+          if (key.endsWith('_') && typeof value === 'object' && value !== null) {
+            Object.assign(result, value)
+          } else {
+            result[key] = value
+          }
+        }
+        return result
       } catch (e) {
-        console.warn(`Error evaluating extended field "${name}":`, e)
-        // Silently ignore runtime errors for individual fields
-        // The field simply won't be added to the result
+        console.warn('Error evaluating extended fields:', e)
+        return {}
       }
     }
-    return result
+  } catch (e) {
+    console.warn('Error creating extended fields function:', e, expression)
+    return null
   }
 }
 

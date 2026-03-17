@@ -337,23 +337,29 @@ describe('createExtendedFieldsFunc', () => {
     expect(result.upper).toBe('TEST')
   })
 
-  it('should ignore field with parse error but continue with others', () => {
-    // Invalid syntax in first field (unclosed bracket), valid second field
-    // Note: parser needs balanced brackets to split correctly, so use a complete but invalid expression
+  it('should return null when expression has syntax error', () => {
+    // With dynamic evaluation, a syntax error fails the whole function creation
     const func = createExtendedFieldsFunc('bad: function{}, good: $.name')
-    expect(func).not.toBeNull()
-    const result = func!({ name: 'John' })
-    expect(result.good).toBe('John')
-    expect(result.bad).toBeUndefined()
+    expect(func).toBeNull()
   })
 
-  it('should ignore field with runtime error but continue with others', () => {
-    // First field will throw at runtime (undefined.foo), second is valid
+  it('should return empty object when evaluation throws runtime error', () => {
+    // With dynamic evaluation, a runtime error fails the whole evaluation and returns {}
     const func = createExtendedFieldsFunc('bad: $.missing.nested.value, good: $.name')
     expect(func).not.toBeNull()
     const result = func!({ name: 'John' })
-    expect(result.good).toBe('John')
-    expect(result.bad).toBeUndefined()
+    expect(result).toEqual({})
+  })
+
+  it('should support spread operator for keys ending with _', () => {
+    // test spread support
+    const func = createExtendedFieldsFunc('info_: $.details, name: $.name')
+    expect(func).not.toBeNull()
+    const result = func!({ name: 'John', details: { age: 30, city: 'NY' } })
+    expect(result.name).toBe('John')
+    expect(result.age).toBe(30)
+    expect(result.city).toBe('NY')
+    expect(result.info_).toBeUndefined()
   })
 
   it('should handle fields with commas inside strings', () => {
