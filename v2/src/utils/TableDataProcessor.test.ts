@@ -10,6 +10,7 @@ import {
 import type { FieldQuery } from '@/models/types'
 
 const createFieldQuery = (overrides: Partial<FieldQuery> = {}): FieldQuery => ({
+  field: 'test',
   query: '',
   isRegex: false,
   isNegate: false,
@@ -795,6 +796,7 @@ describe('TableDataProcessor', () => {
       const config: ProcessingConfig = {
         fieldQueries: {
           status: {
+            field: 'status',
             query: '',
             isRegex: false,
             isNegate: false,

@@ -201,6 +201,7 @@ describe('matchFieldQuery', () => {
     isDisabled: boolean
     patternFields: string[]
   }> = {}) => ({
+    field: 'test-field',
     query: '',
     isRegex: false,
     isNegate: false,
