@@ -280,10 +280,14 @@ function sharePreset(preset: QueryPreset) {
       }
     })
     
-    const url = new URL(window.location.href)
-    url.searchParams.set('sharePreset', encoded)
+    // For hash-based routing, it's safer to put params in the hash part
+    const currentUrl = window.location.href
+    let baseUrl = currentUrl.split('?')[0].split('#')[0]
+    const hashPart = currentUrl.includes('#') ? currentUrl.split('#')[1].split('?')[0] : '/'
     
-    navigator.clipboard.writeText(url.toString())
+    const newUrl = `${baseUrl}#${hashPart}?sharePreset=${encodeURIComponent(encoded)}`
+    
+    navigator.clipboard.writeText(newUrl)
     toast.add({
       severity: 'success',
       summary: 'Link Copied',
@@ -350,27 +354,67 @@ function handleImport(overwrite: boolean) {
   
   // Clean up URL
   const url = new URL(window.location.href)
-  url.searchParams.delete('sharePreset')
-  window.history.replaceState({}, '', url.toString())
+  if (url.searchParams.has('sharePreset')) {
+    url.searchParams.delete('sharePreset')
+    window.history.replaceState({}, '', url.toString())
+  } else {
+    // Clean up hash params
+    const hash = window.location.hash
+    if (hash.includes('sharePreset')) {
+       const [baseHash, query] = hash.split('?')
+       const params = new URLSearchParams(query)
+       params.delete('sharePreset')
+       const newQuery = params.toString()
+       window.history.replaceState({}, '', window.location.pathname + baseHash + (newQuery ? '?' + newQuery : ''))
+    }
+  }
 }
 
 onMounted(() => {
   const urlParams = new URLSearchParams(window.location.search)
-  const sharedData = urlParams.get('sharePreset')
+  const hashParams = new URLSearchParams(window.location.hash.split('?')[1] || '')
+  
+  const sharedData = urlParams.get('sharePreset') || hashParams.get('sharePreset')
+  
   if (sharedData) {
     try {
-      const preset = TD.parse(sharedData)
-      if (preset && preset.name && preset.columns) {
-        sharedPreset.value = preset
-        importConflict.value = !!getPresetByName(preset.name)
+      let preset: any
+      try {
+        preset = TD.parse(sharedData)
+      } catch (tdError) {
+        if (import.meta.env.DEV) console.warn('[PresetSelector] TD.parse failed, trying JSON.parse', tdError)
+        preset = JSON.parse(sharedData)
+      }
+
+      // Some treedoc versions might return a TDNode, some might return a plain object
+      // We need a plain object with name and columns
+      let dataObject = preset
+      if (preset && typeof preset.toJS === 'function') {
+        dataObject = preset.toJS()
+      } else if (preset && typeof preset.getValue === 'function') {
+        // Handle TDNode
+        dataObject = {
+          name: preset.getChildValue('name'),
+          columns: preset.getChildValue('columns'),
+          description: preset.getChildValue('description'),
+          jsQuery: preset.getChildValue('jsQuery'),
+          expandLevel: preset.getChildValue('expandLevel')
+        }
+      }
+
+      if (dataObject && dataObject.name && dataObject.columns) {
+        sharedPreset.value = dataObject
+        importConflict.value = !!getPresetByName(dataObject.name)
         showImportDialog.value = true
+      } else {
+        throw new Error('Invalid preset structure: ' + JSON.stringify(dataObject).slice(0, 100))
       }
     } catch (e) {
-      console.error('Failed to parse shared preset:', e)
+      console.error('[PresetSelector] Failed to parse shared preset:', e, 'Data:', sharedData)
       toast.add({
         severity: 'error',
         summary: 'Import Error',
-        detail: 'The shared link is invalid or corrupted',
+        detail: 'The shared link is invalid or corrupted. See console for details.',
         life: 5000
       })
     }
