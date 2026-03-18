@@ -172,10 +172,10 @@ export function exportPreset(preset: QueryPreset): string {
  */
 export function importPreset(json: string): QueryPreset | null {
   try {
-    const data = JSON.parse(json)
-
+    const data = TD.parse(json)
+    
     // Validate required fields
-    if (!data.name || !data.columns) {
+    if (!data || !data.name || !data.columns) {
       console.error('Invalid preset format: missing required fields')
       return null
     }

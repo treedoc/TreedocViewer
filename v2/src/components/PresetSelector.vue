@@ -17,8 +17,15 @@ import {
 } from '@/utils/PresetService'
 import { useToast } from 'primevue/usetoast'
 import { getFieldValueColors } from '@/utils/ValueColorService'
-import { TD } from 'treedoc'
+import {
+  TDJSONParser,
+  TDJSONWriter,
+  TDJSONWriterOption,
+  TDObjectCoder,
+  TDObjectCoderOption,
+} from 'treedoc'
 import { onMounted } from 'vue'
+import { an } from 'vue-router/dist/router-CWoNjPRp.mjs'
 
 export interface CurrentState {
   columns: Column[]
@@ -272,20 +279,28 @@ function sharePreset(preset: QueryPreset) {
     delete toShare.createdAt
     delete toShare.updatedAt
 
-    const encoded = TD.stringify(toShare, {
-      jsonOption: {
-        alwaysQuoteKey: false,
-        alwaysQuoteValue: false,
-        indentFactor: 0
-      }
-    })
+    const writeOption = new TDJSONWriterOption()
+      .setAlwaysQuoteKey(false)
+      .setAlwaysQuoteValue(false)
+      .setIndentFactor(0)
+    
+    const encoded = TDJSONWriter.writeAsString(
+      TDObjectCoder.encode(toShare, new TDObjectCoderOption()),
+      writeOption
+    )
     
     // For hash-based routing, it's safer to put params in the hash part
     const currentUrl = window.location.href
     let baseUrl = currentUrl.split('?')[0].split('#')[0]
     const hashPart = currentUrl.includes('#') ? currentUrl.split('#')[1].split('?')[0] : '/'
     
-    const newUrl = `${baseUrl}#${hashPart}?sharePreset=${encodeURIComponent(encoded)}`
+    // Ensure baseUrl doesn't have trailing slash if hashPart starts with one
+    if (baseUrl.endsWith('/') && hashPart.startsWith('/')) {
+      baseUrl = baseUrl.slice(0, -1)
+    }
+    
+    const separator = hashPart.includes('?') ? '&' : '?'
+    const newUrl = `${baseUrl}#${hashPart}${separator}sharePreset=${encodeURIComponent(encoded)}`
     
     navigator.clipboard.writeText(newUrl)
     toast.add({
@@ -372,26 +387,29 @@ function handleImport(overwrite: boolean) {
 
 onMounted(() => {
   const urlParams = new URLSearchParams(window.location.search)
-  const hashParams = new URLSearchParams(window.location.hash.split('?')[1] || '')
+  const hash = window.location.hash
+  const hashQuery = hash.includes('?') ? hash.split('?')[1] : ''
+  const hashParams = new URLSearchParams(hashQuery)
   
   const sharedData = urlParams.get('sharePreset') || hashParams.get('sharePreset')
   
   if (sharedData) {
+    if (import.meta.env.DEV) {
+      console.log('[PresetSelector] Received sharedData:', sharedData)
+    }
+    
     try {
-      let preset: any
+      let dataObject: any
+      
+      // Try TDJSONParser first (handles JSONEx)
       try {
-        preset = TD.parse(sharedData)
+        const node = TDJSONParser.get().parse(sharedData)
+        dataObject = node.toObject(false)
+        if (import.meta.env.DEV) console.log('[PresetSelector] Parsed via TDJSONParser:', dataObject)
       } catch (tdError) {
-        if (import.meta.env.DEV) console.warn('[PresetSelector] TD.parse failed, trying JSON.parse', tdError)
-        preset = JSON.parse(sharedData)
-      }
-
-      // Convert TDNode to plain object if necessary
-      let dataObject = preset
-      if (preset && typeof preset.toObject === 'function') {
-        dataObject = preset.toObject()
-      } else if (preset && typeof preset.toJS === 'function') {
-        dataObject = preset.toJS()
+        if (import.meta.env.DEV) console.warn('[PresetSelector] TDJSONParser failed, trying JSON.parse', tdError)
+        // Fallback to plain JSON
+        dataObject = JSON.parse(sharedData)
       }
 
       if (dataObject && dataObject.name && dataObject.columns) {
@@ -404,11 +422,11 @@ onMounted(() => {
       }
     } catch (e) {
       const errorMsg = e instanceof Error ? e.message : String(e)
-      console.error('[PresetSelector] Failed to parse shared preset:', e, 'Data:', sharedData)
+      console.error('[PresetSelector] Import failed:', e)
       toast.add({
         severity: 'error',
         summary: 'Import Error',
-        detail: `The shared link is invalid: ${errorMsg}. Data length: ${sharedData.length}`,
+        detail: `The shared link is invalid: ${errorMsg}`,
         life: 10000
       })
     }
