@@ -35,17 +35,18 @@ export interface CurrentState {
 
 const props = defineProps<{
   currentState: CurrentState
+  modelValue?: string | null
 }>()
 
 const emit = defineEmits<{
   'load': [preset: QueryPreset]
+  'update:modelValue': [value: string | null]
 }>()
 
 const toast = useToast()
 
 // State
 const presets = ref<QueryPreset[]>(getAllPresets())
-const selectedPresetId = ref<string | null>(null)
 const showSaveDialog = ref(false)
 const showManageDialog = ref(false)
 const newPresetName = ref('')
@@ -58,6 +59,12 @@ const existingPresetToOverwrite = ref<QueryPreset | null>(null)
 const showImportDialog = ref(false)
 const sharedPreset = ref<QueryPreset | null>(null)
 const importConflict = ref(false)
+
+// Computed - bind to parent via v-model
+const selectedPresetId = computed({
+  get: () => props.modelValue ?? null,
+  set: (value: string | null) => emit('update:modelValue', value)
+})
 
 // Computed
 const selectedPreset = computed(() => {

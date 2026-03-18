@@ -106,6 +106,9 @@ export interface TableNodeState {
   expandedLevel: number
   isColumnExpanded: boolean
   chartState?: ChartState
+  showExtendedFields?: boolean
+  showAdvancedQuery?: boolean
+  selectedPresetId?: string | null
 }
 
 export interface TDVOptions {

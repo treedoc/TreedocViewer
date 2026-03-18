@@ -20,7 +20,7 @@ import AutoCompleteInput from './AutoCompleteInput.vue'
 import PresetSelector from './PresetSelector.vue'
 import TimeSeriesChart from './TimeSeriesChart.vue'
 import HoverButtonBar, { type HoverButton } from './HoverButtonBar.vue'
-import type { QueryPreset, FieldQuery, Column } from '@/models/types'
+import type { QueryPreset, FieldQuery, Column, TableNodeState } from '@/models/types'
 import { columnsToFieldQueries } from '@/models/types'
 import type { ExpandState } from './ExpandControl.vue'
 import type { ColumnVisibility } from './ColumnSelector.vue'
@@ -105,6 +105,7 @@ const showAdvancedQuery = ref(false)
 const jsQuery = ref('$')
 const extendedFields = ref('')
 const showExtendedFields = ref(false)
+const selectedPresetId = ref<string | null>(null)
 const showChart = ref(false)
 const first = ref(0)
 const rows = ref(100)
@@ -266,7 +267,11 @@ const presetColumnVisibility = ref<Map<string, boolean> | null>(null)
 
 // Apply a loaded preset
 function applyPreset(preset: QueryPreset) {
-  console.log('[TableView] Applying preset:', preset.name, { columns: preset.columns })
+  // The selectedPresetId should already be set by PresetSelector via v-model
+  // but let's ensure it's set in case it wasn't
+  if (selectedPresetId.value !== preset.id) {
+    selectedPresetId.value = preset.id
+  }
 
   // Save preset column order and visibility for use after rebuild
   presetColumnOrder.value = preset.columns.map(c => c.field)
@@ -471,7 +476,7 @@ const derivedColumnSourceMap = ref<Map<string, string>>(new Map())
 const dataProcessor = new TableDataProcessor(valueToSearchString)
 
 const filteredData = computed(() => {
-  logger.log(`Filtering data: initial count=${tableData.value.length}`)
+  // logger.log(`Filtering data: initial count=${tableData.value.length}`)
   
   // Use TableDataProcessor for core data transformation
   const config: ProcessingConfig = {
@@ -518,14 +523,17 @@ const filteredData = computed(() => {
       if (!columns.value.find(c => c.field === colName)) {
         const sourceField = derivedColumnSourceMap.value.get(colName)
         
-        // Use preset visibility if available, otherwise default to true
+        // Check visibility from multiple sources: preset, saved state, then default to true
         const presetVisible = presetColumnVisibility.value?.get(colName)
+        const savedVisible = savedColumnVisibility?.get(colName)
+        const visible = presetVisible !== undefined ? presetVisible : (savedVisible !== undefined ? savedVisible : true)
+        
         const newCol = {
           field: colName,
           header: colName,
           sortable: true,
           filterable: true,
-          visible: presetVisible !== undefined ? presetVisible : true,
+          visible,
           isDerived: true,
         }
         
@@ -593,8 +601,8 @@ const filteredData = computed(() => {
           col.visible = presetVisible
         }
       }
-      // Clear preset visibility after applying
-      presetColumnVisibility.value = null
+      // Don't clear presetColumnVisibility here - it's used for derived columns
+      // and may contain cached visibility from restored state
     }
   }
   
@@ -678,7 +686,7 @@ function buildTable(node: TDNode | null, restoreState = true) {
 }
 
 function buildTableInternal(node: TDNode | null, restoreState = true) {
-  logger.log(`Building table for node: ${node?.key}, restoreState=${restoreState}`)
+  // logger.log(`Building table for node: ${node?.key}, restoreState=${restoreState}`)
   
   // Save current column visibility and order before rebuilding (for non-restore rebuilds)
   const currentFieldQueries = { ...fieldQueries.value }
@@ -707,6 +715,19 @@ function buildTableInternal(node: TDNode | null, restoreState = true) {
   
   // Check if we have cached state for this node - do this BEFORE adding columns
   const cachedState = store.getTableState(node)
+  
+  // Always restore UI state if available (independent of restoreState flag)
+  if (cachedState) {
+    // Restore with explicit false default to prevent panel from showing unexpectedly
+    showExtendedFields.value = cachedState.showExtendedFields ?? false
+    showAdvancedQuery.value = cachedState.showAdvancedQuery ?? false
+    // Only restore selectedPresetId if we're doing a full state restore
+    // (not when rebuilding after applying a preset)
+    if (restoreState) {
+      selectedPresetId.value = cachedState.selectedPresetId ?? null
+    }
+  }
+  
   if (cachedState && restoreState) {
     isColumnExpanded.value = cachedState.isColumnExpanded
     // Restore query state
@@ -724,6 +745,11 @@ function buildTableInternal(node: TDNode | null, restoreState = true) {
         if (col.visible !== undefined) {
           savedColumnVisibility.set(col.field, col.visible)
         }
+      }
+      // IMPORTANT: Also update presetColumnVisibility so derived columns can access it
+      // after buildTable completes (savedColumnVisibility gets cleared at end of build)
+      if (!presetColumnVisibility.value) {
+        presetColumnVisibility.value = new Map(savedColumnVisibility)
       }
     }
     // Restore chart state
@@ -1097,7 +1123,6 @@ function handleUpdateExtendedFields(fields: string) {
     ...existingQuery,
     extendedFields: fields,
   }
-  console.log('[TableView] fieldQueries updated:', fieldQueries.value[field])
 }
 
 function rebuildTable() {
@@ -1106,11 +1131,15 @@ function rebuildTable() {
   first.value = 0
 }
 
+function toggleExtendedFields() {
+  showExtendedFields.value = !showExtendedFields.value
+}
+
 function saveCurrentTableState() {
   const node = localSelectedNode.value
   if (node) {
-    const sortDir = sortOrder.value === 1 ? 'asc' : sortOrder.value === -1 ? 'desc' : ''
-    store.saveTableState(toRaw(node), {
+    const sortDir: 'asc' | 'desc' | '' = sortOrder.value === 1 ? 'asc' : sortOrder.value === -1 ? 'desc' : ''
+    const stateToSave: TableNodeState = {
       query: {
         limit: rows.value,
         offset: first.value,
@@ -1124,6 +1153,9 @@ function saveCurrentTableState() {
       },
       expandedLevel: expandState.expandLevel,
       isColumnExpanded: isColumnExpanded.value,
+      showExtendedFields: showExtendedFields.value,
+      showAdvancedQuery: showAdvancedQuery.value,
+      selectedPresetId: selectedPresetId.value,
       chartState: {
         showChart: showChart.value,
         timeColumn: chartTimeColumn.value,
@@ -1135,7 +1167,8 @@ function saveCurrentTableState() {
         timeSelectionEnd: chartTimeSelectionEnd.value,
         timeSelectionColumn: chartTimeSelectionColumn.value
       }
-    })
+    }
+    store.saveTableState(toRaw(node), stateToSave)
   }
 }
 
@@ -1151,13 +1184,13 @@ watch(
     saveCurrentTableState()
     
     const newNode = store.getRawSelectedNode()
-    logger.log(`Selected node changed: ${newNode?.key}`)
+    // logger.log(`Selected node changed: ${newNode?.key}`)
     localSelectedNode.value = newNode
     if (newNode) {
       buildTable(newNode)
       first.value = 0
     }
-    logger.log(`Selected node changed end`)
+    // logger.log(`Selected node changed end`)
   },
   { immediate: true }
 )
@@ -1264,6 +1297,7 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
         <div class="toolbar-separator" />
         
         <PresetSelector
+          v-model="selectedPresetId"
           :currentState="currentPresetState"
           @load="applyPreset"
         />
@@ -1319,7 +1353,7 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
           size="small"
           :severity="showExtendedFields ? 'primary' : (extendedFields ? 'success' : 'secondary')"
           text
-          @click="showExtendedFields = !showExtendedFields"
+          @click="toggleExtendedFields"
           v-tooltip.top="'Extended Fields (add computed columns)'"
         />
         
