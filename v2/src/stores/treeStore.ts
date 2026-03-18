@@ -154,7 +154,7 @@ export const useTreeStore = defineStore('tree', () => {
   }
   
   function selectNode(node: TDNode | string | string[], initial = false) {
-    logger.log(`selectNode: start`)
+    // logger.log(`selectNode: start`)
     
     if (!tree.value) return
     

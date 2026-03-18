@@ -190,7 +190,7 @@ function handleNodeButtonClick(buttonId: string) {
 }
 
 function selectNode(path: string[], start: number, action: (node: typeof props) => void) {
-  logger.log(`selectNode: start: ${path}, ${start}`)
+  // logger.log(`selectNode: start: ${path}, ${start}`)
   if (start === path.length) {
     // Call action with an object that allows modifying selected state and accessing DOM element
     const nodeController = {
@@ -226,7 +226,7 @@ function bubbleEvent(data: string[], eventName: string) {
 watch(
   () => [props.expandState.expandLevel, props.expandState.fullyExpand, props.expandState.moreLevel] as const,
   () => {
-    logger.log(`watch: expand state: start`)
+    // logger.log(`watch: expand state: start`)
     if (rawNode.value.isLeaf()) return
 
     const state = props.expandState
