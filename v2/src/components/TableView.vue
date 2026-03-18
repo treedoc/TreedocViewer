@@ -573,27 +573,29 @@ const filteredData = computed(() => {
   
   // Apply preset order and visibility OUTSIDE the derivedColumnsChanged block
   // This ensures they're applied even when reapplying the same preset
-  if (presetColumnOrder.value && presetColumnOrder.value.length > 0) {
-    const orderMap = new Map(presetColumnOrder.value.map((field, i) => [field, i]))
-    columns.value.sort((a, b) => {
-      const aOrder = orderMap.get(a.field) ?? Infinity
-      const bOrder = orderMap.get(b.field) ?? Infinity
-      return aOrder - bOrder
-    })
-    // Clear preset order after applying (only apply once)
-    presetColumnOrder.value = null
-  }
-  
-  // Apply preset visibility to all columns (including base columns that were rebuilt)
-  if (presetColumnVisibility.value && presetColumnVisibility.value.size > 0) {
-    for (const col of columns.value) {
-      const presetVisible = presetColumnVisibility.value.get(col.field)
-      if (presetVisible !== undefined) {
-        col.visible = presetVisible
-      }
+  if (tableData.value.length > 0) {
+    if (presetColumnOrder.value && presetColumnOrder.value.length > 0) {
+      const orderMap = new Map(presetColumnOrder.value.map((field, i) => [field, i]))
+      columns.value.sort((a, b) => {
+        const aOrder = orderMap.get(a.field) ?? Infinity
+        const bOrder = orderMap.get(b.field) ?? Infinity
+        return aOrder - bOrder
+      })
+      // Clear preset order after applying (only apply once)
+      presetColumnOrder.value = null
     }
-    // Clear preset visibility after applying
-    presetColumnVisibility.value = null
+    
+    // Apply preset visibility to all columns (including base columns that were rebuilt)
+    if (presetColumnVisibility.value && presetColumnVisibility.value.size > 0) {
+      for (const col of columns.value) {
+        const presetVisible = presetColumnVisibility.value.get(col.field)
+        if (presetVisible !== undefined) {
+          col.visible = presetVisible
+        }
+      }
+      // Clear preset visibility after applying
+      presetColumnVisibility.value = null
+    }
   }
   
   // JS query is already applied by the processor
