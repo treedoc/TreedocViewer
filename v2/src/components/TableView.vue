@@ -1155,6 +1155,8 @@ function saveCurrentTableState() {
         columns: columns.value.map(c => ({
           ...c,
           ...(fieldQueries.value[c.field] ? { ...fieldQueries.value[c.field] } : {}),
+          // Ensure actual column visibility is preserved (not overwritten by fieldQueries)
+          visible: c.visible,
         })),
       },
       expandedLevel: expandState.expandLevel,
