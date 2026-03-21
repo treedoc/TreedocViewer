@@ -166,9 +166,9 @@ function extractJsonPaths(obj: any, prefix: string = '$', depth: number = 0, vis
     if (visited.has(obj)) return paths
     visited.add(obj)
     
-    // For arrays, sample the first item
+    // For arrays, sample the first item - use optional chaining for safe access
     if (obj.length > 0 && typeof obj[0] === 'object' && obj[0] !== null) {
-      const childPaths = extractJsonPaths(obj[0], `${prefix}[0]`, depth + 1, visited)
+      const childPaths = extractJsonPaths(obj[0], `${prefix}?.[0]`, depth + 1, visited)
       paths.push(...childPaths)
     }
   } else if (typeof obj === 'object') {
@@ -180,7 +180,8 @@ function extractJsonPaths(obj: any, prefix: string = '$', depth: number = 0, vis
       // Skip internal/circular properties and TDNode metadata ($$-prefixed keys)
       if (skipKeys.has(key) || key.startsWith('$$')) continue
       
-      const path = `${prefix}.${key}`
+      // Use optional chaining for safe property access
+      const path = `${prefix}?.${key}`
       const sampleValue = formatSampleValue(value)
       
       // Add this path as a leaf or branch
@@ -210,7 +211,8 @@ function extractJsonPaths(obj: any, prefix: string = '$', depth: number = 0, vis
         })
         if (value.length > 0 && typeof value[0] === 'object' && value[0] !== null) {
           if (!visited.has(value[0])) {
-            const childPaths = extractJsonPaths(value[0], `${path}[0]`, depth + 1, visited)
+            // Use optional chaining for safe array access
+            const childPaths = extractJsonPaths(value[0], `${path}?.[0]`, depth + 1, visited)
             paths.push(...childPaths)
           }
         }
