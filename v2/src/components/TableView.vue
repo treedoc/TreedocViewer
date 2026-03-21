@@ -264,6 +264,8 @@ const currentPresetState = computed(() => ({
 
 // Persistent preset visibility for columns
 const presetColumnVisibility = ref<Map<string, boolean> | null>(null)
+// Flag to indicate we're explicitly applying a preset (vs. rebuilding due to query changes)
+const isApplyingPreset = ref(false)
 
 // Apply a loaded preset
 function applyPreset(preset: QueryPreset) {
@@ -272,6 +274,9 @@ function applyPreset(preset: QueryPreset) {
   if (selectedPresetId.value !== preset.id) {
     selectedPresetId.value = preset.id
   }
+
+  // Set flag to indicate we're explicitly applying a preset
+  isApplyingPreset.value = true
 
   // Save preset column order and visibility for use after rebuild
   presetColumnOrder.value = preset.columns.map(c => c.field)
@@ -523,8 +528,8 @@ const filteredData = computed(() => {
       if (!columns.value.find(c => c.field === colName)) {
         const sourceField = derivedColumnSourceMap.value.get(colName)
         
-        // Check visibility from multiple sources: preset, saved state, then default to true
-        const presetVisible = presetColumnVisibility.value?.get(colName)
+        // Check visibility from multiple sources: preset (only when applying), saved state, then default to true
+        const presetVisible = isApplyingPreset.value ? presetColumnVisibility.value?.get(colName) : undefined
         const savedVisible = savedColumnVisibility?.get(colName)
         const visible = presetVisible !== undefined ? presetVisible : (savedVisible !== undefined ? savedVisible : true)
         
@@ -593,16 +598,17 @@ const filteredData = computed(() => {
       presetColumnOrder.value = null
     }
     
-    // Apply preset visibility to all columns (including base columns that were rebuilt)
-    if (presetColumnVisibility.value && presetColumnVisibility.value.size > 0) {
+    // Apply preset visibility to all columns ONLY when explicitly applying a preset
+    // (not during subsequent rebuilds like adding extended fields)
+    if (isApplyingPreset.value && presetColumnVisibility.value && presetColumnVisibility.value.size > 0) {
       for (const col of columns.value) {
         const presetVisible = presetColumnVisibility.value.get(col.field)
         if (presetVisible !== undefined) {
           col.visible = presetVisible
         }
       }
-      // Don't clear presetColumnVisibility here - it's used for derived columns
-      // and may contain cached visibility from restored state
+      // Clear the flag after applying - subsequent rebuilds won't reapply visibility
+      isApplyingPreset.value = false
     }
   }
   
