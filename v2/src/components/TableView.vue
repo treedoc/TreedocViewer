@@ -530,7 +530,7 @@ const filteredData = computed(() => {
         
         // Check visibility from multiple sources: preset (only when applying), saved state, then default to true
         const presetVisible = isApplyingPreset.value ? presetColumnVisibility.value?.get(colName) : undefined
-        const savedVisible = savedColumnVisibility?.get(colName)
+        const savedVisible = savedColumnVisibility.value?.get(colName)
         const visible = presetVisible !== undefined ? presetVisible : (savedVisible !== undefined ? savedVisible : true)
         
         const newCol = {
@@ -659,8 +659,9 @@ function addExtObject(key: string, val: any, row: TableRow) {
   row[key] = getExtValue(val)
 }
 
-// Used during rebuild to preserve column visibility and order
-let savedColumnVisibility: Map<string, boolean> | null = null
+// Persistent column visibility from saved state (survives until derived columns are processed)
+const savedColumnVisibility = ref<Map<string, boolean> | null>(null)
+// Temporary column order for reordering during rebuild
 let savedColumnOrder: string[] | null = null
 
 // Persistent preset column order for derived columns positioning
@@ -669,7 +670,7 @@ const presetColumnOrder = ref<string[] | null>(null)
 function addColumn(field: string, header: string, isExtended: boolean = false) {
   if (!columns.value.find(c => c.field === field)) {
     // Check if we have saved visibility for this column
-    const visible = savedColumnVisibility?.get(field) ?? true
+    const visible = savedColumnVisibility.value?.get(field) ?? true
     columns.value.push({
       field,
       header: isExtended ? `⊕${header}` : header,
@@ -697,14 +698,14 @@ function buildTableInternal(node: TDNode | null, restoreState = true) {
   // Save current column visibility and order before rebuilding (for non-restore rebuilds)
   const currentFieldQueries = { ...fieldQueries.value }
   if (!restoreState) {
-    savedColumnVisibility = new Map<string, boolean>()
+    savedColumnVisibility.value = new Map<string, boolean>()
     savedColumnOrder = []
     for (const col of columns.value) {
-      savedColumnVisibility.set(col.field, col.visible)
+      savedColumnVisibility.value.set(col.field, col.visible)
       savedColumnOrder.push(col.field)
     }
   } else {
-    savedColumnVisibility = null
+    savedColumnVisibility.value = null
     savedColumnOrder = null
   }
   
@@ -744,18 +745,13 @@ function buildTableInternal(node: TDNode | null, restoreState = true) {
       fieldQueries.value[col.field] = { ...col }
       if (col.extendedFields) extendedFields.value = col.extendedFields
     }
-    // Set up column visibility from cache for addColumn to use
+    // Set up column visibility from cache for addColumn and derived columns to use
     if (cachedColumns.length > 0) {
-      savedColumnVisibility = new Map<string, boolean>()
+      savedColumnVisibility.value = new Map<string, boolean>()
       for (const col of cachedColumns) {
         if (col.visible !== undefined) {
-          savedColumnVisibility.set(col.field, col.visible)
+          savedColumnVisibility.value.set(col.field, col.visible)
         }
-      }
-      // IMPORTANT: Also update presetColumnVisibility so derived columns can access it
-      // after buildTable completes (savedColumnVisibility gets cleared at end of build)
-      if (!presetColumnVisibility.value) {
-        presetColumnVisibility.value = new Map(savedColumnVisibility)
       }
     }
     // Restore chart state
@@ -784,7 +780,7 @@ function buildTableInternal(node: TDNode | null, restoreState = true) {
   const keyCol = isArray ? COL_NO : COL_KEY
   
   // Add key column (use saved visibility if available)
-  const keyColVisible = savedColumnVisibility?.get(keyCol) ?? true
+  const keyColVisible = savedColumnVisibility.value?.get(keyCol) ?? true
   columns.value.push({
     field: keyCol,
     header: keyCol,
@@ -808,7 +804,7 @@ function buildTableInternal(node: TDNode | null, restoreState = true) {
       for (const grandChild of child.children) {
         const field = grandChild.key!
         if (!columns.value.find(c => c.field === field)) {
-          const visible = savedColumnVisibility?.get(field) ?? true
+          const visible = savedColumnVisibility.value?.get(field) ?? true
           columns.value.push({
             field,
             header: field,
@@ -822,7 +818,7 @@ function buildTableInternal(node: TDNode | null, restoreState = true) {
     } else {
       // Just add value column
       if (!columns.value.find(c => c.field === COL_VALUE)) {
-        const visible = savedColumnVisibility?.get(COL_VALUE) ?? true
+        const visible = savedColumnVisibility.value?.get(COL_VALUE) ?? true
         columns.value.push({
           field: COL_VALUE,
           header: COL_VALUE,
@@ -873,11 +869,11 @@ function buildTableInternal(node: TDNode | null, restoreState = true) {
     columns.value = reorderedColumns
   }
   
-  // Clear saved visibility and order after build is complete
-  savedColumnVisibility = null
+  // Clear saved order after build is complete (visibility is kept for derived columns)
   savedColumnOrder = null
   
   // Note: columnVisibility is auto-updated by the watcher on columns
+  // savedColumnVisibility is NOT cleared here - it's kept for derived columns in filteredData
 }
 
 function nodeClicked(path: string[]) {

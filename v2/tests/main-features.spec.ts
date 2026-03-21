@@ -380,4 +380,101 @@ test.describe('TreeDoc Viewer - Main UI Features', () => {
       }
     });
   });
+
+  test.describe('Fullscreen Toggle - Column Visibility Preservation', () => {
+    test.beforeEach(async ({ page }) => {
+      await enterJsonData(page, sampleData);
+      await ensureTableViewVisible(page);
+    });
+
+    test('should preserve hidden columns after fullscreen toggle', async ({ page }) => {
+      // Get initial column count
+      const initialHeaders = await page.locator('.column-header').count();
+      expect(initialHeaders).toBeGreaterThan(3);
+      
+      // Hide a column (e.g., 'status')
+      const statusHeader = page.locator('.column-header').filter({ hasText: 'status' });
+      await statusHeader.click();
+      await page.locator('.p-popover').waitFor({ state: 'visible' });
+      
+      // Click hide column button
+      await page.locator('.pi-eye-slash').click();
+      await page.waitForTimeout(300);
+      
+      // Verify column is hidden
+      await expect(page.locator('.column-header').filter({ hasText: 'status' })).not.toBeVisible();
+      const afterHideCount = await page.locator('.column-header').count();
+      expect(afterHideCount).toBe(initialHeaders - 1);
+      
+      // Click the fullscreen button (pi-expand icon in table toolbar)
+      const fullscreenBtn = page.locator('.table-view .pi-expand').locator('..');
+      await fullscreenBtn.click();
+      
+      // Wait for fullscreen transition and table to be visible
+      await page.locator('.p-datatable').waitFor({ state: 'visible', timeout: 5000 });
+      await page.waitForTimeout(300);
+      
+      // Verify column is still hidden after fullscreen toggle
+      await expect(page.locator('.column-header').filter({ hasText: 'status' })).not.toBeVisible();
+      const afterFullscreenCount = await page.locator('.column-header').count();
+      expect(afterFullscreenCount).toBe(afterHideCount);
+      
+      // Click fullscreen button again to exit (or press Escape)
+      const exitFullscreenBtn = page.locator('.table-view .pi-expand').locator('..');
+      await exitFullscreenBtn.click();
+      await page.waitForTimeout(300);
+      
+      // Wait for table to be visible again
+      await page.locator('.p-datatable').waitFor({ state: 'visible', timeout: 5000 });
+      
+      // Verify column is still hidden after exiting fullscreen
+      await expect(page.locator('.column-header').filter({ hasText: 'status' })).not.toBeVisible();
+      const afterExitCount = await page.locator('.column-header').count();
+      expect(afterExitCount).toBe(afterHideCount);
+    });
+
+    test('should preserve multiple hidden columns after fullscreen toggle', async ({ page }) => {
+      // Hide 'status' column
+      const statusHeader = page.locator('.column-header').filter({ hasText: 'status' });
+      await statusHeader.click();
+      await page.locator('.p-popover').waitFor({ state: 'visible' });
+      await page.locator('.pi-eye-slash').click();
+      await page.waitForTimeout(300);
+      
+      // Hide 'value' column
+      const valueHeader = page.locator('.column-header').filter({ hasText: 'value' });
+      await valueHeader.click();
+      await page.locator('.p-popover').waitFor({ state: 'visible' });
+      await page.locator('.pi-eye-slash').click();
+      await page.waitForTimeout(300);
+      
+      // Verify both columns are hidden
+      await expect(page.locator('.column-header').filter({ hasText: 'status' })).not.toBeVisible();
+      await expect(page.locator('.column-header').filter({ hasText: 'value' })).not.toBeVisible();
+      
+      // Click the fullscreen button
+      const fullscreenBtn = page.locator('.table-view .pi-expand').locator('..');
+      await fullscreenBtn.click();
+      
+      // Wait for fullscreen transition
+      await page.locator('.p-datatable').waitFor({ state: 'visible', timeout: 5000 });
+      await page.waitForTimeout(300);
+      
+      // Verify both columns are still hidden
+      await expect(page.locator('.column-header').filter({ hasText: 'status' })).not.toBeVisible();
+      await expect(page.locator('.column-header').filter({ hasText: 'value' })).not.toBeVisible();
+      
+      // Exit fullscreen
+      const exitFullscreenBtn = page.locator('.table-view .pi-expand').locator('..');
+      await exitFullscreenBtn.click();
+      await page.waitForTimeout(300);
+      
+      // Wait for table to be visible again
+      await page.locator('.p-datatable').waitFor({ state: 'visible', timeout: 5000 });
+      
+      // Verify both columns are still hidden
+      await expect(page.locator('.column-header').filter({ hasText: 'status' })).not.toBeVisible();
+      await expect(page.locator('.column-header').filter({ hasText: 'value' })).not.toBeVisible();
+    });
+  });
 });
