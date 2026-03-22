@@ -108,7 +108,7 @@ export interface TableNodeState {
   chartState?: ChartState
   showExtendedFields?: boolean
   showAdvancedQuery?: boolean
-  selectedPresetId?: string | null
+  selectedPresetName?: string | null
 }
 
 export interface TDVOptions {
@@ -125,8 +125,7 @@ export interface TDVOptions {
  * Uses a unified Column array — each column carries its own filter/query state.
  */
 export interface QueryPreset {
-  id: string
-  name: string
+  name: string  // Name is the unique identifier
   description?: string
   createdAt: number
   updatedAt: number

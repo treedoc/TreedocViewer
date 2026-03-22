@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import Button from 'primevue/button'
+import Checkbox from 'primevue/checkbox'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
@@ -14,7 +15,9 @@ import {
   exportPreset,
   importPreset,
   getPresetByName,
+  getPreset,
 } from '@/utils/PresetService'
+import { TD } from 'treedoc'
 import { useToast } from 'primevue/usetoast'
 import { getFieldValueColors } from '@/utils/ValueColorService'
 import {
@@ -25,7 +28,6 @@ import {
   TDObjectCoderOption,
 } from 'treedoc'
 import { onMounted } from 'vue'
-import { an } from 'vue-router/dist/router-CWoNjPRp.mjs'
 
 export interface CurrentState {
   columns: Column[]
@@ -60,22 +62,31 @@ const showImportDialog = ref(false)
 const sharedPreset = ref<QueryPreset | null>(null)
 const importConflict = ref(false)
 
-// Computed - bind to parent via v-model
-const selectedPresetId = computed({
+// File import conflict state
+const showFileImportConflictDialog = ref(false)
+const fileImportConflicts = ref<Array<{ name: string; data: any }>>([])
+const currentConflictIndex = ref(0)
+
+// Multi-select state for export (uses preset names)
+const selectedPresetNames = ref<Set<string>>(new Set())
+const fileInputRef = ref<HTMLInputElement | null>(null)
+
+// Computed - bind to parent via v-model (now uses preset name as key)
+const selectedPresetName = computed({
   get: () => props.modelValue ?? null,
   set: (value: string | null) => emit('update:modelValue', value)
 })
 
 // Computed
 const selectedPreset = computed(() => {
-  if (!selectedPresetId.value) return null
-  return presets.value.find(p => p.id === selectedPresetId.value) || null
+  if (!selectedPresetName.value) return null
+  return presets.value.find(p => p.name.toLowerCase() === selectedPresetName.value?.toLowerCase()) || null
 })
 
 const presetOptions = computed(() => {
   return presets.value.map(p => ({
     label: p.name,
-    value: p.id,
+    value: p.name,  // Use name as value
   }))
 })
 
@@ -90,10 +101,10 @@ function loadSelectedPreset() {
   }
 }
 
-function onPresetChange(presetId: string | null) {
-  selectedPresetId.value = presetId
-  if (presetId) {
-    const preset = presets.value.find(p => p.id === presetId)
+function onPresetChange(presetName: string | null) {
+  selectedPresetName.value = presetName
+  if (presetName) {
+    const preset = presets.value.find(p => p.name.toLowerCase() === presetName.toLowerCase())
     if (preset) {
       emit('load', preset)
     }
@@ -135,11 +146,11 @@ function doSavePreset(overwrite: boolean) {
   const name = newPresetName.value.trim()
   const description = newPresetDescription.value.trim() || undefined
   
-  let preset: QueryPreset
+  let preset: QueryPreset | null
   
   if (overwrite && existingPresetToOverwrite.value) {
-    // Update the existing preset
-    const updated = updatePreset(existingPresetToOverwrite.value.id, {
+    // Update the existing preset (use original name to find it)
+    const updated = updatePreset(existingPresetToOverwrite.value.name, {
       name,
       description,
       columns: buildColumnsWithColors().map(cleanColumnForSave) as Column[],
@@ -174,16 +185,26 @@ function doSavePreset(overwrite: boolean) {
       expandLevel: props.currentState.expandLevel,
     })
     
-    toast.add({
-      severity: 'success',
-      summary: 'Preset Created',
-      detail: `Preset "${name}" has been saved`,
-      life: 3000,
-    })
+    if (preset) {
+      toast.add({
+        severity: 'success',
+        summary: 'Preset Created',
+        detail: `Preset "${name}" has been saved`,
+        life: 3000,
+      })
+    } else {
+      toast.add({
+        severity: 'error',
+        summary: 'Error',
+        detail: `Preset "${name}" already exists`,
+        life: 3000,
+      })
+      return
+    }
   }
   
   refreshPresets()
-  selectedPresetId.value = preset.id
+  selectedPresetName.value = preset.name
   showSaveDialog.value = false
   showOverwriteConfirm.value = false
   existingPresetToOverwrite.value = null
@@ -195,12 +216,11 @@ function cancelOverwrite() {
 }
 
 function updateCurrentPreset() {
-  if (!selectedPresetId.value) return
+  if (!selectedPresetName.value) return
 
-  const preset = presets.value.find(p => p.id === selectedPresetId.value)
   console.log('[PresetSelector] Saving preset, currentState columns:', props.currentState.columns.length)
   
-  const updated = updatePreset(selectedPresetId.value, {
+  const updated = updatePreset(selectedPresetName.value, {
     columns: buildColumnsWithColors().map(cleanColumnForSave) as Column[],
     jsQuery: props.currentState.jsQuery,
     expandLevel: props.currentState.expandLevel,
@@ -210,7 +230,7 @@ function updateCurrentPreset() {
     toast.add({
       severity: 'success',
       summary: 'Preset Saved',
-      detail: `Preset "${preset?.name || 'Unknown'}" has been updated`,
+      detail: `Preset "${selectedPresetName.value}" has been updated`,
       life: 3000,
     })
   } else {
@@ -230,37 +250,97 @@ function openManageDialog() {
   showManageDialog.value = true
 }
 
+// Track original name when editing (for rename detection)
+const editingOriginalName = ref<string | null>(null)
+
 function startEdit(preset: QueryPreset) {
   editingPreset.value = { ...preset }
+  editingOriginalName.value = preset.name
 }
 
 function saveEdit() {
-  if (!editingPreset.value) return
+  if (!editingPreset.value || !editingOriginalName.value) return
   
-  updatePreset(editingPreset.value.id, {
+  const updated = updatePreset(editingOriginalName.value, {
     name: editingPreset.value.name,
     description: editingPreset.value.description,
   })
   
+  if (!updated) {
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: `A preset with name "${editingPreset.value.name}" already exists`,
+      life: 3000,
+    })
+    return
+  }
+  
+  // Update selected preset name if we renamed the currently selected preset
+  if (selectedPresetName.value?.toLowerCase() === editingOriginalName.value.toLowerCase()) {
+    selectedPresetName.value = updated.name
+  }
+  
   refreshPresets()
   editingPreset.value = null
+  editingOriginalName.value = null
 }
 
 function cancelEdit() {
   editingPreset.value = null
+  editingOriginalName.value = null
 }
 
-function removePreset(id: string) {
-  alert('Deleting preset: ' + id)
-  const success = deletePreset(id)
+function removePreset(name: string) {
+  if (!confirm(`Delete preset "${name}"?`)) return
+  
+  const success = deletePreset(name)
   if (success) {
-    if (selectedPresetId.value === id) {
-      selectedPresetId.value = null
+    if (selectedPresetName.value?.toLowerCase() === name.toLowerCase()) {
+      selectedPresetName.value = null
     }
     refreshPresets()
+    toast.add({
+      severity: 'info',
+      summary: 'Deleted',
+      detail: `Preset "${name}" has been deleted`,
+      life: 3000,
+    })
   } else {
-    alert('Failed to delete preset')
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: 'Failed to delete preset',
+      life: 3000,
+    })
   }
+}
+
+function deleteSelectedPresets() {
+  const count = selectedPresetNames.value.size
+  if (count === 0) return
+  
+  if (!confirm(`Delete ${count} selected preset(s)?`)) return
+  
+  let deletedCount = 0
+  for (const name of selectedPresetNames.value) {
+    if (deletePreset(name)) {
+      deletedCount++
+      if (selectedPresetName.value?.toLowerCase() === name.toLowerCase()) {
+        selectedPresetName.value = null
+      }
+    }
+  }
+  
+  deselectAllPresets()
+  refreshPresets()
+  
+  toast.add({
+    severity: 'info',
+    summary: 'Deleted',
+    detail: `${deletedCount} preset(s) deleted`,
+    life: 3000,
+  })
 }
 
 function exportPresetToClipboard(preset: QueryPreset) {
@@ -280,9 +360,8 @@ function sharePreset(preset: QueryPreset) {
       ...preset,
       columns: preset.columns.map(cleanColumnForSave) as Column[],
     }
-    // Deeply removing id, timestamps for cleaner share
+    // Remove timestamps for cleaner share
     const toShare = JSON.parse(JSON.stringify(clean))
-    delete toShare.id
     delete toShare.createdAt
     delete toShare.updatedAt
 
@@ -334,7 +413,7 @@ function handleImport(overwrite: boolean) {
   const existing = getPresetByName(name)
 
   if (existing && overwrite) {
-    updatePreset(existing.id, {
+    updatePreset(existing.name, {
       description: sharedPreset.value.description,
       columns: sharedPreset.value.columns,
       jsQuery: sharedPreset.value.jsQuery,
@@ -445,13 +524,28 @@ function importFromClipboard() {
     const preset = importPreset(text)
     if (preset) {
       refreshPresets()
-      selectedPresetId.value = preset.id
-      alert('Preset imported successfully!')
+      selectedPresetName.value = preset.name
+      toast.add({
+        severity: 'success',
+        summary: 'Imported',
+        detail: `Preset "${preset.name}" imported successfully`,
+        life: 3000
+      })
     } else {
-      alert('Failed to import preset. Invalid format.')
+      toast.add({
+        severity: 'error',
+        summary: 'Import Failed',
+        detail: 'Invalid preset format or name already exists',
+        life: 3000
+      })
     }
   }).catch(() => {
-    alert('Failed to read clipboard.')
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: 'Failed to read clipboard',
+      life: 3000
+    })
   })
 }
 
@@ -473,13 +567,281 @@ function formatDate(timestamp: number): string {
     minute: '2-digit',
   })
 }
+
+// Multi-select functions
+function togglePresetSelection(presetName: string) {
+  if (selectedPresetNames.value.has(presetName)) {
+    selectedPresetNames.value.delete(presetName)
+  } else {
+    selectedPresetNames.value.add(presetName)
+  }
+  selectedPresetNames.value = new Set(selectedPresetNames.value)
+}
+
+function isPresetSelected(presetName: string): boolean {
+  return selectedPresetNames.value.has(presetName)
+}
+
+function selectAllPresets() {
+  selectedPresetNames.value = new Set(presets.value.map(p => p.name))
+}
+
+function deselectAllPresets() {
+  selectedPresetNames.value = new Set()
+}
+
+function sanitizeFileName(name: string): string {
+  return name.replace(/[<>:"/\\|?*]/g, '_').trim() || 'preset'
+}
+
+async function exportSelectedToFiles() {
+  const selectedPresets = presets.value.filter(p => selectedPresetNames.value.has(p.name))
+  
+  if (selectedPresets.length === 0) {
+    toast.add({
+      severity: 'warn',
+      summary: 'No Selection',
+      detail: 'Please select at least one preset to export',
+      life: 3000
+    })
+    return
+  }
+
+  // Try to use File System Access API (modern browsers)
+  if ('showDirectoryPicker' in window) {
+    try {
+      const dirHandle = await (window as any).showDirectoryPicker({ mode: 'readwrite' })
+      
+      for (const preset of selectedPresets) {
+        const json = exportPreset(preset)
+        const fileName = `${sanitizeFileName(preset.name)}.json`
+        const fileHandle = await dirHandle.getFileHandle(fileName, { create: true })
+        const writable = await fileHandle.createWritable()
+        await writable.write(json)
+        await writable.close()
+      }
+      
+      toast.add({
+        severity: 'success',
+        summary: 'Exported',
+        detail: `${selectedPresets.length} preset(s) saved to folder`,
+        life: 3000
+      })
+      
+      deselectAllPresets()
+    } catch (e: any) {
+      if (e.name === 'AbortError') {
+        return
+      }
+      console.error('Directory picker failed:', e)
+      fallbackExportAsZip(selectedPresets)
+    }
+  } else {
+    fallbackExportAsZip(selectedPresets)
+  }
+}
+
+async function fallbackExportAsZip(selectedPresets: QueryPreset[]) {
+  if (selectedPresets.length === 1) {
+    const preset = selectedPresets[0]
+    const json = exportPreset(preset)
+    downloadFile(`${sanitizeFileName(preset.name)}.json`, json)
+    toast.add({
+      severity: 'success',
+      summary: 'Exported',
+      detail: `Preset "${preset.name}" downloaded`,
+      life: 3000
+    })
+  } else {
+    for (const preset of selectedPresets) {
+      const json = exportPreset(preset)
+      downloadFile(`${sanitizeFileName(preset.name)}.json`, json)
+      await new Promise(resolve => setTimeout(resolve, 100))
+    }
+    toast.add({
+      severity: 'success',
+      summary: 'Exported',
+      detail: `${selectedPresets.length} preset files downloaded`,
+      life: 3000
+    })
+  }
+  deselectAllPresets()
+}
+
+function downloadFile(fileName: string, content: string) {
+  const blob = new Blob([content], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = fileName
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
+function triggerFileImport() {
+  fileInputRef.value?.click()
+}
+
+async function handleFileImport(event: Event) {
+  const input = event.target as HTMLInputElement
+  const inputFiles = input.files
+  
+  if (!inputFiles || inputFiles.length === 0) return
+  
+  const files: Array<{ name: string; content: string }> = []
+  for (const file of Array.from(inputFiles)) {
+    const content = await file.text()
+    files.push({ name: file.name, content })
+  }
+  
+  await processImportFiles(files)
+  input.value = ''
+}
+
+async function processImportFiles(files: Array<{ name: string; content: string }>) {
+  let successCount = 0
+  let failCount = 0
+  const errors: string[] = []
+  const conflicts: Array<{ name: string; data: any }> = []
+  
+  for (const file of files) {
+    try {
+      const data = TD.parse(file.content)
+      
+      if (!data || !data.name || !data.columns) {
+        failCount++
+        errors.push(`${file.name}: Invalid format`)
+        continue
+      }
+      
+      // Check if preset with same name exists
+      const existing = getPreset(data.name)
+      if (existing) {
+        conflicts.push({ name: file.name, data })
+      } else {
+        const preset = importPreset(file.content)
+        if (preset) {
+          successCount++
+        } else {
+          failCount++
+          errors.push(`${file.name}: Import failed`)
+        }
+      }
+    } catch (e) {
+      failCount++
+      errors.push(`${file.name}: ${e instanceof Error ? e.message : 'Unknown error'}`)
+    }
+  }
+  
+  refreshPresets()
+  
+  if (successCount > 0) {
+    toast.add({
+      severity: 'success',
+      summary: 'Imported',
+      detail: `${successCount} preset(s) imported successfully`,
+      life: 3000
+    })
+  }
+  
+  if (failCount > 0) {
+    toast.add({
+      severity: 'error',
+      summary: 'Import Errors',
+      detail: errors.join('\n'),
+      life: 5000
+    })
+  }
+  
+  // Handle conflicts
+  if (conflicts.length > 0) {
+    fileImportConflicts.value = conflicts
+    currentConflictIndex.value = 0
+    showFileImportConflictDialog.value = true
+  }
+}
+
+function handleConflictOverwrite() {
+  const conflict = fileImportConflicts.value[currentConflictIndex.value]
+  if (!conflict) return
+  
+  const data = conflict.data
+  updatePreset(data.name, {
+    description: data.description,
+    columns: data.columns,
+    jsQuery: data.jsQuery,
+    expandLevel: data.expandLevel,
+  })
+  
+  toast.add({
+    severity: 'success',
+    summary: 'Overwritten',
+    detail: `Preset "${data.name}" has been updated`,
+    life: 2000
+  })
+  
+  nextConflict()
+}
+
+function handleConflictRename() {
+  const conflict = fileImportConflicts.value[currentConflictIndex.value]
+  if (!conflict) return
+  
+  // Auto-generate unique name
+  const data = conflict.data
+  let newName = data.name
+  let suffix = 1
+  while (getPreset(newName)) {
+    newName = `${data.name} (${suffix})`
+    suffix++
+  }
+  
+  savePreset({
+    name: newName,
+    description: data.description,
+    columns: data.columns,
+    jsQuery: data.jsQuery,
+    expandLevel: data.expandLevel,
+  })
+  
+  toast.add({
+    severity: 'success',
+    summary: 'Imported',
+    detail: `Preset saved as "${newName}"`,
+    life: 2000
+  })
+  
+  nextConflict()
+}
+
+function handleConflictSkip() {
+  nextConflict()
+}
+
+function nextConflict() {
+  refreshPresets()
+  
+  if (currentConflictIndex.value < fileImportConflicts.value.length - 1) {
+    currentConflictIndex.value++
+  } else {
+    showFileImportConflictDialog.value = false
+    fileImportConflicts.value = []
+    currentConflictIndex.value = 0
+  }
+}
+
+const currentConflict = computed(() => {
+  return fileImportConflicts.value[currentConflictIndex.value] || null
+})
 </script>
 
 <template>
   <div class="preset-selector">
     <!-- Preset Dropdown -->
     <Select
-      v-model="selectedPresetId"
+      v-model="selectedPresetName"
       :options="presetOptions"
       optionLabel="label"
       optionValue="value"
@@ -494,14 +856,14 @@ function formatDate(timestamp: number): string {
       icon="pi pi-save"
       size="small"
       text
-      :severity="selectedPresetId ? 'primary' : 'secondary'"
-      @click="selectedPresetId ? updateCurrentPreset() : openSaveDialog()"
-      v-tooltip.top="selectedPresetId ? 'Update preset' : 'Save as new preset'"
+      :severity="selectedPresetName ? 'primary' : 'secondary'"
+      @click="selectedPresetName ? updateCurrentPreset() : openSaveDialog()"
+      v-tooltip.top="selectedPresetName ? 'Update preset' : 'Save as new preset'"
     />
     
     <!-- Save As New Button (when preset selected) -->
     <Button
-      v-if="selectedPresetId"
+      v-if="selectedPresetName"
       icon="pi pi-plus"
       size="small"
       text
@@ -579,19 +941,72 @@ function formatDate(timestamp: number): string {
     v-model:visible="showManageDialog"
     header="Manage Presets"
     :modal="true"
-    :style="{ width: '600px' }"
+    :style="{ width: '650px' }"
     :dismissableMask="true"
   >
     <div class="manage-dialog-content">
       <div class="manage-toolbar">
         <Button
-          label="Import from Clipboard"
-          icon="pi pi-download"
+          icon="pi pi-folder-open"
+          size="small"
+          severity="secondary"
+          @click="triggerFileImport"
+          v-tooltip.top="'Import from files'"
+        />
+        <Button
+          icon="pi pi-clipboard"
           size="small"
           severity="secondary"
           @click="importFromClipboard"
+          v-tooltip.top="'Import from clipboard'"
+        />
+        <div class="toolbar-separator" />
+        <Button
+          icon="pi pi-check-square"
+          size="small"
+          text
+          severity="secondary"
+          @click="selectAllPresets"
+          v-tooltip.top="'Select all'"
+          :disabled="presets.length === 0"
+        />
+        <Button
+          icon="pi pi-times"
+          size="small"
+          text
+          severity="secondary"
+          @click="deselectAllPresets"
+          v-tooltip.top="'Clear selection'"
+          :disabled="selectedPresetNames.size === 0"
+        />
+        <div class="toolbar-separator" />
+        <Button
+          icon="pi pi-download"
+          size="small"
+          severity="secondary"
+          @click="exportSelectedToFiles"
+          v-tooltip.top="'Export selected'"
+          :disabled="selectedPresetNames.size === 0"
+        />
+        <Button
+          icon="pi pi-trash"
+          size="small"
+          severity="danger"
+          @click="deleteSelectedPresets"
+          v-tooltip.top="'Delete selected'"
+          :disabled="selectedPresetNames.size === 0"
         />
       </div>
+      
+      <!-- Hidden file input for import -->
+      <input
+        ref="fileInputRef"
+        type="file"
+        accept=".json"
+        multiple
+        style="display: none"
+        @change="handleFileImport"
+      />
       
       <div v-if="presets.length === 0" class="no-presets">
         No presets saved yet. Save your first preset to get started.
@@ -600,11 +1015,18 @@ function formatDate(timestamp: number): string {
       <div v-else class="preset-list">
         <div
           v-for="preset in presets"
-          :key="preset.id"
+          :key="preset.name"
           class="preset-item"
-          :class="{ 'is-selected': preset.id === selectedPresetId }"
+          :class="{ 'is-selected': preset.name.toLowerCase() === selectedPresetName?.toLowerCase(), 'is-checked': isPresetSelected(preset.name) }"
         >
-          <div v-if="editingPreset?.id === preset.id" class="preset-edit">
+          <div class="preset-checkbox">
+            <Checkbox
+              :modelValue="isPresetSelected(preset.name)"
+              :binary="true"
+              @update:modelValue="togglePresetSelection(preset.name)"
+            />
+          </div>
+          <div v-if="editingOriginalName?.toLowerCase() === preset.name.toLowerCase() && editingPreset" class="preset-edit">
             <InputText v-model="editingPreset.name" class="edit-name" />
             <InputText v-model="editingPreset.description" placeholder="Description..." class="edit-desc" />
             <Button icon="pi pi-check" size="small" @click="saveEdit" />
@@ -629,7 +1051,7 @@ function formatDate(timestamp: number): string {
             <Button icon="pi pi-pencil" size="small" text @click.stop="startEdit(preset)" v-tooltip.top="'Edit'" />
             <Button icon="pi pi-share-alt" size="small" text @click.stop="sharePreset(preset)" v-tooltip.top="'Share link'" />
             <Button icon="pi pi-copy" size="small" text @click.stop="exportPresetToClipboard(preset)" v-tooltip.top="'Copy to clipboard'" />
-            <Button icon="pi pi-trash" size="small" text severity="danger" @click.stop="removePreset(preset.id)" v-tooltip.top="'Delete'" />
+            <Button icon="pi pi-trash" size="small" text severity="danger" @click.stop="removePreset(preset.name)" v-tooltip.top="'Delete'" />
           </div>
         </div>
       </div>
@@ -663,6 +1085,32 @@ function formatDate(timestamp: number): string {
       <template v-else>
         <Button label="Import" @click="handleImport(false)" />
       </template>
+    </template>
+  </Dialog>
+
+  <!-- File Import Conflict Dialog -->
+  <Dialog
+    v-model:visible="showFileImportConflictDialog"
+    header="Import Conflict"
+    :modal="true"
+    :closable="false"
+    :style="{ width: '450px' }"
+  >
+    <div class="import-conflict-content" v-if="currentConflict">
+      <div class="conflict-progress">
+        <span>{{ currentConflictIndex + 1 }} of {{ fileImportConflicts.length }}</span>
+      </div>
+      <p>
+        A preset named <strong>"{{ currentConflict.data.name }}"</strong> already exists.
+      </p>
+      <p class="conflict-file">
+        <i class="pi pi-file"></i> {{ currentConflict.name }}
+      </p>
+    </div>
+    <template #footer>
+      <Button label="Skip" severity="secondary" text @click="handleConflictSkip" />
+      <Button label="Rename" severity="secondary" @click="handleConflictRename" v-tooltip.top="'Save with auto-generated name'" />
+      <Button label="Overwrite" severity="warning" @click="handleConflictOverwrite" />
     </template>
   </Dialog>
 </template>
@@ -713,7 +1161,15 @@ function formatDate(timestamp: number): string {
 
 .manage-toolbar {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  gap: 4px;
+}
+
+.toolbar-separator {
+  width: 1px;
+  height: 20px;
+  background: var(--tdv-surface-border);
+  margin: 0 4px;
 }
 
 .no-presets {
@@ -744,6 +1200,16 @@ function formatDate(timestamp: number): string {
 .preset-item.is-selected {
   border-color: var(--tdv-primary);
   background: var(--tdv-primary-light, rgba(59, 130, 246, 0.1));
+}
+
+.preset-item.is-checked {
+  background: var(--tdv-surface-hover, rgba(0, 0, 0, 0.04));
+}
+
+.preset-checkbox {
+  display: flex;
+  align-items: flex-start;
+  padding-top: 2px;
 }
 
 .preset-info {
@@ -835,5 +1301,34 @@ function formatDate(timestamp: number): string {
 
 .import-warning i {
   font-size: 1.25rem;
+}
+
+.import-conflict-content {
+  padding: 8px 0;
+}
+
+.import-conflict-content p {
+  margin: 8px 0;
+}
+
+.conflict-progress {
+  font-size: 0.85rem;
+  color: var(--tdv-text-muted);
+  margin-bottom: 8px;
+}
+
+.conflict-file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  color: var(--tdv-text-secondary);
+  padding: 8px 12px;
+  background: var(--tdv-surface-light);
+  border-radius: var(--tdv-radius-sm);
+}
+
+.conflict-file i {
+  color: var(--tdv-text-muted);
 }
 </style>

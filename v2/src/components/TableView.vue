@@ -105,7 +105,7 @@ const showAdvancedQuery = ref(false)
 const jsQuery = ref('$')
 const extendedFields = ref('')
 const showExtendedFields = ref(false)
-const selectedPresetId = ref<string | null>(null)
+const selectedPresetName = ref<string | null>(null)
 const showChart = ref(false)
 const first = ref(0)
 const rows = ref(100)
@@ -184,7 +184,7 @@ const fieldQueries = ref<Record<string, FieldQuery>>({})
 
 // Keep columnVisibility in sync with columns (auto-update when columns change)
 watch(columns, (cols) => {
-  console.log('[TableView] columns watcher triggered, count:', cols.length, 'fields:', cols.map(c => c.field))
+  // console.log('[TableView] columns watcher triggered, count:', cols.length, 'fields:', cols.map(c => c.field))
   columnVisibility.value = cols.map(c => ({
     field: c.field,
     header: c.header,
@@ -269,10 +269,10 @@ const isApplyingPreset = ref(false)
 
 // Apply a loaded preset
 function applyPreset(preset: QueryPreset) {
-  // The selectedPresetId should already be set by PresetSelector via v-model
+  // The selectedPresetName should already be set by PresetSelector via v-model
   // but let's ensure it's set in case it wasn't
-  if (selectedPresetId.value !== preset.id) {
-    selectedPresetId.value = preset.id
+  if (selectedPresetName.value !== preset.name) {
+    selectedPresetName.value = preset.name
   }
 
   // Set flag to indicate we're explicitly applying a preset
@@ -392,7 +392,7 @@ function cancelHoverTimeout() {
 
 function updateFieldQuery(query: FieldQuery) {
   if (activeFilterColumn.value) {
-    console.log(`[updateFieldQuery] Field: ${activeFilterColumn.value.field}, patternExtract: "${query.patternExtract}", extendedFields: "${query.extendedFields}"`)
+    // console.log(`[updateFieldQuery] Field: ${activeFilterColumn.value.field}, patternExtract: "${query.patternExtract}", extendedFields: "${query.extendedFields}"`)
     fieldQueries.value[activeFilterColumn.value.field] = query
   }
 }
@@ -728,10 +728,10 @@ function buildTableInternal(node: TDNode | null, restoreState = true) {
     // Restore with explicit false default to prevent panel from showing unexpectedly
     showExtendedFields.value = cachedState.showExtendedFields ?? false
     showAdvancedQuery.value = cachedState.showAdvancedQuery ?? false
-    // Only restore selectedPresetId if we're doing a full state restore
+    // Only restore selectedPresetName if we're doing a full state restore
     // (not when rebuilding after applying a preset)
     if (restoreState) {
-      selectedPresetId.value = cachedState.selectedPresetId ?? null
+      selectedPresetName.value = cachedState.selectedPresetName ?? null
     }
   }
   
@@ -840,7 +840,7 @@ function buildTableInternal(node: TDNode | null, restoreState = true) {
         }
       } catch (e) {
         console.error('Error evaluating extended fields:', extendedFields.value)
-        console.error(e)
+        // console.error(e)
       }
     }
     
@@ -1108,7 +1108,7 @@ function handleExtendFieldResult(result: ExtendFieldResult) {
 // Handle immediate sync of JSON path extended fields from ExtendFieldDialog
 function handleUpdateExtendedFields(fields: string) {
   const field = extendFieldColumn.value
-  console.log('[TableView] handleUpdateExtendedFields called, field:', field, 'fields:', fields)
+  // console.log('[TableView] handleUpdateExtendedFields called, field:', field, 'fields:', fields)
   if (!field) return
   
   const existingQuery = fieldQueries.value[field] || {
@@ -1159,7 +1159,7 @@ function saveCurrentTableState() {
       isColumnExpanded: isColumnExpanded.value,
       showExtendedFields: showExtendedFields.value,
       showAdvancedQuery: showAdvancedQuery.value,
-      selectedPresetId: selectedPresetId.value,
+      selectedPresetName: selectedPresetName.value,
       chartState: {
         showChart: showChart.value,
         timeColumn: chartTimeColumn.value,
@@ -1201,13 +1201,13 @@ watch(
 
 watch(isColumnExpanded, () => {
   if (isBuilding) return
-  logger.log(`isColumnExpanded changed: ${isColumnExpanded.value}`)
+  // logger.log(`isColumnExpanded changed: ${isColumnExpanded.value}`)
   const node = localSelectedNode.value
   if (node) {
     saveCurrentTableState()
     buildTable(toRaw(node), false)
   }
-  logger.log(`isColumnExpanded changed end`)
+  // logger.log(`isColumnExpanded changed end`)
 })
 
 defineExpose({ onKeyPress })
@@ -1301,7 +1301,7 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
         <div class="toolbar-separator" />
         
         <PresetSelector
-          v-model="selectedPresetId"
+          v-model="selectedPresetName"
           :currentState="currentPresetState"
           @load="applyPreset"
         />
