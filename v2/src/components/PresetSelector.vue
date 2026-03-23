@@ -71,6 +71,10 @@ const currentConflictIndex = ref(0)
 const selectedPresetNames = ref<Set<string>>(new Set())
 const fileInputRef = ref<HTMLInputElement | null>(null)
 
+// Remembered export folder (File System Access API)
+const savedDirHandle = ref<any>(null)
+const savedDirName = ref<string | null>(null)
+
 // Computed - bind to parent via v-model (now uses preset name as key)
 const selectedPresetName = computed({
   get: () => props.modelValue ?? null,
@@ -594,6 +598,121 @@ function sanitizeFileName(name: string): string {
   return name.replace(/[<>:"/\\|?*]/g, '_').trim() || 'preset'
 }
 
+async function pickExportFolder() {
+  if (!('showDirectoryPicker' in window)) {
+    toast.add({
+      severity: 'warn',
+      summary: 'Not Supported',
+      detail: 'Your browser does not support folder selection',
+      life: 3000
+    })
+    return false
+  }
+
+  try {
+    const dirHandle = await (window as any).showDirectoryPicker({ mode: 'readwrite' })
+    savedDirHandle.value = dirHandle
+    savedDirName.value = dirHandle.name
+    toast.add({
+      severity: 'info',
+      summary: 'Folder Selected',
+      detail: `Export folder set to "${dirHandle.name}"`,
+      life: 2000
+    })
+    return true
+  } catch (e: any) {
+    if (e.name === 'AbortError') return false
+    console.error('Directory picker failed:', e)
+    return false
+  }
+}
+
+async function checkFileExists(dirHandle: any, fileName: string): Promise<boolean> {
+  try {
+    await dirHandle.getFileHandle(fileName)
+    return true
+  } catch {
+    return false
+  }
+}
+
+async function exportPresetsToFolder(presetsToExport: QueryPreset[]) {
+  // Try to use File System Access API (modern browsers)
+  if (!('showDirectoryPicker' in window)) {
+    fallbackExportAsZip(presetsToExport)
+    return
+  }
+
+  try {
+    // Use saved directory handle or pick a new one
+    let dirHandle = savedDirHandle.value
+    if (!dirHandle) {
+      dirHandle = await (window as any).showDirectoryPicker({ mode: 'readwrite' })
+      savedDirHandle.value = dirHandle
+      savedDirName.value = dirHandle.name
+    }
+    
+    // Verify we still have permission
+    const permission = await dirHandle.queryPermission({ mode: 'readwrite' })
+    if (permission !== 'granted') {
+      const requestResult = await dirHandle.requestPermission({ mode: 'readwrite' })
+      if (requestResult !== 'granted') {
+        // Permission denied, pick a new folder
+        dirHandle = await (window as any).showDirectoryPicker({ mode: 'readwrite' })
+        savedDirHandle.value = dirHandle
+        savedDirName.value = dirHandle.name
+      }
+    }
+    
+    // Check for existing files
+    const existingFiles: string[] = []
+    for (const preset of presetsToExport) {
+      const fileName = `${sanitizeFileName(preset.name)}.json`
+      if (await checkFileExists(dirHandle, fileName)) {
+        existingFiles.push(fileName)
+      }
+    }
+    
+    // Warn about overwriting
+    if (existingFiles.length > 0) {
+      const fileList = existingFiles.length <= 3 
+        ? existingFiles.join(', ') 
+        : `${existingFiles.slice(0, 3).join(', ')} and ${existingFiles.length - 3} more`
+      if (!confirm(`The following file(s) will be overwritten:\n${fileList}\n\nContinue?`)) {
+        return
+      }
+    }
+    
+    // Export files
+    for (const preset of presetsToExport) {
+      const json = exportPreset(preset)
+      const fileName = `${sanitizeFileName(preset.name)}.json`
+      const fileHandle = await dirHandle.getFileHandle(fileName, { create: true })
+      const writable = await fileHandle.createWritable()
+      await writable.write(json)
+      await writable.close()
+    }
+    
+    toast.add({
+      severity: 'success',
+      summary: 'Exported',
+      detail: `${presetsToExport.length} preset(s) saved to "${savedDirName.value}"`,
+      life: 3000
+    })
+    
+    deselectAllPresets()
+  } catch (e: any) {
+    if (e.name === 'AbortError') {
+      return
+    }
+    console.error('Directory picker failed:', e)
+    // Clear saved handle if it's invalid
+    savedDirHandle.value = null
+    savedDirName.value = null
+    fallbackExportAsZip(presetsToExport)
+  }
+}
+
 async function exportSelectedToFiles() {
   const selectedPresets = presets.value.filter(p => selectedPresetNames.value.has(p.name))
   
@@ -607,38 +726,11 @@ async function exportSelectedToFiles() {
     return
   }
 
-  // Try to use File System Access API (modern browsers)
-  if ('showDirectoryPicker' in window) {
-    try {
-      const dirHandle = await (window as any).showDirectoryPicker({ mode: 'readwrite' })
-      
-      for (const preset of selectedPresets) {
-        const json = exportPreset(preset)
-        const fileName = `${sanitizeFileName(preset.name)}.json`
-        const fileHandle = await dirHandle.getFileHandle(fileName, { create: true })
-        const writable = await fileHandle.createWritable()
-        await writable.write(json)
-        await writable.close()
-      }
-      
-      toast.add({
-        severity: 'success',
-        summary: 'Exported',
-        detail: `${selectedPresets.length} preset(s) saved to folder`,
-        life: 3000
-      })
-      
-      deselectAllPresets()
-    } catch (e: any) {
-      if (e.name === 'AbortError') {
-        return
-      }
-      console.error('Directory picker failed:', e)
-      fallbackExportAsZip(selectedPresets)
-    }
-  } else {
-    fallbackExportAsZip(selectedPresets)
-  }
+  await exportPresetsToFolder(selectedPresets)
+}
+
+async function exportSinglePreset(preset: QueryPreset) {
+  await exportPresetsToFolder([preset])
 }
 
 async function fallbackExportAsZip(selectedPresets: QueryPreset[]) {
@@ -985,8 +1077,16 @@ const currentConflict = computed(() => {
           size="small"
           severity="secondary"
           @click="exportSelectedToFiles"
-          v-tooltip.top="'Export selected'"
+          v-tooltip.top="savedDirName ? `Export to '${savedDirName}'` : 'Export selected'"
           :disabled="selectedPresetNames.size === 0"
+        />
+        <Button
+          icon="pi pi-folder"
+          size="small"
+          text
+          :severity="savedDirName ? 'primary' : 'secondary'"
+          @click="pickExportFolder"
+          v-tooltip.top="savedDirName ? `Change folder (${savedDirName})` : 'Set export folder'"
         />
         <Button
           icon="pi pi-trash"
@@ -1049,6 +1149,7 @@ const currentConflict = computed(() => {
           </div>
           <div class="preset-actions">
             <Button icon="pi pi-pencil" size="small" text @click.stop="startEdit(preset)" v-tooltip.top="'Edit'" />
+            <Button icon="pi pi-download" size="small" text @click.stop="exportSinglePreset(preset)" v-tooltip.top="'Export to file'" />
             <Button icon="pi pi-share-alt" size="small" text @click.stop="sharePreset(preset)" v-tooltip.top="'Share link'" />
             <Button icon="pi pi-copy" size="small" text @click.stop="exportPresetToClipboard(preset)" v-tooltip.top="'Copy to clipboard'" />
             <Button icon="pi pi-trash" size="small" text severity="danger" @click.stop="removePreset(preset.name)" v-tooltip.top="'Delete'" />
