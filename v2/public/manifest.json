@@ -1,0 +1,26 @@
+{
+  "name": "TreeDoc Viewer",
+  "short_name": "TreeDoc",
+  "description": "A powerful JSON/TreeDoc viewer with table view, tree view, and query capabilities",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#3b82f6",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "file_handlers": [
+    {
+      "action": "/",
+      "accept": {
+        "application/json": [".json"],
+        "text/plain": [".txt", ".log", ".yaml", ".yml", ".xml", ".csv", ".tsv", ".prometheus"]
+      }
+    }
+  ]
+}
