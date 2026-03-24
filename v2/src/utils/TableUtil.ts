@@ -5,7 +5,7 @@
 import type { TDNode } from 'treedoc'
 import { TDNodeType, TDJSONWriter, TDJSONWriterOption, TD, NodeFilter, TDObjectCoder, CSVWriter } from 'treedoc'
 import { toRaw } from 'vue'
-import { getTimestampHint, tryDate } from './DateUtil'
+import { getTimestampHint, tryParseDate } from './DateUtil'
 
 export type TimeBucket = 'second' | 'minute' | '5min' | '10min' | '30min' | 'hour' | 'day' | 'week' | 'month'
 
@@ -200,14 +200,26 @@ function getNumericValue(row: TableRow, field: string): number | null {
 }
 
 /**
- * Parse a timestamp value to Date, handling ms, seconds, and microseconds
+ * Get any value from a cell (numeric or string)
  */
-function parseTimestamp(val: number): Date | null {
-  return tryDate(val) || tryDate(val * 1000) || tryDate(val / 1000_000)
+function getCellAnyValue(row: TableRow, field: string): unknown {
+  const node = getCellNode(row, field)
+  if (node && node.type === TDNodeType.SIMPLE) {
+    return node.value
+  }
+  return row[field]
+}
+
+/**
+ * Parse a timestamp value to Date, handling numbers and strings
+ */
+function parseTimestamp(val: unknown): Date | null {
+  return tryParseDate(val)
 }
 
 /**
  * Detect columns that appear to contain timestamp values
+ * Supports both numeric timestamps and date strings
  */
 export function detectTimeColumns(data: TableRow[], columns: TableColumn[]): string[] {
   const timeColumns: string[] = []
@@ -220,15 +232,15 @@ export function detectTimeColumns(data: TableRow[], columns: TableColumn[]): str
     let totalSampled = 0
 
     for (let i = 0; i < sampleSize && i < data.length; i++) {
-      const num = getNumericValue(data[i], col.field)
-      if (num !== null) {
+      const val = getCellAnyValue(data[i], col.field)
+      if (val !== null && val !== undefined && val !== '') {
         totalSampled++
-        const date = parseTimestamp(num)
+        const date = parseTimestamp(val)
         if (date) validCount++
       }
     }
 
-    // If at least 80% of sampled numeric values are valid timestamps
+    // If at least 80% of sampled values are valid timestamps
     if (totalSampled > 0 && validCount / totalSampled >= 0.8) {
       timeColumns.push(col.field)
     }
@@ -322,9 +334,9 @@ export function detectBucketSize(data: TableRow[], timeColumn: string): TimeBuck
   let maxTime = -Infinity
 
   for (const row of data) {
-    const num = getNumericValue(row, timeColumn)
-    if (num !== null) {
-      const date = parseTimestamp(num)
+    const val = getCellAnyValue(row, timeColumn)
+    if (val !== null && val !== undefined) {
+      const date = parseTimestamp(val)
       if (date) {
         const time = date.getTime()
         if (time < minTime) minTime = time
@@ -471,10 +483,10 @@ export function aggregateByTime(
   const buckets = new Map<string, { count: number; sum: number; valueCount: number; groups: Record<string, number> }>()
 
   for (const row of data) {
-    const num = getNumericValue(row, timeColumn)
-    if (num === null) continue
+    const val = getCellAnyValue(row, timeColumn)
+    if (val === null || val === undefined) continue
 
-    const date = parseTimestamp(num)
+    const date = parseTimestamp(val)
     if (!date) continue
 
     const key = getBucketKey(date, bucket)
