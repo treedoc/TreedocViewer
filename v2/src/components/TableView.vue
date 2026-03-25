@@ -21,7 +21,7 @@ import PresetSelector from './PresetSelector.vue'
 import TimeSeriesChart from './TimeSeriesChart.vue'
 import HoverButtonBar, { type HoverButton } from './HoverButtonBar.vue'
 import type { QueryPreset, FieldQuery, Column, TableNodeState } from '@/models/types'
-import { columnsToFieldQueries } from '@/models/types'
+import { columnsToFieldQueries, getPresetConfigForPath } from '@/models/types'
 import type { ExpandState } from './ExpandControl.vue'
 import type { ColumnVisibility } from './ColumnSelector.vue'
 import { Logger } from '@/utils/Logger'
@@ -260,6 +260,7 @@ const currentPresetState = computed(() => ({
   })),
   jsQuery: jsQuery.value,
   expandLevel: expandControlRef.value?.state?.expandLevel,
+  currentPath: localSelectedNode.value?.pathAsString || '',
 }))
 
 // Persistent preset visibility for columns
@@ -275,29 +276,41 @@ function applyPreset(preset: QueryPreset) {
     selectedPresetName.value = preset.name
   }
 
+  // Get the current node path for path-based rule matching
+  const currentPath = localSelectedNode.value?.pathAsString || ''
+  
+  // Get the effective configuration for this path
+  const config = getPresetConfigForPath(preset, currentPath)
+  
+  // If no path rule matches, don't apply any configuration
+  if (!config) {
+    logger.log(`No matching path rule for "${currentPath}" in preset "${preset.name}"`)
+    return
+  }
+
   // Set flag to indicate we're explicitly applying a preset
   isApplyingPreset.value = true
 
   // Save preset column order and visibility for use after rebuild
-  presetColumnOrder.value = preset.columns.map(c => c.field)
+  presetColumnOrder.value = config.columns.map(c => c.field)
   presetColumnVisibility.value = new Map(
-    preset.columns
+    config.columns
       .filter(c => c.visible !== undefined)
       .map(c => [c.field, c.visible as boolean])
   )
 
   // Derive extendedFields from the first column that has one (global)
-  const colWithExt = preset.columns.find(c => c.extendedFields)
+  const colWithExt = config.columns.find(c => c.extendedFields)
   extendedFields.value = colWithExt?.extendedFields || ''
 
   // Apply field queries from preset columns
-  fieldQueries.value = columnsToFieldQueries(preset.columns)
+  fieldQueries.value = columnsToFieldQueries(config.columns)
 
   // Apply JS query
-  jsQuery.value = preset.jsQuery || '$'
+  jsQuery.value = config.jsQuery || '$'
 
   // Apply value colors from preset columns
-  applyValueColorsFromColumns(preset.columns)
+  applyValueColorsFromColumns(config.columns)
 
   // Rebuild table to apply changes (derived columns will be positioned using presetColumnOrder)
   rebuildTable()

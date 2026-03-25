@@ -5,7 +5,7 @@ import Checkbox from 'primevue/checkbox'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
-import type { QueryPreset, Column } from '@/models/types'
+import type { QueryPreset, Column, PathRule } from '@/models/types'
 import { cleanColumnForSave } from '@/models/types'
 import {
   getAllPresets,
@@ -33,6 +33,7 @@ export interface CurrentState {
   columns: Column[]
   jsQuery: string
   expandLevel?: number
+  currentPath?: string  // Current selected node path for path-based rules
 }
 
 const props = defineProps<{
@@ -74,6 +75,12 @@ const fileInputRef = ref<HTMLInputElement | null>(null)
 // Remembered export folder (File System Access API)
 const savedDirHandle = ref<any>(null)
 const savedDirName = ref<string | null>(null)
+
+// Path rules editing state
+const showPathRulesDialog = ref(false)
+const editingPathRules = ref<PathRule[]>([])
+const editingPathRulesPresetName = ref<string | null>(null)
+const newPathPattern = ref('')
 
 // Computed - bind to parent via v-model (now uses preset name as key)
 const selectedPresetName = computed({
@@ -146,9 +153,21 @@ function saveCurrentAsPreset() {
   doSavePreset(false)
 }
 
+function buildPathRuleFromCurrentState(pathPattern: string): PathRule {
+  return {
+    pathPattern,
+    columns: buildColumnsWithColors().map(cleanColumnForSave) as Column[],
+    jsQuery: props.currentState.jsQuery,
+    expandLevel: props.currentState.expandLevel,
+  }
+}
+
 function doSavePreset(overwrite: boolean) {
   const name = newPresetName.value.trim()
   const description = newPresetDescription.value.trim() || undefined
+  
+  // Create a catch-all rule with current settings
+  const catchAllRule = buildPathRuleFromCurrentState('**')
   
   let preset: QueryPreset | null
   
@@ -157,9 +176,7 @@ function doSavePreset(overwrite: boolean) {
     const updated = updatePreset(existingPresetToOverwrite.value.name, {
       name,
       description,
-      columns: buildColumnsWithColors().map(cleanColumnForSave) as Column[],
-      jsQuery: props.currentState.jsQuery,
-      expandLevel: props.currentState.expandLevel,
+      pathRules: [catchAllRule],
     })
     
     if (updated) {
@@ -180,13 +197,11 @@ function doSavePreset(overwrite: boolean) {
       return
     }
   } else {
-    // Create new preset
+    // Create new preset with a catch-all rule
     preset = savePreset({
       name,
       description,
-      columns: buildColumnsWithColors().map(cleanColumnForSave) as Column[],
-      jsQuery: props.currentState.jsQuery,
-      expandLevel: props.currentState.expandLevel,
+      pathRules: [catchAllRule],
     })
     
     if (preset) {
@@ -224,10 +239,27 @@ function updateCurrentPreset() {
 
   console.log('[PresetSelector] Saving preset, currentState columns:', props.currentState.columns.length)
   
+  const preset = getPreset(selectedPresetName.value)
+  if (!preset) return
+  
+  // Find the catch-all rule (**) or the first rule to update
+  const existingRules = preset.pathRules
+  const catchAllIndex = existingRules.findIndex(r => r.pathPattern === '**')
+  
+  const newRule = buildPathRuleFromCurrentState('**')
+  
+  let updatedRules: PathRule[]
+  if (catchAllIndex >= 0) {
+    // Update existing catch-all rule
+    updatedRules = [...existingRules]
+    updatedRules[catchAllIndex] = newRule
+  } else {
+    // Add catch-all rule at the end
+    updatedRules = [...existingRules, newRule]
+  }
+  
   const updated = updatePreset(selectedPresetName.value, {
-    columns: buildColumnsWithColors().map(cleanColumnForSave) as Column[],
-    jsQuery: props.currentState.jsQuery,
-    expandLevel: props.currentState.expandLevel,
+    pathRules: updatedRules,
   })
   
   if (updated) {
@@ -247,6 +279,134 @@ function updateCurrentPreset() {
   }
   
   refreshPresets()
+}
+
+// Save current settings as a path rule for the selected preset
+function saveAsPathRule() {
+  if (!selectedPresetName.value || !props.currentState.currentPath) {
+    toast.add({
+      severity: 'warn',
+      summary: 'Cannot Save Path Rule',
+      detail: 'Please select a preset and ensure a node is selected',
+      life: 3000,
+    })
+    return
+  }
+  
+  const preset = getPreset(selectedPresetName.value)
+  if (!preset) return
+  
+  const currentPath = props.currentState.currentPath
+  const existingRules = preset.pathRules
+  
+  // Check if a rule for this exact path already exists
+  const existingIndex = existingRules.findIndex(r => r.pathPattern === currentPath)
+  
+  const newRule = buildPathRuleFromCurrentState(currentPath)
+  
+  let updatedRules: PathRule[]
+  if (existingIndex >= 0) {
+    // Update existing rule
+    updatedRules = [...existingRules]
+    updatedRules[existingIndex] = newRule
+  } else {
+    // Add new rule at the beginning (higher priority than catch-all)
+    updatedRules = [newRule, ...existingRules]
+  }
+  
+  const updated = updatePreset(selectedPresetName.value, {
+    pathRules: updatedRules,
+  })
+  
+  if (updated) {
+    toast.add({
+      severity: 'success',
+      summary: 'Path Rule Saved',
+      detail: `Settings saved for path "${currentPath}"`,
+      life: 3000,
+    })
+    refreshPresets()
+  }
+}
+
+// Open the path rules management dialog
+function openPathRulesDialog(preset: QueryPreset) {
+  editingPathRulesPresetName.value = preset.name
+  editingPathRules.value = preset.pathRules ? [...preset.pathRules] : []
+  newPathPattern.value = ''
+  showPathRulesDialog.value = true
+}
+
+// Add a new path rule
+function addPathRule() {
+  if (!newPathPattern.value.trim()) return
+  
+  // Check for duplicate pattern
+  if (editingPathRules.value.some(r => r.pathPattern === newPathPattern.value.trim())) {
+    toast.add({
+      severity: 'warn',
+      summary: 'Duplicate Pattern',
+      detail: 'A rule with this pattern already exists',
+      life: 3000,
+    })
+    return
+  }
+  
+  editingPathRules.value.push({
+    pathPattern: newPathPattern.value.trim(),
+    columns: [],
+  })
+  newPathPattern.value = ''
+}
+
+// Remove a path rule
+function removePathRule(index: number) {
+  editingPathRules.value.splice(index, 1)
+}
+
+// Move a path rule up in priority
+function movePathRuleUp(index: number) {
+  if (index <= 0) return
+  const rules = editingPathRules.value
+  const temp = rules[index]
+  rules[index] = rules[index - 1]
+  rules[index - 1] = temp
+  editingPathRules.value = [...rules]
+}
+
+// Move a path rule down in priority
+function movePathRuleDown(index: number) {
+  if (index >= editingPathRules.value.length - 1) return
+  const rules = editingPathRules.value
+  const temp = rules[index]
+  rules[index] = rules[index + 1]
+  rules[index + 1] = temp
+  editingPathRules.value = [...rules]
+}
+
+// Save path rules changes
+function savePathRules() {
+  if (!editingPathRulesPresetName.value) return
+  
+  const updated = updatePreset(editingPathRulesPresetName.value, {
+    pathRules: editingPathRules.value.length > 0 ? editingPathRules.value : undefined,
+  })
+  
+  if (updated) {
+    toast.add({
+      severity: 'success',
+      summary: 'Path Rules Saved',
+      detail: `Path rules updated for "${editingPathRulesPresetName.value}"`,
+      life: 3000,
+    })
+    refreshPresets()
+    showPathRulesDialog.value = false
+  }
+}
+
+// Count path rules in a preset
+function countPathRules(preset: QueryPreset): number {
+  return preset.pathRules?.length || 0
 }
 
 function openManageDialog() {
@@ -361,8 +521,14 @@ function exportPresetToClipboard(preset: QueryPreset) {
 function sharePreset(preset: QueryPreset) {
   try {
     const clean: QueryPreset = {
-      ...preset,
-      columns: preset.columns.map(cleanColumnForSave) as Column[],
+      name: preset.name,
+      description: preset.description,
+      createdAt: preset.createdAt,
+      updatedAt: preset.updatedAt,
+      pathRules: preset.pathRules.map(rule => ({
+        ...rule,
+        columns: rule.columns.map(cleanColumnForSave) as Column[],
+      })),
     }
     // Remove timestamps for cleaner share
     const toShare = JSON.parse(JSON.stringify(clean))
@@ -419,9 +585,7 @@ function handleImport(overwrite: boolean) {
   if (existing && overwrite) {
     updatePreset(existing.name, {
       description: sharedPreset.value.description,
-      columns: sharedPreset.value.columns,
-      jsQuery: sharedPreset.value.jsQuery,
-      expandLevel: sharedPreset.value.expandLevel,
+      pathRules: sharedPreset.value.pathRules,
     })
     toast.add({
       severity: 'success',
@@ -433,8 +597,9 @@ function handleImport(overwrite: boolean) {
     // Save as new with renamed name
     const newName = `${name} (imported)`
     savePreset({
-      ...sharedPreset.value,
-      name: newName
+      name: newName,
+      description: sharedPreset.value.description,
+      pathRules: sharedPreset.value.pathRules,
     })
     toast.add({
       severity: 'success',
@@ -444,7 +609,11 @@ function handleImport(overwrite: boolean) {
     })
   } else {
     // Simple save
-    savePreset(sharedPreset.value)
+    savePreset({
+      name: sharedPreset.value.name,
+      description: sharedPreset.value.description,
+      pathRules: sharedPreset.value.pathRules,
+    })
     toast.add({
       severity: 'success',
       summary: 'Imported',
@@ -555,12 +724,27 @@ function importFromClipboard() {
 
 function countPresetColors(preset: QueryPreset): number {
   let count = 0
-  for (const col of preset.columns) {
-    if (col.valueColors) {
-      count += Object.keys(col.valueColors).length
+  for (const rule of preset.pathRules) {
+    for (const col of rule.columns) {
+      if (col.valueColors) {
+        count += Object.keys(col.valueColors).length
+      }
     }
   }
   return count
+}
+
+// Get summary info from the first/catch-all rule for display
+function getPresetSummary(preset: QueryPreset): { columns: Column[], hasExtendedFields: boolean, filterCount: number } {
+  const firstRule = preset.pathRules[0]
+  if (!firstRule) {
+    return { columns: [], hasExtendedFields: false, filterCount: 0 }
+  }
+  return {
+    columns: firstRule.columns,
+    hasExtendedFields: firstRule.columns.some(c => c.extendedFields),
+    filterCount: firstRule.columns.filter(c => c.query || c.jsExpression).length,
+  }
 }
 
 function formatDate(timestamp: number): string {
@@ -860,11 +1044,17 @@ function handleConflictOverwrite() {
   if (!conflict) return
   
   const data = conflict.data
-  updatePreset(data.name, {
-    description: data.description,
-    columns: data.columns,
+  // Migrate old format if needed
+  const pathRules = data.pathRules || [{
+    pathPattern: '**',
+    columns: data.columns || [],
     jsQuery: data.jsQuery,
     expandLevel: data.expandLevel,
+  }]
+  
+  updatePreset(data.name, {
+    description: data.description,
+    pathRules,
   })
   
   toast.add({
@@ -890,12 +1080,18 @@ function handleConflictRename() {
     suffix++
   }
   
+  // Migrate old format if needed
+  const pathRules = data.pathRules || [{
+    pathPattern: '**',
+    columns: data.columns || [],
+    jsQuery: data.jsQuery,
+    expandLevel: data.expandLevel,
+  }]
+  
   savePreset({
     name: newName,
     description: data.description,
-    columns: data.columns,
-    jsQuery: data.jsQuery,
-    expandLevel: data.expandLevel,
+    pathRules,
   })
   
   toast.add({
@@ -962,6 +1158,17 @@ const currentConflict = computed(() => {
       severity="secondary"
       @click="openSaveDialog"
       v-tooltip.top="'Save as new preset'"
+    />
+    
+    <!-- Save for Path Button (when preset selected and path available) -->
+    <Button
+      v-if="selectedPresetName && currentState.currentPath"
+      icon="pi pi-sitemap"
+      size="small"
+      text
+      severity="secondary"
+      @click="saveAsPathRule"
+      v-tooltip.top="'Save settings for current path: ' + currentState.currentPath"
     />
     
     <!-- Manage Button -->
@@ -1141,14 +1348,16 @@ const currentConflict = computed(() => {
               {{ preset.description }}
             </div>
             <div class="preset-meta">
-              <span>{{ preset.columns.filter(c => c.visible !== false).length }} columns</span>
-              <span v-if="preset.columns.some(c => c.extendedFields)">• Extended fields</span>
-              <span v-if="preset.columns.some(c => c.query || c.jsExpression)">• {{ preset.columns.filter(c => c.query || c.jsExpression).length }} filters</span>
+              <span>{{ countPathRules(preset) }} path rule(s)</span>
+              <span v-if="getPresetSummary(preset).columns.filter(c => c.visible !== false).length > 0">• {{ getPresetSummary(preset).columns.filter(c => c.visible !== false).length }} columns</span>
+              <span v-if="getPresetSummary(preset).hasExtendedFields">• Extended fields</span>
+              <span v-if="getPresetSummary(preset).filterCount > 0">• {{ getPresetSummary(preset).filterCount }} filters</span>
               <span v-if="countPresetColors(preset) > 0">• {{ countPresetColors(preset) }} colors</span>
             </div>
           </div>
           <div class="preset-actions">
             <Button icon="pi pi-pencil" size="small" text @click.stop="startEdit(preset)" v-tooltip.top="'Edit'" />
+            <Button icon="pi pi-sitemap" size="small" text @click.stop="openPathRulesDialog(preset)" v-tooltip.top="'Manage path rules'" />
             <Button icon="pi pi-download" size="small" text @click.stop="exportSinglePreset(preset)" v-tooltip.top="'Export to file'" />
             <Button icon="pi pi-share-alt" size="small" text @click.stop="sharePreset(preset)" v-tooltip.top="'Share link'" />
             <Button icon="pi pi-copy" size="small" text @click.stop="exportPresetToClipboard(preset)" v-tooltip.top="'Copy to clipboard'" />
@@ -1212,6 +1421,91 @@ const currentConflict = computed(() => {
       <Button label="Skip" severity="secondary" text @click="handleConflictSkip" />
       <Button label="Rename" severity="secondary" @click="handleConflictRename" v-tooltip.top="'Save with auto-generated name'" />
       <Button label="Overwrite" severity="warning" @click="handleConflictOverwrite" />
+    </template>
+  </Dialog>
+
+  <!-- Path Rules Management Dialog -->
+  <Dialog
+    v-model:visible="showPathRulesDialog"
+    header="Manage Path Rules"
+    :modal="true"
+    :style="{ width: '600px' }"
+    :dismissableMask="true"
+  >
+    <div class="path-rules-dialog-content">
+      <p class="path-rules-help">
+        Path rules let you apply different settings based on the selected node's path.
+        Rules are checked in order - the first matching rule wins.
+        Use <code>*</code> for single segment, <code>**</code> for multiple segments.
+      </p>
+      
+      <!-- Add new rule -->
+      <div class="add-rule-row">
+        <InputText
+          v-model="newPathPattern"
+          placeholder="Enter path pattern (e.g., /logs/**, /orders/*)"
+          class="pattern-input"
+          @keydown.enter="addPathRule"
+        />
+        <Button icon="pi pi-plus" @click="addPathRule" :disabled="!newPathPattern.trim()" />
+      </div>
+      
+      <!-- Rules list -->
+      <div v-if="editingPathRules.length === 0" class="no-rules">
+        No path rules defined. Settings will apply to all paths.
+      </div>
+      
+      <div v-else class="rules-list">
+        <div
+          v-for="(rule, index) in editingPathRules"
+          :key="index"
+          class="rule-item"
+        >
+          <div class="rule-priority">{{ index + 1 }}</div>
+          <div class="rule-pattern">
+            <code>{{ rule.pathPattern }}</code>
+          </div>
+          <div class="rule-meta">
+            <span v-if="rule.columns.length > 0">{{ rule.columns.length }} columns</span>
+            <span v-else class="text-muted">Empty (uses default)</span>
+          </div>
+          <div class="rule-actions">
+            <Button 
+              icon="pi pi-chevron-up" 
+              size="small" 
+              text 
+              @click="movePathRuleUp(index)"
+              :disabled="index === 0"
+              v-tooltip.top="'Move up'"
+            />
+            <Button 
+              icon="pi pi-chevron-down" 
+              size="small" 
+              text 
+              @click="movePathRuleDown(index)"
+              :disabled="index === editingPathRules.length - 1"
+              v-tooltip.top="'Move down'"
+            />
+            <Button 
+              icon="pi pi-trash" 
+              size="small" 
+              text 
+              severity="danger" 
+              @click="removePathRule(index)"
+              v-tooltip.top="'Delete'"
+            />
+          </div>
+        </div>
+      </div>
+      
+      <div class="path-rules-note">
+        <i class="pi pi-info-circle"></i>
+        <span>To edit a rule's columns/settings: select that path in the table, configure the columns, then use "Save for Path".</span>
+      </div>
+    </div>
+    <template #footer>
+      <Button label="Cancel" severity="secondary" text @click="showPathRulesDialog = false" />
+      <Button label="Save" @click="savePathRules" />
     </template>
   </Dialog>
 </template>
@@ -1431,5 +1725,126 @@ const currentConflict = computed(() => {
 
 .conflict-file i {
   color: var(--tdv-text-muted);
+}
+
+/* Path rules badge */
+.path-rules-badge {
+  color: var(--tdv-primary);
+}
+
+/* Path rules dialog */
+.path-rules-dialog-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.path-rules-help {
+  font-size: 0.85rem;
+  color: var(--tdv-text-secondary);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.path-rules-help code {
+  background: var(--tdv-surface-light);
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-size: 0.8rem;
+}
+
+.add-rule-row {
+  display: flex;
+  gap: 8px;
+}
+
+.pattern-input {
+  flex: 1;
+}
+
+.no-rules {
+  text-align: center;
+  padding: 24px;
+  color: var(--tdv-text-muted);
+  font-style: italic;
+  background: var(--tdv-surface-light);
+  border-radius: var(--tdv-radius-sm);
+}
+
+.rules-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.rule-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--tdv-surface-border);
+  border-radius: var(--tdv-radius-sm);
+  background: var(--tdv-surface-light);
+}
+
+.rule-priority {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--tdv-primary);
+  color: white;
+  border-radius: 50%;
+  font-size: 0.75rem;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.rule-pattern {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rule-pattern code {
+  font-size: 0.85rem;
+  word-break: break-all;
+}
+
+.rule-meta {
+  font-size: 0.75rem;
+  color: var(--tdv-text-muted);
+  flex-shrink: 0;
+}
+
+.text-muted {
+  font-style: italic;
+}
+
+.rule-actions {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.path-rules-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px;
+  background: var(--tdv-surface-light);
+  border-radius: var(--tdv-radius-sm);
+  font-size: 0.85rem;
+  color: var(--tdv-text-secondary);
+}
+
+.path-rules-note i {
+  color: var(--tdv-primary);
+  flex-shrink: 0;
+  margin-top: 2px;
 }
 </style>

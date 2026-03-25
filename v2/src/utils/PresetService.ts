@@ -3,8 +3,20 @@
  * Preset name is used as the unique identifier (case-insensitive)
  */
 
-import type { QueryPreset, Column } from '@/models/types'
+import type { QueryPreset, Column, PathRule } from '@/models/types'
 import { cleanColumnForSave } from '@/models/types'
+
+/**
+ * Clean a PathRule for saving (compact JSON)
+ */
+function cleanPathRuleForSave(rule: PathRule): PathRule {
+  return {
+    pathPattern: rule.pathPattern,
+    columns: rule.columns.map(cleanColumnForSave) as Column[],
+    ...(rule.jsQuery ? { jsQuery: rule.jsQuery } : {}),
+    ...(rule.expandLevel !== undefined ? { expandLevel: rule.expandLevel } : {}),
+  }
+}
 import { TD } from 'treedoc'
 
 const STORAGE_KEY = 'tdv-query-presets'
@@ -34,12 +46,23 @@ export function getAllPresets(): QueryPreset[] {
 }
 
 /**
- * Migrate a preset from the old format to the new unified Column format.
- * Old format had: columns[], fieldQueries{}, extendedFields string, id field.
- * New format has: columns[] (with filter state embedded), jsQuery, name as key.
+ * Migrate a preset from old formats to the new path-rules-only format.
+ * Old formats had: columns[], fieldQueries{}, extendedFields string, id field.
+ * New format has: pathRules[] only (no default columns at root level).
  */
 function migratePreset(raw: any): QueryPreset {
-  // Merge old fieldQueries into columns if present
+  // If already has pathRules, just return with cleaned structure
+  if (raw.pathRules && Array.isArray(raw.pathRules) && raw.pathRules.length > 0) {
+    return {
+      name: raw.name,
+      description: raw.description,
+      createdAt: raw.createdAt,
+      updatedAt: raw.updatedAt,
+      pathRules: raw.pathRules,
+    }
+  }
+  
+  // Migrate old format: merge fieldQueries into columns
   let columns = raw.columns || []
   if (raw.fieldQueries || raw.extendedFields) {
     const colMap: Record<string, Column> = {}
@@ -52,15 +75,20 @@ function migratePreset(raw: any): QueryPreset {
     columns = Object.values(colMap)
   }
 
-  // Return without the old 'id' field
+  // Convert old default config to a catch-all path rule
+  const catchAllRule: PathRule = {
+    pathPattern: '**',
+    columns,
+    ...(raw.jsQuery ? { jsQuery: raw.jsQuery } : {}),
+    ...(raw.expandLevel !== undefined ? { expandLevel: raw.expandLevel } : {}),
+  }
+  
   return {
     name: raw.name,
     description: raw.description,
     createdAt: raw.createdAt,
     updatedAt: raw.updatedAt,
-    columns,
-    jsQuery: raw.jsQuery,
-    expandLevel: raw.expandLevel,
+    pathRules: [catchAllRule],
   }
 }
 
@@ -81,7 +109,7 @@ export function getPresetByName(name: string): QueryPreset | null {
 }
 
 /**
- * Save a new preset. Columns are cleaned to remove default values (compact JSON).
+ * Save a new preset. Path rules are cleaned to remove default values (compact JSON).
  * Returns null if a preset with the same name already exists.
  */
 export function savePreset(preset: Omit<QueryPreset, 'createdAt' | 'updatedAt'>): QueryPreset | null {
@@ -97,10 +125,11 @@ export function savePreset(preset: Omit<QueryPreset, 'createdAt' | 'updatedAt'>)
   const now = Date.now()
 
   const newPreset: QueryPreset = {
-    ...preset,
-    columns: preset.columns.map(cleanColumnForSave) as Column[],
+    name: preset.name,
+    description: preset.description,
     createdAt: now,
     updatedAt: now,
+    pathRules: preset.pathRules.map(cleanPathRuleForSave),
   }
 
   presets.push(newPreset)
@@ -130,8 +159,8 @@ export function updatePreset(name: string, updates: Partial<Omit<QueryPreset, 'c
   }
 
   const cleanUpdates = { ...updates }
-  if (cleanUpdates.columns) {
-    cleanUpdates.columns = cleanUpdates.columns.map(cleanColumnForSave) as Column[]
+  if (cleanUpdates.pathRules) {
+    cleanUpdates.pathRules = cleanUpdates.pathRules.map(cleanPathRuleForSave)
   }
 
   const updated: QueryPreset = {
@@ -167,12 +196,15 @@ export function deletePreset(name: string): boolean {
  */
 export function exportPreset(preset: QueryPreset): string {
   const clean: QueryPreset = {
-    ...preset,
-    columns: preset.columns.map(cleanColumnForSave) as Column[],
+    name: preset.name,
+    description: preset.description,
+    createdAt: preset.createdAt,
+    updatedAt: preset.updatedAt,
+    pathRules: preset.pathRules.map(cleanPathRuleForSave),
   }
-  // Remove id and timestamps for a cleaner export/share
+  
+  // Remove timestamps for a cleaner export/share
   const toExport = JSON.parse(JSON.stringify(clean))
-  delete toExport.id
   delete toExport.createdAt
   delete toExport.updatedAt
 
@@ -187,15 +219,15 @@ export function exportPreset(preset: QueryPreset): string {
 
 /**
  * Import a preset from JSON string.
- * Accepts both old (fieldQueries/extendedFields) and new (unified columns) format.
+ * Accepts both old (columns at root) and new (pathRules only) format.
  * If a preset with the same name exists, appends a number to make it unique.
  */
 export function importPreset(json: string): QueryPreset | null {
   try {
     const data = TD.parse(json)
     
-    // Validate required fields
-    if (!data || !data.name || !data.columns) {
+    // Validate required fields (either pathRules or old-style columns)
+    if (!data || !data.name || (!data.pathRules && !data.columns)) {
       console.error('Invalid preset format: missing required fields')
       return null
     }
@@ -214,9 +246,7 @@ export function importPreset(json: string): QueryPreset | null {
     const preset = savePreset({
       name: finalName,
       description: migrated.description,
-      columns: migrated.columns,
-      jsQuery: migrated.jsQuery,
-      expandLevel: migrated.expandLevel,
+      pathRules: migrated.pathRules,
     })
 
     return preset
@@ -236,8 +266,6 @@ export function duplicatePreset(id: string, newName: string): QueryPreset | null
   return savePreset({
     name: newName,
     description: original.description,
-    columns: [...original.columns],
-    jsQuery: original.jsQuery,
-    expandLevel: original.expandLevel,
+    pathRules: [...original.pathRules],
   })
 }
