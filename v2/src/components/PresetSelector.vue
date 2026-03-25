@@ -6,7 +6,7 @@ import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
 import type { QueryPreset, Column, PathRule } from '@/models/types'
-import { cleanColumnForSave } from '@/models/types'
+import { cleanColumnForSave, findMatchingPathRule, matchPathPattern } from '@/models/types'
 import {
   getAllPresets,
   savePreset,
@@ -16,6 +16,7 @@ import {
   importPreset,
   getPresetByName,
   getPreset,
+  parsePresetFromObject,
 } from '@/utils/PresetService'
 import { TD } from 'treedoc'
 import { useToast } from 'primevue/usetoast'
@@ -81,6 +82,10 @@ const showPathRulesDialog = ref(false)
 const editingPathRules = ref<PathRule[]>([])
 const editingPathRulesPresetName = ref<string | null>(null)
 const newPathPattern = ref('')
+
+// Update preset (save) dialog — path pattern editing
+const showUpdatePresetDialog = ref(false)
+const updatePresetPattern = ref('')
 
 // Computed - bind to parent via v-model (now uses preset name as key)
 const selectedPresetName = computed({
@@ -162,6 +167,95 @@ function buildPathRuleFromCurrentState(pathPattern: string): PathRule {
   }
 }
 
+/** Index of the first path rule that matches `path` (same order as findMatchingPathRule). */
+function findMatchingRuleIndex(preset: QueryPreset, path: string): number {
+  for (let i = 0; i < preset.pathRules.length; i++) {
+    if (matchPathPattern(path, preset.pathRules[i].pathPattern)) {
+      return i
+    }
+  }
+  return -1
+}
+
+function openUpdatePresetDialog() {
+  if (!selectedPresetName.value) return
+  const preset = getPreset(selectedPresetName.value)
+  if (!preset) return
+
+  const path = props.currentState.currentPath
+  const matched = path ? findMatchingPathRule(preset, path) : undefined
+  const catchAll = preset.pathRules.find((r) => r.pathPattern === '**')
+  updatePresetPattern.value = matched?.pathPattern ?? catchAll?.pathPattern ?? '**'
+  showUpdatePresetDialog.value = true
+}
+
+function applyCurrentPathToPattern() {
+  const p = props.currentState.currentPath
+  if (p) {
+    updatePresetPattern.value = p
+  }
+}
+
+function confirmUpdatePreset() {
+  if (!selectedPresetName.value) return
+  const preset = getPreset(selectedPresetName.value)
+  if (!preset) return
+
+  const newPattern = updatePresetPattern.value.trim()
+  if (!newPattern) {
+    toast.add({
+      severity: 'warn',
+      summary: 'Pattern required',
+      detail: 'Enter a path pattern before saving.',
+      life: 3000,
+    })
+    return
+  }
+
+  const newRule = buildPathRuleFromCurrentState(newPattern)
+  const path = props.currentState.currentPath
+  const rules = [...preset.pathRules]
+  let matchedIdx = path ? findMatchingRuleIndex(preset, path) : rules.findIndex((r) => r.pathPattern === '**')
+
+  if (matchedIdx < 0) {
+    const filtered = rules.filter((r) => r.pathPattern !== newPattern)
+    filtered.unshift(newRule)
+    const updated = updatePreset(selectedPresetName.value, { pathRules: filtered })
+    finishPresetUpdate(updated)
+    return
+  }
+
+  for (let j = rules.length - 1; j >= 0; j--) {
+    if (j !== matchedIdx && rules[j].pathPattern === newPattern) {
+      rules.splice(j, 1)
+      if (j < matchedIdx) matchedIdx--
+    }
+  }
+  rules[matchedIdx] = newRule
+  const updated = updatePreset(selectedPresetName.value, { pathRules: rules })
+  finishPresetUpdate(updated)
+}
+
+function finishPresetUpdate(updated: QueryPreset | null) {
+  if (updated) {
+    toast.add({
+      severity: 'success',
+      summary: 'Preset Saved',
+      detail: `Preset "${selectedPresetName.value}" has been updated`,
+      life: 3000,
+    })
+  } else {
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: 'Failed to update preset',
+      life: 3000,
+    })
+  }
+  refreshPresets()
+  showUpdatePresetDialog.value = false
+}
+
 function doSavePreset(overwrite: boolean) {
   const name = newPresetName.value.trim()
   const description = newPresetDescription.value.trim() || undefined
@@ -232,101 +326,6 @@ function doSavePreset(overwrite: boolean) {
 function cancelOverwrite() {
   showOverwriteConfirm.value = false
   existingPresetToOverwrite.value = null
-}
-
-function updateCurrentPreset() {
-  if (!selectedPresetName.value) return
-
-  console.log('[PresetSelector] Saving preset, currentState columns:', props.currentState.columns.length)
-  
-  const preset = getPreset(selectedPresetName.value)
-  if (!preset) return
-  
-  // Find the catch-all rule (**) or the first rule to update
-  const existingRules = preset.pathRules
-  const catchAllIndex = existingRules.findIndex(r => r.pathPattern === '**')
-  
-  const newRule = buildPathRuleFromCurrentState('**')
-  
-  let updatedRules: PathRule[]
-  if (catchAllIndex >= 0) {
-    // Update existing catch-all rule
-    updatedRules = [...existingRules]
-    updatedRules[catchAllIndex] = newRule
-  } else {
-    // Add catch-all rule at the end
-    updatedRules = [...existingRules, newRule]
-  }
-  
-  const updated = updatePreset(selectedPresetName.value, {
-    pathRules: updatedRules,
-  })
-  
-  if (updated) {
-    toast.add({
-      severity: 'success',
-      summary: 'Preset Saved',
-      detail: `Preset "${selectedPresetName.value}" has been updated`,
-      life: 3000,
-    })
-  } else {
-    toast.add({
-      severity: 'error',
-      summary: 'Error',
-      detail: 'Failed to update preset',
-      life: 3000,
-    })
-  }
-  
-  refreshPresets()
-}
-
-// Save current settings as a path rule for the selected preset
-function saveAsPathRule() {
-  if (!selectedPresetName.value || !props.currentState.currentPath) {
-    toast.add({
-      severity: 'warn',
-      summary: 'Cannot Save Path Rule',
-      detail: 'Please select a preset and ensure a node is selected',
-      life: 3000,
-    })
-    return
-  }
-  
-  const preset = getPreset(selectedPresetName.value)
-  if (!preset) return
-  
-  const currentPath = props.currentState.currentPath
-  const existingRules = preset.pathRules
-  
-  // Check if a rule for this exact path already exists
-  const existingIndex = existingRules.findIndex(r => r.pathPattern === currentPath)
-  
-  const newRule = buildPathRuleFromCurrentState(currentPath)
-  
-  let updatedRules: PathRule[]
-  if (existingIndex >= 0) {
-    // Update existing rule
-    updatedRules = [...existingRules]
-    updatedRules[existingIndex] = newRule
-  } else {
-    // Add new rule at the beginning (higher priority than catch-all)
-    updatedRules = [newRule, ...existingRules]
-  }
-  
-  const updated = updatePreset(selectedPresetName.value, {
-    pathRules: updatedRules,
-  })
-  
-  if (updated) {
-    toast.add({
-      severity: 'success',
-      summary: 'Path Rule Saved',
-      detail: `Settings saved for path "${currentPath}"`,
-      life: 3000,
-    })
-    refreshPresets()
-  }
 }
 
 // Open the path rules management dialog
@@ -671,9 +670,10 @@ onMounted(() => {
         dataObject = JSON.parse(sharedData)
       }
 
-      if (dataObject && dataObject.name && dataObject.columns) {
-        sharedPreset.value = dataObject
-        importConflict.value = !!getPresetByName(dataObject.name)
+      const normalized = parsePresetFromObject(dataObject)
+      if (normalized) {
+        sharedPreset.value = normalized
+        importConflict.value = !!getPresetByName(normalized.name)
         showImportDialog.value = true
       } else {
         const structure = dataObject ? Object.keys(dataObject).join(', ') : 'null'
@@ -1145,7 +1145,7 @@ const currentConflict = computed(() => {
       size="small"
       text
       :severity="selectedPresetName ? 'primary' : 'secondary'"
-      @click="selectedPresetName ? updateCurrentPreset() : openSaveDialog()"
+      @click="selectedPresetName ? openUpdatePresetDialog() : openSaveDialog()"
       v-tooltip.top="selectedPresetName ? 'Update preset' : 'Save as new preset'"
     />
     
@@ -1158,17 +1158,6 @@ const currentConflict = computed(() => {
       severity="secondary"
       @click="openSaveDialog"
       v-tooltip.top="'Save as new preset'"
-    />
-    
-    <!-- Save for Path Button (when preset selected and path available) -->
-    <Button
-      v-if="selectedPresetName && currentState.currentPath"
-      icon="pi pi-sitemap"
-      size="small"
-      text
-      severity="secondary"
-      @click="saveAsPathRule"
-      v-tooltip.top="'Save settings for current path: ' + currentState.currentPath"
     />
     
     <!-- Manage Button -->
@@ -1212,6 +1201,49 @@ const currentConflict = computed(() => {
     <template #footer>
       <Button label="Cancel" severity="secondary" text @click="showSaveDialog = false" />
       <Button label="Save" :disabled="!newPresetName.trim()" @click="saveCurrentAsPreset" />
+    </template>
+  </Dialog>
+  
+  <!-- Update preset: path pattern + current path -->
+  <Dialog
+    v-model:visible="showUpdatePresetDialog"
+    header="Update Preset"
+    :modal="true"
+    :style="{ width: '440px' }"
+    :dismissableMask="true"
+  >
+    <div class="save-dialog-content">
+      <div class="field">
+        <label>Current path</label>
+        <div class="current-path-line">
+          <code v-if="currentState.currentPath">{{ currentState.currentPath }}</code>
+          <span v-else class="text-muted">No node selected (using catch-all pattern)</span>
+        </div>
+      </div>
+      <div class="field">
+        <label>Path pattern</label>
+        <InputText
+          v-model="updatePresetPattern"
+          placeholder="e.g. /logs/** or **"
+          class="w-full"
+          @keydown.enter="confirmUpdatePreset"
+        />
+        <p class="field-hint">First matching rule wins. Edit the pattern or use the button below.</p>
+      </div>
+      <div class="field field-row">
+        <Button
+          label="Apply current path"
+          icon="pi pi-link"
+          size="small"
+          outlined
+          :disabled="!currentState.currentPath"
+          @click="applyCurrentPathToPattern"
+        />
+      </div>
+    </div>
+    <template #footer>
+      <Button label="Cancel" severity="secondary" text @click="showUpdatePresetDialog = false" />
+      <Button label="Save" @click="confirmUpdatePreset" />
     </template>
   </Dialog>
   
@@ -1542,6 +1574,33 @@ const currentConflict = computed(() => {
   font-size: 0.85rem;
   font-weight: 500;
   color: var(--tdv-text-secondary);
+}
+
+.current-path-line code {
+  display: block;
+  padding: 8px 10px;
+  border-radius: var(--tdv-radius-sm);
+  background: var(--tdv-surface-light);
+  border: 1px solid var(--tdv-surface-border);
+  font-size: 0.8rem;
+  word-break: break-all;
+}
+
+.field-hint {
+  font-size: 0.75rem;
+  color: var(--tdv-text-muted);
+  margin: 4px 0 0;
+  line-height: 1.35;
+}
+
+.field-row {
+  flex-direction: row;
+  align-items: center;
+}
+
+.text-muted {
+  color: var(--tdv-text-muted);
+  font-size: 0.85rem;
 }
 
 .w-full {

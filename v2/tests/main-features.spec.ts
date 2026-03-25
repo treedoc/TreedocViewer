@@ -478,3 +478,24 @@ test.describe('TreeDoc Viewer - Main UI Features', () => {
     });
   });
 });
+
+test.describe('Shared preset URL', () => {
+  test('opens import dialog for pathRules-only shared preset (no root columns)', async ({
+    page,
+  }) => {
+    const presetName = `e2e-share-pathrules-${Date.now()}`;
+    const preset = {
+      name: presetName,
+      pathRules: [{ pathPattern: '**', columns: [{ field: 'id' }] }],
+    };
+    await page.goto(`/?sharePreset=${encodeURIComponent(JSON.stringify(preset))}`);
+    await page.locator('.cm-editor').waitFor({ state: 'visible', timeout: 10000 });
+
+    await expect(page.getByRole('dialog', { name: 'Import Shared Preset' })).toBeVisible({
+      timeout: 8000,
+    });
+    await expect(page.getByText("You've opened a shared preset:")).toBeVisible();
+    await expect(page.getByText(presetName, { exact: true })).toBeVisible();
+    await expect(page.getByText('Import Error')).toHaveCount(0);
+  });
+});

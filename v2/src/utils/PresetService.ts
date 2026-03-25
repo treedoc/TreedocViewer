@@ -93,6 +93,26 @@ function migratePreset(raw: any): QueryPreset {
 }
 
 /**
+ * Parse a preset object from a share URL or clipboard (same rules as import).
+ * Accepts new shape (pathRules) or legacy (columns at root).
+ */
+export function parsePresetFromObject(raw: unknown): QueryPreset | null {
+  const data = raw as Record<string, unknown> | null | undefined
+  if (
+    !data ||
+    typeof data.name !== 'string' ||
+    (!data.pathRules && !data.columns)
+  ) {
+    return null
+  }
+  try {
+    return migratePreset(data)
+  } catch {
+    return null
+  }
+}
+
+/**
  * Get a preset by name (case-insensitive)
  */
 export function getPreset(name: string): QueryPreset | null {
