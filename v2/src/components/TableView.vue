@@ -1223,7 +1223,7 @@ watch(isColumnExpanded, () => {
   // logger.log(`isColumnExpanded changed end`)
 })
 
-defineExpose({ onKeyPress })
+defineExpose({ onKeyPress, applyPreset })
 
 const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
 </script>

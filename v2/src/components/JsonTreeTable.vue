@@ -15,13 +15,15 @@ import { storeToRefs } from 'pinia'
 import SourceView from './SourceView.vue'
 import TreeView from './TreeView.vue'
 import TableView from './TableView.vue'
-import type { TDVOptions } from '../models/types'
+import type { TDVOptions, QueryPreset } from '../models/types'
+import { TDJSONParser } from 'treedoc'
 
 const props = defineProps<{
   data?: string | object
   initialPath?: string
   options?: TDVOptions
   rootObjectKey?: string
+  initialPreset?: string  // JSONEx encoded preset to apply after data loads
 }>()
 
 const emit = defineEmits<{
@@ -352,7 +354,10 @@ watch(() => props.initialPath, (path) => {
   }
 }, { immediate: true })
 
-// Show parse result as toast
+// Track if initial preset has been applied
+const initialPresetApplied = ref(false)
+
+// Show parse result as toast and apply initial preset if provided
 watch(parseResult, (result) => {
   if (result && result !== 'No data') {
     toast.add({
@@ -361,8 +366,65 @@ watch(parseResult, (result) => {
       detail: result,
       life: hasError.value ? 5000 : 3000
     })
+    
+    // Apply initial preset after successful parse (only once)
+    if (!hasError.value && props.initialPreset && !initialPresetApplied.value) {
+      initialPresetApplied.value = true
+      applyInitialPreset()
+    }
   }
 })
+
+// Apply initial preset from URL parameter
+function applyInitialPreset() {
+  if (!props.initialPreset) return
+  
+  try {
+    // Parse the JSONEx encoded preset
+    const node = TDJSONParser.get().parse(props.initialPreset)
+    const presetData = node.toObject(false)
+    
+    if (!presetData || !presetData.pathRules) {
+      // Handle old format with columns at root
+      if (presetData && presetData.columns) {
+        // Convert to new format
+        presetData.pathRules = [{
+          pathPattern: '**',
+          columns: presetData.columns,
+          jsQuery: presetData.jsQuery,
+          expandLevel: presetData.expandLevel,
+        }]
+        delete presetData.columns
+        delete presetData.jsQuery
+        delete presetData.expandLevel
+      } else {
+        console.error('[JsonTreeTable] Invalid preset format')
+        return
+      }
+    }
+    
+    // Create a temporary preset object
+    const preset: QueryPreset = {
+      name: presetData.name || '_url_preset',
+      description: presetData.description,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      pathRules: presetData.pathRules,
+    }
+    
+    // Apply the preset to TableView after a short delay to ensure it's mounted
+    nextTick(() => {
+      setTimeout(() => {
+        if (tableViewRef.value) {
+          tableViewRef.value.applyPreset(preset)
+          console.log('[JsonTreeTable] Applied initial preset:', preset.name)
+        }
+      }, 100)
+    })
+  } catch (e) {
+    console.error('[JsonTreeTable] Failed to parse initial preset:', e)
+  }
+}
 
 // Global keyboard handler for fullscreen toggle
 function handleGlobalKeydown(event: KeyboardEvent) {

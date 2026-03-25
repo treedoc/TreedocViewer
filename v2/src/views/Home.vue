@@ -16,6 +16,8 @@ const dataParam = urlParams.get('data') || hashParams.get('data')
 const dataUrlParam = urlParams.get('dataUrl') || hashParams.get('dataUrl')
 const initialPath = urlParams.get('initialPath') || hashParams.get('initialPath') || '/'
 const title = urlParams.get('title') || hashParams.get('title') || 'TreeDoc Viewer'
+// Preset parameter - JSONEx encoded preset to apply after data loads
+const presetParam = urlParams.get('preset') || hashParams.get('preset') || undefined
 
 // Sample data selection
 const selectedSample = ref<typeof sampleData[0] | null>(null)
@@ -98,6 +100,7 @@ watch(() => store.rawText, (text) => {
     <JsonTreeTable
       ref="jsonTreeTableRef"
       :initial-path="initialPath"
+      :initial-preset="presetParam"
       root-object-key="root"
     >
       <template #title>
