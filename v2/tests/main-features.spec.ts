@@ -1,3 +1,6 @@
+import { readFileSync, unlinkSync } from 'fs';
+import { join } from 'path';
+import { tmpdir } from 'os';
 import { test, expect } from '@playwright/test';
 
 const sampleData = [
@@ -476,6 +479,79 @@ test.describe('TreeDoc Viewer - Main UI Features', () => {
       await expect(page.locator('.column-header').filter({ hasText: 'status' })).not.toBeVisible();
       await expect(page.locator('.column-header').filter({ hasText: 'value' })).not.toBeVisible();
     });
+  });
+});
+
+test.describe('Preset export and file import', () => {
+  test('exports preset via exportPreset then imports the file', async ({ page }) => {
+    await page.addInitScript(() => {
+      try {
+        delete (window as unknown as { showDirectoryPicker?: unknown }).showDirectoryPicker;
+      } catch {
+        /* ignore */
+      }
+    });
+
+    await page.goto('/');
+    await page.locator('.cm-editor').waitFor({ state: 'visible', timeout: 10000 });
+
+    await enterJsonData(page, sampleData);
+    await ensureTableViewVisible(page);
+
+    const presetName = `e2e-export-import-${Date.now()}`;
+
+    await page
+      .locator('.preset-selector button')
+      .filter({ has: page.locator('.pi-save') })
+      .first()
+      .click();
+    await expect(page.getByRole('dialog', { name: 'Save Preset' })).toBeVisible({ timeout: 5000 });
+    await page.getByPlaceholder('Enter preset name...').fill(presetName);
+    await page.getByRole('dialog', { name: 'Save Preset' }).getByRole('button', { name: 'Save' }).click();
+    await expect(page.getByRole('dialog', { name: 'Save Preset' })).not.toBeVisible({ timeout: 5000 });
+
+    await page
+      .locator('.preset-selector button')
+      .filter({ has: page.locator('.pi-cog') })
+      .first()
+      .click();
+    const manageDialog = page.getByRole('dialog', { name: 'Manage Presets' });
+    await expect(manageDialog).toBeVisible({ timeout: 5000 });
+
+    const presetRow = manageDialog.locator('.preset-item').filter({ hasText: presetName });
+
+    const downloadPromise = page.waitForEvent('download');
+    await presetRow.locator('.preset-actions .pi-download').click();
+    const download = await downloadPromise;
+
+    const tmpPath = join(tmpdir(), `e2e-preset-${Date.now()}.json`);
+    await download.saveAs(tmpPath);
+    let exportedJson: string;
+    try {
+      exportedJson = readFileSync(tmpPath, 'utf8');
+    } finally {
+      unlinkSync(tmpPath);
+    }
+
+    // exportPreset uses TD.stringify (JSONEx), not strict JSON — assert content shape
+    expect(exportedJson).toContain(presetName);
+    expect(exportedJson).toContain('pathRules');
+
+    page.once('dialog', (dialog) => dialog.accept());
+    await presetRow.locator('.preset-actions .pi-trash').click();
+    await expect(presetRow).not.toBeVisible({ timeout: 5000 });
+
+    await manageDialog.locator('input[type="file"]').setInputFiles({
+      name: `${presetName}.json`,
+      mimeType: 'application/json',
+      buffer: Buffer.from(exportedJson, 'utf8'),
+    });
+
+    await expect(
+      page.locator('.p-toast-message-success').filter({ hasText: 'Imported' }),
+    ).toBeVisible({ timeout: 8000 });
+
+    await expect(manageDialog.locator('.preset-item').filter({ hasText: presetName })).toBeVisible();
   });
 });
 

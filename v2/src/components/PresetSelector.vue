@@ -985,8 +985,8 @@ async function processImportFiles(files: Array<{ name: string; content: string }
   for (const file of files) {
     try {
       const data = TD.parse(file.content)
-      
-      if (!data || !data.name || !data.columns) {
+
+      if (!parsePresetFromObject(data)) {
         failCount++
         errors.push(`${file.name}: Invalid format`)
         continue
