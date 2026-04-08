@@ -15,7 +15,7 @@ import { storeToRefs } from 'pinia'
 import SourceView from './SourceView.vue'
 import TreeView from './TreeView.vue'
 import TableView from './TableView.vue'
-import type { TDVOptions, QueryPreset } from '../models/types'
+import { ParseStatus, type TDVOptions, type QueryPreset } from '../models/types'
 import { TDJSONParser } from 'treedoc'
 
 const props = defineProps<{
@@ -35,6 +35,7 @@ const themeStore = useThemeStore()
 const { 
   rawText, 
   parseResult, 
+  parseStatus,
   hasError,
   showSource, 
   showTree, 
@@ -357,15 +358,22 @@ watch(() => props.initialPath, (path) => {
 // Track if initial preset has been applied
 const initialPresetApplied = ref(false)
 
+function getToastProps(status: ParseStatus) {
+  switch (status) {
+    case ParseStatus.ERROR:
+      return { severity: 'error' as const, summary: 'Parse Error', life: 5000 }
+    case ParseStatus.WARN:
+      return { severity: 'warn' as const, summary: 'Parsed with warnings', life: 4000 }
+    default:
+      return { severity: 'success' as const, summary: 'Parsed', life: 3000 }
+  }
+}
+
 // Show parse result as toast and apply initial preset if provided
 watch(parseResult, (result) => {
   if (result && result !== 'No data') {
-    toast.add({
-      severity: hasError.value ? 'error' : 'success',
-      summary: hasError.value ? 'Parse Error' : 'Parsed',
-      detail: result,
-      life: hasError.value ? 5000 : 3000
-    })
+    const props_ = getToastProps(parseStatus.value)
+    toast.add({ ...props_, detail: result })
     
     // Apply initial preset after successful parse (only once)
     if (!hasError.value && props.initialPreset && !initialPresetApplied.value) {
