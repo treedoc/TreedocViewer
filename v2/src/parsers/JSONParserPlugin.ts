@@ -27,15 +27,15 @@ export default class JSONParserPlugin implements ParserPlugin<JSONParserOption> 
   ) {}
 
   looksLike(str: string): boolean {
-    // Check if it looks like YAML first
+    // Check if it looks like YAML first[]
     const trimmed = str.trim()
     if (trimmed.startsWith('---') || (trimmed.startsWith('-') && !trimmed.startsWith('-{'))) {
       return false
     }
     
-    if (str.length < 1000000 && this.parse(str).status !== ParseStatus.SUCCESS) {
-      return false
-    }
+    // if (str.length < 1000000 && this.parse(str).status !== ParseStatus.SUCCESS) {
+    //   return false
+    // }
     
     const opt = this.getTDJSONParserOption(this.type)
     if (!nonBlankEndsWith(str, [opt.deliminatorObjectEnd as string, opt.deliminatorArrayEnd as string])) {
@@ -75,8 +75,13 @@ export default class JSONParserPlugin implements ParserPlugin<JSONParserOption> 
       return result
     } catch (e) {
       result.message = `Error: ${(e as Error).message}`
+        if (e instanceof Error && 'partialObject' in e && (e as any).partialObject) {
+          result.message = `Warning: ${e.message}`
+          result.status = ParseStatus.WARN
+          result.result = (e as any).partialObject
+          return result
+        }
       result.status = ParseStatus.ERROR
-      console.error(e)
       return result
     }
   }
