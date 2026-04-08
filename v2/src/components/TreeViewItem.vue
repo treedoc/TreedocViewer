@@ -7,6 +7,14 @@ import HoverButtonBar, { type HoverButton } from './HoverButtonBar.vue'
 import type { ExpandState } from './ExpandControl.vue'
 import TreeUtil from '@/utils/TreeUtil'
 import { Logger } from '@/utils/Logger'
+import {
+  type FilterOptions,
+  defaultFilterOptions,
+  nodeDirectlyMatches,
+  nodeOrDescendantMatches,
+  highlightText,
+  escapeHtml,
+} from '@/utils/TreeFilterUtil'
 
 const logger = new Logger('TreeViewItem')
 const PAGE_SIZE = 1000
@@ -26,6 +34,8 @@ const props = defineProps<{
   currentLevel: number
   expandState: ExpandState
   filterQuery?: string
+  filterOptions?: FilterOptions
+  ancestorMatched?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -43,74 +53,29 @@ const rawNode = computed(() => getRawNode(props.tnode))
 
 const isSimpleType = computed(() => rawNode.value.type === TDNodeType.SIMPLE)
 
-// Check if this node or any descendant matches the filter
-function nodeMatchesFilter(node: TDNode, query: string): boolean {
-  if (!query) return true
-  
-  const queryLower = query.toLowerCase()
-  
-  // Check if key matches
-  if (node.key?.toLowerCase().includes(queryLower)) {
-    return true
-  }
-  
-  // Check if value matches (for simple types)
-  if (node.type === TDNodeType.SIMPLE && node.value !== null) {
-    if (String(node.value).toLowerCase().includes(queryLower)) {
-      return true
-    }
-  }
-  
-  // Check children recursively
-  if (node.children) {
-    for (const child of node.children) {
-      if (nodeMatchesFilter(child, query)) {
-        return true
-      }
-    }
-  }
-  
-  return false
-}
+const opts = computed<FilterOptions>(() => props.filterOptions || defaultFilterOptions)
+
+const thisNodeDirectlyMatches = computed(() => {
+  if (!props.filterQuery) return false
+  return nodeDirectlyMatches(rawNode.value, props.filterQuery, opts.value)
+})
 
 const isVisible = computed(() => {
   if (!props.filterQuery) return true
-  return nodeMatchesFilter(rawNode.value, props.filterQuery)
+  if (props.ancestorMatched) return true
+  return nodeOrDescendantMatches(rawNode.value, props.filterQuery, opts.value)
 })
 
-// Escape HTML to prevent XSS
-function escapeHtml(text: string): string {
-  if (!text) return text
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;')
-}
-
-// Highlight matched text by wrapping in <mark> tags
-function highlightText(text: string, query: string): string {
-  if (!query || !text) return escapeHtml(text)
-  
-  const queryLower = query.toLowerCase()
-  const textLower = text.toLowerCase()
-  const index = textLower.indexOf(queryLower)
-  
-  if (index === -1) return escapeHtml(text)
-  
-  const before = text.substring(0, index)
-  const match = text.substring(index, index + query.length)
-  const after = text.substring(index + query.length)
-  
-  // Recursively highlight remaining text
-  return escapeHtml(before) + '<mark class="highlight">' + escapeHtml(match) + '</mark>' + highlightText(after, query)
-}
+// If this node or an ancestor matched, all descendants are shown without filtering
+const childAncestorMatched = computed(() => {
+  return props.ancestorMatched || thisNodeDirectlyMatches.value
+})
 
 const highlightedKey = computed(() => {
   const key = rawNode.value.key
-  if (!key || !props.filterQuery) return key
-  return highlightText(key, props.filterQuery)
+  if (!key) return key
+  if (!props.filterQuery) return escapeHtml(key)
+  return highlightText(key, props.filterQuery, opts.value)
 })
 
 const nodeKey = computed(() => rawNode.value.key)
@@ -296,6 +261,8 @@ defineExpose({ selectNode, tnode: rawNode, selected })
           :current-level="currentLevel + 1"
           :expand-state="expandState"
           :filter-query="filterQuery"
+          :filter-options="filterOptions"
+          :ancestor-matched="childAncestorMatched"
           @node-clicked="bubbleEvent($event, 'nodeClicked')"
         />
         <a 
@@ -317,7 +284,7 @@ defineExpose({ selectNode, tnode: rawNode, selected })
       @mouseleave="isHovered = false"
     >
       <span class="node-key leaf-key" v-html="highlightedKey"></span>:
-      <SimpleValue :tnode="rawNode" :filter-query="filterQuery" @node-clicked="emit('nodeClicked', [$event])" />
+      <SimpleValue :tnode="rawNode" :filter-query="filterQuery" :filter-options="filterOptions" @node-clicked="emit('nodeClicked', [$event])" />
       <HoverButtonBar
         :buttons="nodeButtons"
         :is-visible="isHovered"

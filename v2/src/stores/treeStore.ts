@@ -54,6 +54,9 @@ export const useTreeStore = defineStore('tree', () => {
   // Tree filter state
   const showTreeFilter = ref(false)
   const treeFilterQuery = ref('')
+  const treeFilterCaseSensitive = ref(false)
+  const treeFilterWholeWord = ref(false)
+  const treeFilterRegex = ref(false)
   
   // Parser state
   const defaultParser: ParserPlugin = new JSONParserPlugin()
@@ -110,7 +113,12 @@ export const useTreeStore = defineStore('tree', () => {
     
     // Auto-detect parser
     if (detectParser) {
-      const detected = availableParsers.value.find(p => p.looksLike(text))
+      logger.log(`detectParser: start`)
+      const detected = availableParsers.value.find(p => {
+        logger.log(`checking parser: ${p.name}`)
+        return p.looksLike(text)
+      })
+      logger.log(`detected: ${detected?.name}`)
       if (detected) {
         selectedParser.value = detected
       } else {
@@ -337,6 +345,9 @@ export const useTreeStore = defineStore('tree', () => {
     // Tree filter state
     showTreeFilter,
     treeFilterQuery,
+    treeFilterCaseSensitive,
+    treeFilterWholeWord,
+    treeFilterRegex,
     
     // Parser
     selectedParser,

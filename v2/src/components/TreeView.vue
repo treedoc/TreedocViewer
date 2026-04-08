@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, reactive, watch, nextTick, toRaw, shallowRef, computed, onMounted } from 'vue'
 import type { TDNode, TreeDoc } from 'treedoc'
-import { TDNodeType } from 'treedoc'
 import { storeToRefs } from 'pinia'
 import TreeViewItem from './TreeViewItem.vue'
 import ExpandControl from './ExpandControl.vue'
@@ -11,6 +10,7 @@ import { Logger } from '@/utils/Logger'
 import { debounce } from 'lodash-es'
 import InputText from 'primevue/inputtext'
 import Button from 'primevue/button'
+import { collectMatches, type FilterOptions } from '@/utils/TreeFilterUtil'
 
 const logger = new Logger('TreeView')
 
@@ -20,7 +20,7 @@ const props = defineProps<{
 }>()
 
 const store = useTreeStore()
-const { showTreeFilter, treeFilterQuery } = storeToRefs(store)
+const { showTreeFilter, treeFilterQuery, treeFilterCaseSensitive, treeFilterWholeWord, treeFilterRegex } = storeToRefs(store)
 
 const localTree = shallowRef<TreeDoc | null>(null)
 const localSelectedNode = shallowRef<TDNode | null>(null)
@@ -70,85 +70,35 @@ function onKeyPress(e: KeyboardEvent) {
   expandControlRef.value?.onKeyPress(e)
 }
 
-// Check if a node or any descendant matches the filter
-function nodeMatchesFilter(node: TDNode, query: string): boolean {
-  if (!query) return true
-  
-  const queryLower = query.toLowerCase()
-  
-  // Check if key matches
-  if (node.key?.toLowerCase().includes(queryLower)) {
-    return true
-  }
-  
-  // Check if value matches (for simple types)
-  if (node.type === TDNodeType.SIMPLE && node.value !== null) {
-    if (String(node.value).toLowerCase().includes(queryLower)) {
-      return true
-    }
-  }
-  
-  // Check children recursively
-  if (node.children) {
-    for (const child of node.children) {
-      if (nodeMatchesFilter(child, query)) {
-        return true
-      }
-    }
-  }
-  
-  return false
-}
+const activeFilterOptions = computed<FilterOptions>(() => ({
+  caseSensitive: treeFilterCaseSensitive.value,
+  wholeWord: treeFilterWholeWord.value,
+  isRegex: treeFilterRegex.value,
+}))
 
-// Collect all matched nodes for navigation
-function collectMatches(node: TDNode, query: string, results: TDNode[]): void {
-  if (!query) return
-  
-  const queryLower = query.toLowerCase()
-  
-  // Check if this node itself matches
-  const keyMatches = node.key?.toLowerCase().includes(queryLower)
-  let valueMatches = false
-  if (node.type === TDNodeType.SIMPLE && node.value !== null) {
-    valueMatches = String(node.value).toLowerCase().includes(queryLower)
-  }
-  
-  if (keyMatches || valueMatches) {
-    results.push(node)
-  }
-  
-  // Search children
-  if (node.children) {
-    for (const child of node.children) {
-      collectMatches(child, query, results)
-    }
-  }
-}
-
-// Debounced filter application
-const applyFilter = debounce(() => {
+function runFilter() {
   activeFilter.value = treeFilterQuery.value
-  
+
   if (!treeFilterQuery.value || !localTree.value) {
     matchCount.value = 0
     currentMatchIndex.value = -1
     matchedNodes.value = []
     return
   }
-  
-  // Collect matches for navigation
+
   const results: TDNode[] = []
-  collectMatches(localTree.value.root, treeFilterQuery.value, results)
+  collectMatches(localTree.value.root, treeFilterQuery.value, activeFilterOptions.value, results)
   matchedNodes.value = results
   matchCount.value = results.length
-  
-  // Just set the index to 0 without navigating - user must click next/prev to navigate
+
   if (results.length > 0) {
     currentMatchIndex.value = 0
   } else {
     currentMatchIndex.value = -1
   }
-}, 300)
+}
+
+const applyFilter = debounce(runFilter, 300)
 
 function goToMatch(index: number) {
   if (index < 0 || index >= matchedNodes.value.length) return
@@ -196,8 +146,8 @@ function onFilterKeydown(e: KeyboardEvent) {
   }
 }
 
-// Watch filter query changes - immediate: true ensures filter is applied on mount
-watch(treeFilterQuery, () => {
+// Re-apply filter when query or options change
+watch([treeFilterQuery, treeFilterCaseSensitive, treeFilterWholeWord, treeFilterRegex], () => {
   applyFilter()
 }, { immediate: true })
 
@@ -282,6 +232,32 @@ defineExpose({ onKeyPress })
           class="filter-input"
           @keydown="onFilterKeydown"
         />
+        <div class="filter-option-btns">
+          <button
+            class="filter-option-btn"
+            :class="{ active: treeFilterCaseSensitive }"
+            @click="treeFilterCaseSensitive = !treeFilterCaseSensitive"
+            type="button"
+            tabindex="-1"
+            title="Match Case"
+          >Aa</button>
+          <button
+            class="filter-option-btn"
+            :class="{ active: treeFilterWholeWord }"
+            @click="treeFilterWholeWord = !treeFilterWholeWord"
+            type="button"
+            tabindex="-1"
+            title="Match Whole Word"
+          >Ab|</button>
+          <button
+            class="filter-option-btn"
+            :class="{ active: treeFilterRegex }"
+            @click="treeFilterRegex = !treeFilterRegex"
+            type="button"
+            tabindex="-1"
+            title="Use Regular Expression"
+          >.*</button>
+        </div>
         <button
           v-if="treeFilterQuery"
           class="input-clear-btn"
@@ -328,6 +304,7 @@ defineExpose({ onKeyPress })
         :current-level="0"
         :expand-state="expandState"
         :filter-query="activeFilter"
+        :filter-options="activeFilterOptions"
         @node-clicked="nodeClicked"
       />
       <div v-else class="no-data">
@@ -386,7 +363,45 @@ defineExpose({ onKeyPress })
 
 .filter-input {
   flex: 1;
-  padding-right: 28px;
+  padding-right: 100px;
+}
+
+.filter-option-btns {
+  position: absolute;
+  right: 26px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  gap: 1px;
+}
+
+.filter-option-btn {
+  width: 22px;
+  height: 20px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--tdv-text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  padding: 0;
+  font-size: 11px;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-weight: 600;
+  transition: all 0.15s ease;
+}
+
+.filter-option-btn:hover {
+  background: var(--tdv-surface-hover);
+  color: var(--tdv-text);
+}
+
+.filter-option-btn.active {
+  background: var(--tdv-primary);
+  color: #fff;
+  border-color: var(--tdv-primary);
 }
 
 .input-clear-btn {

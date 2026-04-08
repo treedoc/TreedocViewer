@@ -1,12 +1,19 @@
 <script setup lang="ts">
 import { computed, toRaw } from 'vue'
 import type { TDNode } from 'treedoc'
+import {
+  type FilterOptions,
+  defaultFilterOptions,
+  highlightText,
+  escapeHtml,
+} from '@/utils/TreeFilterUtil'
 
 const props = defineProps<{
   tnode: TDNode
   isInTable?: boolean
   textWrap?: boolean
   filterQuery?: string
+  filterOptions?: FilterOptions
 }>()
 
 const emit = defineEmits<{
@@ -84,40 +91,14 @@ const valueStyle = computed(() => {
 
 const whiteSpaceStyle = computed(() => (props.textWrap ? 'pre-wrap' : 'pre'))
 
-// Highlight matched text by wrapping in <mark> tags
-function highlightText(text: string, query: string): string {
-  if (!query || !text) return escapeHtml(text)
-  
-  const queryLower = query.toLowerCase()
-  const textLower = text.toLowerCase()
-  const index = textLower.indexOf(queryLower)
-  
-  if (index === -1) return escapeHtml(text)
-  
-  const before = text.substring(0, index)
-  const match = text.substring(index, index + query.length)
-  const after = text.substring(index + query.length)
-  
-  // Recursively highlight remaining text
-  return escapeHtml(before) + '<mark class="highlight">' + escapeHtml(match) + '</mark>' + highlightText(after, query)
-}
-
-function escapeHtml(text: string): string {
-  if (!text) return text
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;')
-}
+const opts = computed<FilterOptions>(() => props.filterOptions || defaultFilterOptions)
 
 const highlightedValue = computed(() => {
   const val = nodeValue.value
   if (val === null) return 'null'
   const text = String(val)
   if (!props.filterQuery) return escapeHtml(text)
-  return highlightText(text, props.filterQuery)
+  return highlightText(text, props.filterQuery, opts.value)
 })
 
 function handleRefClick() {
