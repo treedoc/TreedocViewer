@@ -358,11 +358,11 @@ export class TableDataProcessor {
     return data.filter(row => {
       const value = row[field]
 
-      // Handle undefined values:
-      // - For base columns: keep rows where field doesn't exist (don't filter by missing fields)
-      // - For derived columns: filter out rows where extraction didn't produce a value
-      if (value === undefined) {
-        return !isDerivedColumn
+      // Undefined/null values don't contain the search term, so:
+      // - Positive filter (looking FOR something): exclude these rows
+      // - Negative filter (excluding something): keep these rows (they don't contain the excluded term)
+      if (value === undefined || value === null) {
+        return !!fq.isNegate
       }
 
       const strValue = this.valueToString(value)

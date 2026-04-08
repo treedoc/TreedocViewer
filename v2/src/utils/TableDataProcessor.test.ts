@@ -229,14 +229,14 @@ describe('TableDataProcessor', () => {
       
       const result = processor.processData(data, config)
       
-      // Should only show rows with 'Success' and rows with undefined status (field not present)
-      // Empty string and null should be filtered out
+      // Should only show rows with 'Success'
+      // Empty string, null, and undefined should all be filtered out
       console.log('Result data:', result.data.map(r => ({ id: r.id, status: r.status })))
       
-      // Rows 1, 5, 6 should remain (Success, undefined, Success)
-      // Rows 2, 3, 4 should be filtered (fail, empty, null)
-      expect(result.data).toHaveLength(3)
-      expect(result.data.map(r => r.id)).toEqual([1, 5, 6])
+      // Only rows 1, 6 should remain (Success)
+      // Rows 2, 3, 4, 5 should be filtered (fail, empty, null, undefined)
+      expect(result.data).toHaveLength(2)
+      expect(result.data.map(r => r.id)).toEqual([1, 6])
     })
     
     it('should filter TDNode empty values when searching for Success', () => {
@@ -371,7 +371,7 @@ describe('TableDataProcessor', () => {
       expect(result.data.every(r => r.status === 'active')).toBe(true)
     })
     
-    it('should keep rows with undefined field values for base columns (field not present)', () => {
+    it('should filter out rows with undefined field values when query is active', () => {
       const data: TableRow[] = [
         { name: 'Alice', status: 'active' },
         { name: 'Bob' },  // no status field
@@ -386,9 +386,9 @@ describe('TableDataProcessor', () => {
       }
       
       const result = processor.processData(data, config)
-      // Bob should be kept because status is a BASE column (not derived)
-      // and his status field doesn't exist - we don't filter by missing base fields
-      expect(result.data).toHaveLength(3)
+      // Bob should be filtered out - his status is undefined and doesn't match 'active'
+      expect(result.data).toHaveLength(2)
+      expect(result.data.map(r => r.name)).toEqual(['Alice', 'Charlie'])
     })
     
     it('should skip disabled queries', () => {

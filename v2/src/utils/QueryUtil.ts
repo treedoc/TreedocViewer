@@ -170,6 +170,12 @@ export function matchPattern(value: string, pattern: string): Record<string, str
 export function matchFieldQuery(value: string, fq: FieldQuery): boolean {
   if (!fq.query) return true
 
+  // Empty or whitespace-only values should not match positive filters (looking FOR something)
+  // but should match negative filters (filtering OUT something - empty doesn't contain the excluded value)
+  if (!value || !value.trim()) {
+    return !!fq.isNegate
+  }
+
   // Handle pattern matching mode
   if (fq.isPattern) {
     const groups = matchPattern(value, fq.query)
