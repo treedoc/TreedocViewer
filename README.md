@@ -4,6 +4,8 @@ A powerful JSON/YAML/XML viewer with tree view, table view, and advanced filteri
 
 **Live Demo:** [https://treedoc.github.io](https://treedoc.github.io)
 
+**Introduction animation** (overview of main features, CSS-only): [https://treedoc.github.io/intro-animation.html](https://treedoc.github.io/intro-animation.html) — source: [`v2/public/intro-animation.html`](v2/public/intro-animation.html) (also works locally after `yarn dev` at `/intro-animation.html`).
+
 ## Versions
 
 ### v2 (Current - Vue 3 + PrimeVue)
