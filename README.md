@@ -19,6 +19,25 @@ yarn build    # Production build
 yarn deploy   # Deploy to GitHub Pages
 ```
 
+### VS Code Extension
+
+The VS Code extension lives in `vscode-extension` and uses the v2 Vue viewer as its webview UI.
+
+```bash
+cd v2
+yarn install
+cd ../vscode-extension
+npm install
+npm run build
+```
+
+The extension build reuses the local v2 viewer source and toolchain. Launch the extension from VS Code with `F5`, then use **Open with TreeDoc Viewer** for `.json` or `.jsonc` files.
+
+```bash
+cd vscode-extension
+npm run package
+```
+
 ### v1 (Legacy - Vue 2 + Bootstrap)
 The original version built with Vue 2, Bootstrap, and Vue CLI.
 

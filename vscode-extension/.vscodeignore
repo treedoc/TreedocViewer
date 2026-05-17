@@ -1,0 +1,5 @@
+node_modules/**
+webview/**
+.vscode/**
+*.vsix
+package-lock.json

@@ -1,0 +1,121 @@
+{
+  "name": "treedoc-viewer-vscode",
+  "displayName": "TreeDoc Viewer",
+  "description": "View JSON files with the TreeDoc Viewer tree, source, and table views.",
+  "version": "0.0.2",
+  "publisher": "treedoc",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/treedoc/TreedocViewer.git"
+  },
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Visualization",
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:treedocViewer.openJsonViewer",
+    "onCustomEditor:treedocViewer.jsonViewer"
+  ],
+  "main": "./src/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "treedocViewer.openJsonViewer",
+        "title": "Open with TreeDoc Viewer",
+        "category": "TreeDoc Viewer"
+      }
+    ],
+    "customEditors": [
+      {
+        "viewType": "treedocViewer.jsonViewer",
+        "displayName": "TreeDoc Viewer",
+        "selector": [
+          {
+            "filenamePattern": "*.json"
+          },
+          {
+            "filenamePattern": "*.jsonc"
+          },
+          {
+            "filenamePattern": "*.txt"
+          },
+          {
+            "filenamePattern": "*.log"
+          },
+          {
+            "filenamePattern": "*.csv"
+          },
+          {
+            "filenamePattern": "*.tsv"
+          },
+          {
+            "filenamePattern": "*.yaml"
+          },
+          {
+            "filenamePattern": "*.yml"
+          },
+          {
+            "filenamePattern": "*.xml"
+          },
+          {
+            "filenamePattern": "*.*"
+          }
+        ],
+        "priority": "option"
+      }
+    ],
+    "menus": {
+      "editor/title/context": [
+        {
+          "command": "treedocViewer.openJsonViewer",
+          "when": "resourceLangId == json || resourceLangId == jsonc",
+          "group": "navigation"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "treedocViewer.openJsonViewer",
+          "when": "resourceExtname == .json || resourceExtname == .jsonc",
+          "group": "navigation"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "build:webview": "../v2/node_modules/.bin/vite build --config webview/vite.config.ts",
+    "build": "npm run build:webview",
+    "watch:webview": "../v2/node_modules/.bin/vite build --watch --config webview/vite.config.ts",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.2.1",
+    "@vscode/vsce": "^3.2.1",
+    "vite": "^6.1.0",
+    "typescript": "~5.7.2",
+    "vue-tsc": "^2.2.0"
+  },
+  "dependencies": {
+    "@codemirror/lang-javascript": "^6.2.2",
+    "@codemirror/lang-xml": "^6.1.0",
+    "@codemirror/lang-yaml": "^6.1.1",
+    "@primevue/themes": "^4.2.5",
+    "chart.js": "^4.5.1",
+    "chartjs-adapter-date-fns": "^3.0.0",
+    "codemirror": "^6.0.1",
+    "date-fns": "^4.1.0",
+    "lodash-es": "^4.17.21",
+    "pinia": "^2.2.8",
+    "primeicons": "^7.0.0",
+    "primevue": "^4.2.5",
+    "splitpanes": "^3.1.5",
+    "treedoc": "^0.3.48",
+    "vue": "^3.5.13",
+    "vue-chartjs": "^5.3.3",
+    "vue-codemirror": "^6.1.1",
+    "yaml": "^2.7.0"
+  }
+}

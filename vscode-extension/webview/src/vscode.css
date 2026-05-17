@@ -1,0 +1,31 @@
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  overflow: hidden;
+}
+
+.vscode-shell {
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+.vscode-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--tdv-accent);
+  white-space: nowrap;
+}
+
+.vscode-title strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
