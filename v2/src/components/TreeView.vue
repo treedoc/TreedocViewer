@@ -209,7 +209,7 @@ defineExpose({ onKeyPress })
 <template>
   <div class="tree-view" @keypress="onKeyPress" tabindex="0">
     <div class="tree-header">
-      <span class="panel-title">Tree View</span>
+      <span class="panel-title">Tree</span>
       <div class="header-controls">
         <Button
           icon="pi pi-filter"

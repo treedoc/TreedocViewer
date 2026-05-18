@@ -217,7 +217,7 @@ function saveAs() {
 <template>
   <div class="source-view">
     <div class="source-header">
-      <span class="panel-title">Source View</span>
+      <span class="panel-title">Source</span>
       <div class="source-controls">
         <Button
           icon="pi pi-save"

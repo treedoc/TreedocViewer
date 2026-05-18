@@ -22,6 +22,11 @@ declare global {
 const vscode = window.acquireVsCodeApi?.()
 const documentText = ref('{}')
 const title = ref('TreeDoc Viewer')
+const viewerOptions = {
+  showSource: false,
+  showTree: true,
+  showTable: true,
+}
 
 function loadInternalViewerUrl(href: string): boolean {
   let url: URL
@@ -98,6 +103,7 @@ onMounted(() => {
     <JsonTreeTable
       :key="title"
       :data="documentText"
+      :options="viewerOptions"
       root-object-key="root"
     >
       <template #title>

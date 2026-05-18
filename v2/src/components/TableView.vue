@@ -7,6 +7,7 @@ import PVColumn from 'primevue/column'
 import InputText from 'primevue/inputtext'
 import Button from 'primevue/button'
 import Paginator from 'primevue/paginator'
+import Menu from 'primevue/menu'
 import { useTreeStore } from '../stores/treeStore'
 import { storeToRefs } from 'pinia'
 import JsonPath from './JsonPath.vue'
@@ -31,7 +32,8 @@ import {
   isComplexValue, 
   getComplexValueSummary,
   copyCellValue,
-  copyAsJSON as copy,
+  copyTableData,
+  type TableCopyFormat,
   shouldExpandColumns,
   detectTimeColumns
 } from '@/utils/TableUtil'
@@ -127,12 +129,28 @@ let hoverTargetEvent: MouseEvent | null = null
 
 const columnSelectorRef = ref<InstanceType<typeof ColumnSelector> | null>(null)
 const columnVisibility = ref<ColumnVisibility[]>([])
+const copyMenuRef = ref<InstanceType<typeof Menu> | null>(null)
 
 // File input for open file in fullscreen mode
 const fileInputRef = ref<HTMLInputElement | null>(null)
 
 function openFile() {
   fileInputRef.value?.click()
+}
+
+const copyMenuItems = [
+  { label: 'JSON', icon: 'pi pi-code', command: () => copyTable('json') },
+  { label: 'CSV', icon: 'pi pi-file-export', command: () => copyTable('csv') },
+  { label: 'Markdown', icon: 'pi pi-list', command: () => copyTable('markdown') },
+  { label: 'HTML', icon: 'pi pi-globe', command: () => copyTable('html') },
+]
+
+function toggleCopyMenu(event: Event) {
+  copyMenuRef.value?.toggle(event)
+}
+
+function copyTable(format: TableCopyFormat) {
+  copyTableData(filteredData.value as any, visibleColumns.value as any, format)
 }
 
 function handleFileSelect(event: Event) {
@@ -1321,20 +1339,18 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
         
         <div class="toolbar-separator" />
         
+        <Menu
+          ref="copyMenuRef"
+          :model="copyMenuItems"
+          :popup="true"
+        />
+        
         <Button
           icon="pi pi-copy"
           size="small"
           text
-          @click="copy(filteredData as any, visibleColumns as any, false)"
-          v-tooltip.top="'Copy as JSON'"
-        />
-        
-        <Button
-          icon="pi pi-file-export"
-          size="small"
-          text
-          @click="copy(filteredData as any, visibleColumns as any, true)"
-          v-tooltip.top="'Copy as CSV'"
+          @click="toggleCopyMenu"
+          v-tooltip.top="'Copy table'"
         />
         
         <Button

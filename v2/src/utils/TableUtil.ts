@@ -107,11 +107,19 @@ export function copyCellValue(row: TableRow, field: string): void {
 }
 
 /**
- * Copy table data as JSON to clipboard
+ * Copy table data to clipboard
  */
-export function copyAsJSON(data: TableRow[], columns: TableColumn[], asCSV = false): void {
+export type TableCopyFormat = 'json' | 'csv' | 'markdown' | 'html'
+
+export function copyTableData(data: TableRow[], columns: TableColumn[], format: TableCopyFormat): void {
+  const jsonData = getSerializableTableData(data, columns)
+  const text = formatTableData(jsonData, columns, format)
+  navigator.clipboard.writeText(text)
+}
+
+function getSerializableTableData(data: TableRow[], columns: TableColumn[]): Record<string, unknown>[] {
   const fields = columns.map(c => c.field)
-  const jsonData = data.map(row => {
+  return data.map(row => {
     const obj: any = {}
     for (const field of fields) {
       if (field === '__node') continue
@@ -125,32 +133,79 @@ export function copyAsJSON(data: TableRow[], columns: TableColumn[], asCSV = fal
     }
     return obj
   })
-  navigator.clipboard.writeText(asCSV ? toCSV(jsonData) : TD.stringify(jsonData))
 }
 
-// /**
-//  * Copy table data as CSV to clipboard
-//  */
-// export function copyAsCSV(data: TableRow[], columns: TableColumn[]): void {
-//   const header = columns.map(c => c.header).join(',')
-//   const csvRows = data.map(row => {
-//     return columns.map(col => {
-//       const val = row[col.field]
-//       if (val === undefined || val === null) return ''
-//       if (typeof val === 'object' && 'value' in val) {
-//         const v = (val as TDNode).value
-//         return typeof v === 'string' ? `"${v.replace(/"/g, '""')}"` : String(v)
-//       }
-//       return String(val)
-//     }).join(',')
-//   })
-//   const csv = [header, ...csvRows].join('\n')
-//   navigator.clipboard.writeText(csv)
-// }
+function formatTableData(data: Record<string, unknown>[], columns: TableColumn[], format: TableCopyFormat): string {
+  switch (format) {
+    case 'csv':
+      return toCSV(data)
+    case 'markdown':
+      return toMarkdownTable(data, columns)
+    case 'html':
+      return toHTMLTable(data, columns)
+    default:
+      return TD.stringify(data)
+  }
+}
 
 export function toCSV(val: any) {
   const obj = TDObjectCoder.encode(val);
   return CSVWriter.instance.writeAsString(obj);
+}
+
+function toMarkdownTable(data: Record<string, unknown>[], columns: TableColumn[]): string {
+  const fields = columns.map(c => c.field).filter(field => field !== '__node')
+  const headers = fields.map(field => columns.find(c => c.field === field)?.header || field)
+  const headerRow = `| ${headers.map(escapeMarkdownCell).join(' | ')} |`
+  const separatorRow = `| ${headers.map(() => '---').join(' | ')} |`
+  const bodyRows = data.map(row => {
+    return `| ${fields.map(field => escapeMarkdownCell(valueToFlatString(row[field]))).join(' | ')} |`
+  })
+
+  return [headerRow, separatorRow, ...bodyRows].join('\n')
+}
+
+function toHTMLTable(data: Record<string, unknown>[], columns: TableColumn[]): string {
+  const fields = columns.map(c => c.field).filter(field => field !== '__node')
+  const headers = fields.map(field => columns.find(c => c.field === field)?.header || field)
+  const headerCells = headers.map(header => `<th>${escapeHtml(header)}</th>`).join('')
+  const bodyRows = data.map(row => {
+    const cells = fields.map(field => `<td>${escapeHtml(valueToFlatString(row[field]))}</td>`).join('')
+    return `  <tr>${cells}</tr>`
+  })
+
+  return [
+    '<table>',
+    '  <thead>',
+    `    <tr>${headerCells}</tr>`,
+    '  </thead>',
+    '  <tbody>',
+    ...bodyRows,
+    '  </tbody>',
+    '</table>',
+  ].join('\n')
+}
+
+function valueToFlatString(value: unknown): string {
+  if (value === undefined || value === null) return ''
+  if (typeof value === 'object') return TD.stringify(value)
+  return String(value)
+}
+
+function escapeMarkdownCell(value: string): string {
+  return value
+    .replace(/\\/g, '\\\\')
+    .replace(/\|/g, '\\|')
+    .replace(/\r?\n/g, '<br>')
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
 }
 
 
