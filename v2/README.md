@@ -4,8 +4,6 @@ A modern, feature-rich viewer for hierarchical data formats (JSON, YAML, XML, CS
 
 ![TreeDoc Viewer Screenshot](screenshot.png)
 
-**Introduction animation:** [Live (GitHub Pages)](https://treedoc.github.io/intro-animation.html) · [Source](public/intro-animation.html) — a short, looping overview of the main features (three-pane layout, filters, table tools). Open `http://localhost:5173/intro-animation.html` when running the dev server.
-
 ## Features
 
 ### Three Synchronized Views
