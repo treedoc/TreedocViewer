@@ -1327,6 +1327,7 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
       :title="activeFilterColumn.header"
       :field-query="getFieldQuery(activeFilterColumn.field)"
       :filtered-data="filteredData"
+      :columns="visibleColumns"
       @update:field-query="updateFieldQuery"
       @hide-column="hideColumn(activeFilterColumn.field)"
     />

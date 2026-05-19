@@ -6,6 +6,7 @@ import InputText from 'primevue/inputtext'
 import Button from 'primevue/button'
 import ToggleButton from 'primevue/togglebutton'
 import ProgressBar from 'primevue/progressbar'
+import Select from 'primevue/select'
 import HoverButtonBar, { type HoverButton } from './HoverButtonBar.vue'
 import type { TDNode } from 'treedoc'
 import { TDNodeType, TDJSONWriter, TDJSONWriterOption } from 'treedoc'
@@ -16,6 +17,7 @@ export type { FieldQuery }
 export interface ColumnStatistic {
   total: number
   uniqueCount: number
+  numericCount: number
   min: number | string | null
   max: number | string | null
   sum: number
@@ -26,11 +28,26 @@ export interface ColumnStatistic {
   topValues: { val: string; count: number; percent: number }[]
 }
 
+interface StatisticTableRow {
+  value: string
+  count: number
+  percent: number
+  uniqueCount: number
+  isNumeric: boolean
+  total: number
+  max: number | string | null
+  avg: number
+  p99: number
+  p90: number
+  p50: number
+}
+
 const props = defineProps<{
   field: string
   title: string
   fieldQuery: FieldQuery
   filteredData: any[]
+  columns: { field: string; header: string }[]
 }>()
 
 const emit = defineEmits<{
@@ -143,6 +160,8 @@ const localLinkExpression = ref(props.fieldQuery.linkExpression || '')
 const showExtendedFields = ref(false)
 const showFormat = ref(false)
 const selectedValues = ref<string[]>([])
+const breakdownField = ref('')
+const selectedBreakdownValue = ref<string | null>(null)
 
 // Popover size and resize
 const defaultPopoverWidth = 450
@@ -250,7 +269,12 @@ const AUTO_EXPAND_THRESHOLD = 10000
 watch(() => props.field, () => {
   showStats.value = props.filteredData.length < AUTO_EXPAND_THRESHOLD
   selectedValues.value = []
+  selectedBreakdownValue.value = null
 }, { immediate: true })
+
+watch(breakdownField, () => {
+  selectedBreakdownValue.value = null
+})
 
 // Enlarge popover when stats are shown (to fit 30 values)
 const statsExpandedHeight = 600
@@ -516,11 +540,11 @@ const previewPatternFields = computed(() => {
   return extractPatternFields(localPatternExtract.value)
 })
 
-// Calculate column statistics
-const columnStats = computed<ColumnStatistic>(() => {
+function calculateColumnStats(rows: any[], field: string): ColumnStatistic {
   const stat: ColumnStatistic = {
     total: 0,
     uniqueCount: 0,
+    numericCount: 0,
     min: null,
     max: null,
     sum: 0,
@@ -531,14 +555,14 @@ const columnStats = computed<ColumnStatistic>(() => {
     topValues: [],
   }
   
-  if (!showStats.value || !props.filteredData.length) return stat
+  if (!showStats.value || !rows.length) return stat
   
   const valueCounts: Record<string, number> = {}
   const numericValues: number[] = []
   
-  for (const row of props.filteredData) {
+  for (const row of rows) {
     stat.total++
-    const val = row[props.field]
+    const val = row[field]
     
     // Get string representation including all descendants for complex objects
     const strVal = valueToSearchString(val)
@@ -567,6 +591,7 @@ const columnStats = computed<ColumnStatistic>(() => {
   // Calculate averages and percentiles
   if (numericValues.length > 0) {
     numericValues.sort((a, b) => a - b)
+    stat.numericCount = numericValues.length
     stat.avg = stat.sum / numericValues.length
     stat.p50 = numericValues[Math.floor(numericValues.length * 0.5)] || 0
     stat.p90 = numericValues[Math.floor(numericValues.length * 0.9)] || 0
@@ -583,43 +608,133 @@ const columnStats = computed<ColumnStatistic>(() => {
   }))
   
   return stat
+}
+
+// Calculate column statistics
+const columnStats = computed<ColumnStatistic>(() => {
+  return calculateColumnStats(props.filteredData, props.field)
 })
 
-watch(() => columnStats.value.topValues.map(item => item.val).join('\u0000'), (topValuesKey) => {
+const breakdownColumns = computed(() => {
+  return props.columns
+    .filter(col => col.field !== props.field)
+    .map(col => ({ label: col.header || col.field, value: col.field }))
+})
+
+const selectedBreakdownRows = computed(() => {
+  if (!breakdownField.value || selectedBreakdownValue.value === null) {
+    return props.filteredData
+  }
+  return props.filteredData.filter(row => valueToSearchString(row[breakdownField.value]) === selectedBreakdownValue.value)
+})
+
+const scopedColumnStats = computed<ColumnStatistic>(() => {
+  return calculateColumnStats(selectedBreakdownRows.value, props.field)
+})
+
+const displayedTopValues = computed(() => scopedColumnStats.value.topValues)
+const hasNumericStatisticRows = computed(() => columnStats.value.numericCount > 0)
+
+const selectedBreakdownLabel = computed(() => {
+  if (!breakdownField.value || selectedBreakdownValue.value === null) return ''
+  const column = props.columns.find(col => col.field === breakdownField.value)
+  const label = column?.header || breakdownField.value
+  return `${label}: ${selectedBreakdownValue.value || '(empty)'}`
+})
+
+function createStatisticTableRow(value: string, rows: any[], totalBase: number): StatisticTableRow {
+  const stats = calculateColumnStats(rows, props.field)
+  const isNumeric = stats.numericCount > 0
+  return {
+    value,
+    count: rows.length,
+    percent: hasNumericStatisticRows.value
+      ? (totalBase ? (stats.sum / totalBase) * 100 : 0)
+      : (props.filteredData.length ? (rows.length / props.filteredData.length) * 100 : 0),
+    uniqueCount: stats.uniqueCount,
+    isNumeric,
+    total: stats.sum,
+    max: stats.max,
+    avg: stats.avg,
+    p99: stats.p99,
+    p90: stats.p90,
+    p50: stats.p50,
+  }
+}
+
+const statisticRows = computed<StatisticTableRow[]>(() => {
+  if (!showStats.value) return []
+
+  const totalBase = columnStats.value.sum
+  if (!breakdownField.value) {
+    return [createStatisticTableRow('Global', props.filteredData, totalBase)]
+  }
+
+  const groups = new Map<string, any[]>()
+  for (const row of props.filteredData) {
+    const key = valueToSearchString(row[breakdownField.value])
+    const rows = groups.get(key)
+    if (rows) {
+      rows.push(row)
+    } else {
+      groups.set(key, [row])
+    }
+  }
+
+  return Array.from(groups.entries())
+    .map(([value, rows]) => createStatisticTableRow(value, rows, totalBase))
+    .sort((a, b) => {
+      if (hasNumericStatisticRows.value) {
+        return b.total - a.total || b.count - a.count
+      }
+      return b.count - a.count
+    })
+})
+
+watch(() => displayedTopValues.value.map(item => item.val).join('\u0000'), (topValuesKey) => {
   const allowed = new Set(topValuesKey ? topValuesKey.split('\u0000') : [])
   selectedValues.value = selectedValues.value.filter(value => allowed.has(value) && isTopValueSelectable(value))
 })
-
-const hasNumericStats = computed(() => columnStats.value.sum !== 0)
 
 function formatNumber(val: number): string {
   return val.toLocaleString(undefined, { maximumFractionDigits: 2 })
 }
 
-function copyStats() {
-  // Compute full value counts (not just top 30) for copying
-  const valueCounts: Record<string, number> = {}
-  let total = 0
-  
-  for (const row of props.filteredData) {
-    total++
-    const val = row[props.field]
-    // Use valueToSearchString to include all descendants for complex objects
-    const strVal = valueToSearchString(val)
-    valueCounts[strVal] = (valueCounts[strVal] || 0) + 1
-  }
-  
-  // Sort by count and format all values
-  const sortedKeys = Object.keys(valueCounts).sort((a, b) => valueCounts[b] - valueCounts[a])
-  const csv = sortedKeys
-    .map(key => {
-      const count = valueCounts[key]
-      const percent = (count / total) * 100
-      return `"${key.replace(/"/g, '""')}",${count},${percent.toFixed(1)}%`
-    })
+function copyBreakdownStats() {
+  const breakdownColumn = props.columns.find(col => col.field === breakdownField.value)
+  const breakdownLabel = breakdownColumn?.header || breakdownField.value || 'Value'
+  const headers = hasNumericStatisticRows.value
+    ? [breakdownLabel, 'Count', 'Unique', 'Total', 'Percent', 'Max', 'Avg', 'P99', 'P90', 'P50']
+    : [breakdownLabel, 'Count', 'Unique', 'Percent']
+  const rows = statisticRows.value.map(row => {
+    const common = [
+      row.value,
+      row.count,
+      row.uniqueCount,
+    ]
+    if (!hasNumericStatisticRows.value) {
+      return [...common, row.percent.toFixed(1) + '%']
+    }
+    return [
+      ...common,
+      row.total,
+      row.percent.toFixed(1) + '%',
+      row.max ?? '',
+      row.avg,
+      row.p99,
+      row.p90,
+      row.p50,
+    ]
+  })
+
+  const csv = [
+    headers,
+    ...rows,
+  ]
+    .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
     .join('\n')
-  
-  navigator.clipboard.writeText(`Value,Count,Percent\n${csv}`)
+
+  navigator.clipboard.writeText(csv)
 }
 
 // Import shared value color service
@@ -895,64 +1010,99 @@ user=${userId}, action=$action"
           <span class="stats-section-title">
             Column Statistics
           </span>
-          <Button
-            v-if="showStats"
-            icon="pi pi-copy"
-            size="small"
-            text
-            severity="secondary"
-            @click.stop="copyStats"
-            v-tooltip.top="'Copy statistics'"
-            class="stats-copy-btn"
-          />
         </div>
         <div v-if="showStats" class="stats-panel">
-        <!-- Summary Stats -->
-        <div class="stats-summary">
-          <div class="stat-item">
-            <span class="stat-label">#</span>
-            <span class="stat-value">{{ columnStats.total }}</span>
+        <!-- Statistics Table -->
+        <div class="stats-breakdown">
+          <div class="stats-breakdown-controls">
+            <label v-if="breakdownColumns.length > 0" class="stats-breakdown-label">Break down by</label>
+            <Select
+              v-if="breakdownColumns.length > 0"
+              v-model="breakdownField"
+              :options="breakdownColumns"
+              optionLabel="label"
+              optionValue="value"
+              placeholder="Select column"
+              showClear
+              class="stats-breakdown-select"
+            />
+            <Button
+              v-if="statisticRows.length > 0"
+              icon="pi pi-copy"
+              size="small"
+              text
+              severity="secondary"
+              class="stats-breakdown-copy-btn"
+              v-tooltip.top="'Copy breakdown table'"
+              @click="copyBreakdownStats"
+            />
           </div>
-          <div class="stat-item">
-            <span class="stat-label">#Unique</span>
-            <span class="stat-value">{{ columnStats.uniqueCount }}</span>
+          <div v-if="statisticRows.length > 0" class="stats-breakdown-table-wrap">
+            <table class="stats-breakdown-table">
+              <thead>
+                <tr>
+                  <th>Value</th>
+                  <th>Count</th>
+                  <th>Unique</th>
+                  <th v-if="hasNumericStatisticRows">Total</th>
+                  <th>%</th>
+                  <th v-if="hasNumericStatisticRows">Max</th>
+                  <th v-if="hasNumericStatisticRows">Avg</th>
+                  <th v-if="hasNumericStatisticRows">P99</th>
+                  <th v-if="hasNumericStatisticRows">P90</th>
+                  <th v-if="hasNumericStatisticRows">P50</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="row in statisticRows"
+                  :key="row.value"
+                  :class="{ 'is-selected': breakdownField && selectedBreakdownValue === row.value }"
+                  @click="breakdownField && (selectedBreakdownValue = selectedBreakdownValue === row.value ? null : row.value)"
+                >
+                  <td class="breakdown-value" :title="row.value">{{ row.value || '(empty)' }}</td>
+                  <td>{{ row.count }}</td>
+                  <td>{{ row.uniqueCount }}</td>
+                  <td v-if="hasNumericStatisticRows" class="breakdown-total-cell">
+                    <div class="breakdown-total-value">{{ row.isNumeric ? formatNumber(row.total) : '' }}</div>
+                    <div class="breakdown-percent-row">
+                      <ProgressBar
+                        :value="row.percent"
+                        :showValue="false"
+                        class="breakdown-percent-bar"
+                      />
+                    </div>
+                  </td>
+                  <td class="breakdown-percent-cell">
+                    <template v-if="!hasNumericStatisticRows">
+                      <ProgressBar
+                        :value="row.percent"
+                        :showValue="false"
+                        class="breakdown-percent-bar"
+                      />
+                    </template>
+                    <span class="breakdown-percent-label">{{ row.percent.toFixed(1) }}%</span>
+                  </td>
+                  <td v-if="hasNumericStatisticRows">{{ row.max ?? '' }}</td>
+                  <td v-if="hasNumericStatisticRows">{{ row.isNumeric ? formatNumber(row.avg) : '' }}</td>
+                  <td v-if="hasNumericStatisticRows">{{ row.isNumeric ? formatNumber(row.p99) : '' }}</td>
+                  <td v-if="hasNumericStatisticRows">{{ row.isNumeric ? formatNumber(row.p90) : '' }}</td>
+                  <td v-if="hasNumericStatisticRows">{{ row.isNumeric ? formatNumber(row.p50) : '' }}</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
-          <template v-if="hasNumericStats">
-            <div class="stat-item">
-              <span class="stat-label">Sum</span>
-              <span class="stat-value">{{ formatNumber(columnStats.sum) }}</span>
-            </div>
-            <div class="stat-item">
-              <span class="stat-label">Avg</span>
-              <span class="stat-value">{{ formatNumber(columnStats.avg) }}</span>
-            </div>
-            <div class="stat-item">
-              <span class="stat-label">P50</span>
-              <span class="stat-value">{{ formatNumber(columnStats.p50) }}</span>
-            </div>
-            <div class="stat-item">
-              <span class="stat-label">P90</span>
-              <span class="stat-value">{{ formatNumber(columnStats.p90) }}</span>
-            </div>
-            <div class="stat-item">
-              <span class="stat-label">P99</span>
-              <span class="stat-value">{{ formatNumber(columnStats.p99) }}</span>
-            </div>
-            <div class="stat-item">
-              <span class="stat-label">Min</span>
-              <span class="stat-value">{{ columnStats.min }}</span>
-            </div>
-            <div class="stat-item">
-              <span class="stat-label">Max</span>
-              <span class="stat-value">{{ columnStats.max }}</span>
-            </div>
-          </template>
         </div>
-        
+
         <!-- Top Values -->
         <div class="top-values">
           <div class="top-values-header-row">
-            <div class="top-values-header">Top Values</div>
+            <div class="top-values-header">
+              Top Values
+              <span v-if="selectedBreakdownLabel" class="top-values-scope">
+                {{ selectedBreakdownLabel }}
+              </span>
+            </div>
             <div class="top-values-selection-actions" :class="{ 'is-inactive': selectedValues.length === 0 }">
               <Button
                 label="Filter In"
@@ -987,7 +1137,7 @@ user=${userId}, action=$action"
           </div>
           <div class="top-values-list">
             <div
-              v-for="(item, idx) in columnStats.topValues"
+              v-for="(item, idx) in displayedTopValues"
               :key="idx"
               class="top-value-item"
               :class="{ 'has-highlight': getValueColor(item.val) }"
@@ -1622,10 +1772,6 @@ user=${userId}, action=$action"
   flex: 1;
 }
 
-.stats-copy-btn {
-  margin-left: auto;
-}
-
 .stats-panel {
   background: var(--tdv-surface-light);
   border-top: 1px solid var(--tdv-surface-border);
@@ -1635,42 +1781,115 @@ user=${userId}, action=$action"
   overflow-y: auto;
 }
 
-.stats-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-}
-
-.stats-title {
-  font-weight: 600;
-  font-size: 0.9rem;
-  color: var(--tdv-text);
-}
-
-.stats-summary {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 16px;
+.stats-breakdown {
   margin-bottom: 12px;
   padding-bottom: 12px;
   border-bottom: 1px solid var(--tdv-surface-border);
 }
 
-.stat-item {
+.stats-breakdown-controls {
   display: flex;
-  gap: 4px;
-  font-size: 0.85rem;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
 }
 
-.stat-label {
-  color: var(--tdv-text-muted);
-  font-weight: 500;
-}
-
-.stat-value {
-  color: var(--tdv-primary);
+.stats-breakdown-label {
+  font-size: 0.8rem;
   font-weight: 600;
+  color: var(--tdv-text-muted);
+  white-space: nowrap;
+}
+
+.stats-breakdown-select {
+  flex: 1;
+  min-width: 0;
+}
+
+.stats-breakdown-copy-btn {
+  flex-shrink: 0;
+}
+
+.stats-breakdown-table-wrap {
+  max-height: 180px;
+  overflow: auto;
+  border: 1px solid var(--tdv-surface-border);
+  border-radius: 4px;
+  background: var(--tdv-surface);
+}
+
+.stats-breakdown-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+
+.stats-breakdown-table th,
+.stats-breakdown-table td {
+  padding: 5px 6px;
+  border-bottom: 1px solid var(--tdv-surface-border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.stats-breakdown-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--tdv-surface-light);
+  color: var(--tdv-text-muted);
+  font-weight: 600;
+}
+
+.stats-breakdown-table tbody tr {
+  cursor: pointer;
+}
+
+.stats-breakdown-table tbody tr:hover,
+.stats-breakdown-table tbody tr.is-selected {
+  background: var(--tdv-primary-light);
+}
+
+.breakdown-value,
+.breakdown-total-cell {
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.breakdown-value {
+  white-space: nowrap;
+}
+
+.breakdown-total-value {
+  margin-bottom: 3px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.breakdown-percent-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 120px;
+}
+
+.breakdown-percent-cell {
+  min-width: 90px;
+}
+
+.breakdown-percent-cell .breakdown-percent-bar {
+  margin-bottom: 3px;
+}
+
+.breakdown-percent-bar {
+  flex: 1;
+  height: 6px;
+}
+
+.breakdown-percent-label {
+  min-width: 38px;
+  color: var(--tdv-text-muted);
+  font-size: 0.7rem;
   font-family: 'JetBrains Mono', monospace;
 }
 
@@ -1678,6 +1897,18 @@ user=${userId}, action=$action"
   font-weight: 600;
   font-size: 0.85rem;
   color: var(--tdv-text);
+}
+
+.top-values-scope {
+  display: block;
+  margin-top: 2px;
+  color: var(--tdv-text-muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .top-values-header-row {

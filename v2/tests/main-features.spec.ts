@@ -213,6 +213,46 @@ test.describe('TreeDoc Viewer - Main UI Features', () => {
       
       await expect(page.locator('.has-filter, .column-filter-indicator, .pi-filter-fill').first()).toBeVisible();
     });
+
+    test('should show statistics breakdown and scope top values by selected row', async ({ page }) => {
+      await page.locator('.column-header').filter({ hasText: 'value' }).click();
+      await page.locator('.p-popover').waitFor({ state: 'visible' });
+
+      await expect(page.locator('.stats-breakdown-table')).toBeVisible();
+      await expect(page.locator('.stats-breakdown-table tbody tr')).toHaveCount(1);
+      await expect(page.locator('.stats-breakdown-table tbody tr').first()).toContainText('Global');
+
+      await page.locator('.stats-breakdown-select').click();
+      await page.locator('.p-select-option').filter({ hasText: 'status' }).click();
+
+      await expect(page.locator('.stats-breakdown-table')).toBeVisible();
+      await expect(page.locator('.stats-breakdown-table thead')).toContainText('Count');
+      await expect(page.locator('.stats-breakdown-table thead')).toContainText('Unique');
+      await expect(page.locator('.stats-breakdown-table thead')).toContainText('Total');
+      await expect(page.locator('.stats-breakdown-table thead')).toContainText('Max');
+      await expect(page.locator('.stats-breakdown-table thead')).toContainText('Avg');
+      await expect(page.locator('.stats-breakdown-table thead')).toContainText('P99');
+      await expect(page.locator('.stats-breakdown-table thead')).toContainText('P90');
+      await expect(page.locator('.stats-breakdown-table thead')).toContainText('P50');
+      await expect(page.locator('.stats-breakdown-copy-btn')).toBeVisible();
+      await page.locator('.stats-breakdown-table tbody tr').filter({ hasText: 'Success' }).click();
+
+      await expect(page.locator('.top-values-scope')).toContainText('status: Success');
+      await expect(page.locator('.top-values-list')).toContainText('100');
+    });
+
+    test('should hide numeric statistics for non-numeric columns', async ({ page }) => {
+      await page.locator('.column-header').filter({ hasText: 'name' }).click();
+      await page.locator('.p-popover').waitFor({ state: 'visible' });
+
+      await expect(page.locator('.stats-breakdown-table')).toBeVisible();
+      await expect(page.locator('.stats-breakdown-table thead')).toContainText('Count');
+      await expect(page.locator('.stats-breakdown-table thead')).toContainText('Unique');
+      await expect(page.locator('.stats-breakdown-table thead')).toContainText('%');
+      await expect(page.locator('.stats-breakdown-table thead')).not.toContainText('Total');
+      await expect(page.locator('.stats-breakdown-table thead')).not.toContainText('Max');
+      await expect(page.locator('.stats-breakdown-table thead')).not.toContainText('P99');
+    });
   });
 
   test.describe('Filter Modes', () => {
