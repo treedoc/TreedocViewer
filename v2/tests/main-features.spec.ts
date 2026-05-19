@@ -31,6 +31,15 @@ async function ensureTableViewVisible(page: any) {
   await dataTable.waitFor({ state: 'visible', timeout: 10000 });
 }
 
+async function sortTableColumn(page: any, headerText: string, clicks = 1) {
+  const header = page.locator('.p-datatable-thead th').filter({ hasText: headerText });
+  const sortIcon = header.locator('.p-sortable-column-icon, svg, img').last();
+  for (let i = 0; i < clicks; i++) {
+    await sortIcon.click();
+    await page.waitForTimeout(100);
+  }
+}
+
 test.describe('TreeDoc Viewer - Main UI Features', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
@@ -128,6 +137,35 @@ test.describe('TreeDoc Viewer - Main UI Features', () => {
     test('should have column header for each field', async ({ page }) => {
       const headers = page.locator('.column-header');
       await expect(headers).toHaveCount(5); // id, name, status, value, + row number
+    });
+  });
+
+  test.describe('Table View - Sorting', () => {
+    test('should sort globally before pagination', async ({ page }) => {
+      const largeData = Array.from({ length: 150 }, (_, i) => ({
+        id: i + 1,
+        name: `User ${i + 1}`,
+        value: 150 - i
+      }));
+      await enterJsonData(page, largeData);
+      await ensureTableViewVisible(page);
+
+      await sortTableColumn(page, 'value');
+
+      await expect(page.locator('.p-datatable-tbody tr').first().locator('td').nth(3)).toHaveText('1');
+    });
+
+    test('should sort decimal number columns numerically', async ({ page }) => {
+      await enterJsonData(page, [
+        { id: 1, value: 10.1 },
+        { id: 2, value: 2.5 },
+        { id: 3, value: 11.2 }
+      ]);
+      await ensureTableViewVisible(page);
+
+      await sortTableColumn(page, 'value');
+
+      await expect(page.locator('.p-datatable-tbody tr').first().locator('td').nth(2)).toContainText('2.5');
     });
   });
 

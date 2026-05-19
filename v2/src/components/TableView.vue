@@ -3,6 +3,7 @@ import { ref, computed, watch, reactive, toRaw, shallowRef, onBeforeUnmount, nex
 import type { TDNode } from 'treedoc'
 import { TDNodeType, TDJSONWriter, TDJSONWriterOption } from 'treedoc'
 import DataTable from 'primevue/datatable'
+import type { DataTableSortEvent } from 'primevue/datatable'
 import PVColumn from 'primevue/column'
 import InputText from 'primevue/inputtext'
 import Button from 'primevue/button'
@@ -226,6 +227,7 @@ const currentColumnPatternExtract = computed(() => {
 
 const sortField = ref<string>('')
 const sortOrder = ref<1 | -1 | 0>(0)
+const stringSortCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' })
 
 function createFieldQuery(field: string): FieldQuery {
   return {
@@ -647,8 +649,71 @@ const filteredData = computed(() => {
   return data as TableRow[]
 })
 
+function normalizeSortValue(value: any): any {
+  if (value && typeof value === 'object') {
+    if ('type' in value && 'value' in value) {
+      return (value as TDNode).value
+    }
+    if ('$$tdNode' in value && value.$$tdNode && typeof value.$$tdNode === 'object' && 'value' in value.$$tdNode) {
+      return value.$$tdNode.value
+    }
+  }
+  return value
+}
+
+function getSortableNumber(value: any): number | null {
+  const normalized = normalizeSortValue(value)
+  if (typeof normalized === 'number') {
+    return Number.isFinite(normalized) ? normalized : null
+  }
+  if (typeof normalized === 'string') {
+    const trimmed = normalized.trim()
+    if (!trimmed) return null
+    const parsed = Number(trimmed)
+    return Number.isFinite(parsed) ? parsed : null
+  }
+  return null
+}
+
+function isEmptySortValue(value: any): boolean {
+  const normalized = normalizeSortValue(value)
+  return normalized === undefined || normalized === null || normalized === ''
+}
+
+function compareSortValues(a: any, b: any): number {
+  const aEmpty = isEmptySortValue(a)
+  const bEmpty = isEmptySortValue(b)
+  if (aEmpty && bEmpty) return 0
+  if (aEmpty) return 1
+  if (bEmpty) return -1
+
+  const aNumber = getSortableNumber(a)
+  const bNumber = getSortableNumber(b)
+  if (aNumber !== null && bNumber !== null) {
+    return aNumber - bNumber
+  }
+
+  return stringSortCollator.compare(String(normalizeSortValue(a)), String(normalizeSortValue(b)))
+}
+
+const sortedData = computed(() => {
+  if (!sortField.value || sortOrder.value === 0) {
+    return filteredData.value
+  }
+
+  const field = sortField.value
+  const order = sortOrder.value
+  return filteredData.value
+    .map((row, index) => ({ row, index }))
+    .sort((a, b) => {
+      const compared = compareSortValues(a.row[field], b.row[field])
+      return compared === 0 ? a.index - b.index : compared * order
+    })
+    .map(({ row }) => row)
+})
+
 const paginatedData = computed(() => {
-  return filteredData.value.slice(first.value, first.value + rows.value)
+  return sortedData.value.slice(first.value, first.value + rows.value)
 })
 
 
@@ -946,6 +1011,12 @@ function onKeyPress(e: KeyboardEvent) {
 function onPage(event: { first: number; rows: number }) {
   first.value = event.first
   rows.value = event.rows
+}
+
+function onSort(event: DataTableSortEvent) {
+  sortField.value = typeof event.sortField === 'string' ? event.sortField : ''
+  sortOrder.value = event.sortOrder ?? 0
+  first.value = 0
 }
 
 function clearAllFilters() {
@@ -1513,8 +1584,8 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
         :value="paginatedData"
         :sortField="sortField"
         :sortOrder="sortOrder"
-        @sort="e => { sortField = e.sortField as string; sortOrder = e.sortOrder as 1 | -1 | 0 }"
-        sortMode="multiple"
+        @sort="onSort"
+        lazy
         removableSort
         stripedRows
         size="small"
