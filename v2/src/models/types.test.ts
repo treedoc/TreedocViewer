@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { matchPathPattern, findMatchingPathRule, getPresetConfigForPath, type QueryPreset, type PathRule } from './types'
+import { matchPathPattern, findMatchingPathRule, getPresetConfigForPath, cleanColumnForSave, type QueryPreset, type PathRule } from './types'
 
 describe('matchPathPattern', () => {
   it('should match exact paths', () => {
@@ -125,5 +125,18 @@ describe('getPresetConfigForPath', () => {
     }
     const config = getPresetConfigForPath(noMatchPreset, '/orders/123')
     expect(config).toBeNull()
+  })
+})
+
+describe('cleanColumnForSave', () => {
+  it('should preserve statistic breakdown field', () => {
+    expect(cleanColumnForSave({
+      field: 'duration',
+      visible: true,
+      statisticBreakdownField: 'status',
+    })).toEqual({
+      field: 'duration',
+      statisticBreakdownField: 'status',
+    })
   })
 })

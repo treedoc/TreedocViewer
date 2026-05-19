@@ -160,7 +160,7 @@ const localLinkExpression = ref(props.fieldQuery.linkExpression || '')
 const showExtendedFields = ref(false)
 const showFormat = ref(false)
 const selectedValues = ref<string[]>([])
-const breakdownField = ref('')
+const breakdownField = ref(props.fieldQuery.statisticBreakdownField || '')
 const selectedBreakdownValue = ref<string | null>(null)
 
 // Popover size and resize
@@ -258,6 +258,7 @@ watch(() => props.fieldQuery, (fq) => {
   localPatternExtract.value = fq.patternExtract || ''
   localPatternFilter.value = fq.patternFilter || false
   localLinkExpression.value = fq.linkExpression || ''
+  breakdownField.value = fq.statisticBreakdownField || ''
   // Auto-show/hide extended fields section based on content
   showExtendedFields.value = !!(fq.extendedFields || fq.patternExtract)
   // Auto-show format section if it has content
@@ -274,6 +275,10 @@ watch(() => props.field, () => {
 
 watch(breakdownField, () => {
   selectedBreakdownValue.value = null
+  emit('update:fieldQuery', {
+    ...props.fieldQuery,
+    statisticBreakdownField: breakdownField.value || undefined,
+  })
 })
 
 // Enlarge popover when stats are shown (to fit 30 values)
@@ -642,6 +647,11 @@ const selectedBreakdownLabel = computed(() => {
   return `${label}: ${selectedBreakdownValue.value || '(empty)'}`
 })
 
+const statisticValueHeader = computed(() => {
+  const column = props.columns.find(col => col.field === breakdownField.value)
+  return column?.header || breakdownField.value || 'Value'
+})
+
 function createStatisticTableRow(value: string, rows: any[], totalBase: number): StatisticTableRow {
   const stats = calculateColumnStats(rows, props.field)
   const isNumeric = stats.numericCount > 0
@@ -726,6 +736,24 @@ function copyBreakdownStats() {
       row.p50,
     ]
   })
+
+  const csv = [
+    headers,
+    ...rows,
+  ]
+    .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+    .join('\n')
+
+  navigator.clipboard.writeText(csv)
+}
+
+function copyTopValues() {
+  const headers = [props.title || props.field, 'Count', 'Percent']
+  const rows = displayedTopValues.value.map(item => [
+    item.val,
+    item.count,
+    item.percent.toFixed(1) + '%',
+  ])
 
   const csv = [
     headers,
@@ -1041,7 +1069,7 @@ user=${userId}, action=$action"
             <table class="stats-breakdown-table">
               <thead>
                 <tr>
-                  <th>Value</th>
+                  <th>{{ statisticValueHeader }}</th>
                   <th>Count</th>
                   <th>Unique</th>
                   <th v-if="hasNumericStatisticRows">Total</th>
@@ -1134,6 +1162,16 @@ user=${userId}, action=$action"
                 @click="clearTopValueSelection"
               />
             </div>
+            <Button
+              v-if="displayedTopValues.length > 0"
+              icon="pi pi-copy"
+              size="small"
+              text
+              severity="secondary"
+              class="top-values-copy-btn"
+              v-tooltip.top="'Copy top values'"
+              @click="copyTopValues"
+            />
           </div>
           <div class="top-values-list">
             <div
@@ -1914,7 +1952,7 @@ user=${userId}, action=$action"
 .top-values-header-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 8px;
   margin-bottom: 8px;
   flex-wrap: wrap;
@@ -1925,6 +1963,7 @@ user=${userId}, action=$action"
   align-items: center;
   gap: 6px;
   min-height: 24px;
+  margin-left: auto;
 }
 
 .top-values-selection-actions.is-inactive {

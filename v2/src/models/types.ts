@@ -58,6 +58,7 @@ export interface Column {
   extendedFields?: string
   jsExpression?: string
   linkExpression?: string  // JS expression returning URL, can use $ for cell value, $$ for row
+  statisticBreakdownField?: string
 }
 
 /**
@@ -233,6 +234,7 @@ export function cleanColumnForSave(col: Column): Partial<Column> {
   if (col.extendedFields) result.extendedFields = col.extendedFields
   if (col.jsExpression) result.jsExpression = col.jsExpression
   if (col.linkExpression) result.linkExpression = col.linkExpression
+  if (col.statisticBreakdownField) result.statisticBreakdownField = col.statisticBreakdownField
   return result
 }
 
