@@ -2,12 +2,12 @@
 import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
 import { debounce } from 'lodash-es'
 import Popover from 'primevue/popover'
-import InputText from 'primevue/inputtext'
+import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
-import ToggleButton from 'primevue/togglebutton'
 import ProgressBar from 'primevue/progressbar'
 import Select from 'primevue/select'
 import HoverButtonBar, { type HoverButton } from './HoverButtonBar.vue'
+import ColumnFilterBasicControls from './ColumnFilterBasicControls.vue'
 import type { TDNode } from 'treedoc'
 import { TDNodeType, TDJSONWriter, TDJSONWriterOption } from 'treedoc'
 import type { FieldQuery } from '@/models/types'
@@ -137,19 +137,18 @@ function toggle(event: Event) {
 }
 
 function resetSize() {
-  popoverWidth.value = defaultPopoverWidth
-  popoverHeight.value = defaultPopoverHeight
-  savePopoverSize(defaultPopoverWidth, defaultPopoverHeight)
+  overlayWidth.value = defaultOverlayWidth
+  overlayHeight.value = defaultOverlayHeight
+  saveOverlaySize(defaultOverlayWidth, defaultOverlayHeight)
 }
 
 defineExpose({ show, hide, toggle, resetSize })
 
-const inputRef = ref()
 const showStats = ref(false)
-const localQuery = ref(props.fieldQuery.query)
-const localIsRegex = ref(props.fieldQuery.isRegex)
-const localIsNegate = ref(props.fieldQuery.isNegate)
-const localIsArray = ref(props.fieldQuery.isArray)
+const localQuery = ref(props.fieldQuery.query || '')
+const localIsRegex = ref(!!props.fieldQuery.isRegex)
+const localIsNegate = ref(!!props.fieldQuery.isNegate)
+const localIsArray = ref(!!props.fieldQuery.isArray)
 const localIsPattern = ref(props.fieldQuery.isPattern || false)
 const localIsDisabled = ref(props.fieldQuery.isDisabled || false)
 const localIsJs = ref(!!props.fieldQuery.jsExpression && props.fieldQuery.jsExpression !== 'true')
@@ -163,53 +162,118 @@ const selectedValues = ref<string[]>([])
 const breakdownField = ref(props.fieldQuery.statisticBreakdownField || '')
 const selectedBreakdownValue = ref<string | null>(null)
 
-// Popover size and resize
-const defaultPopoverWidth = 450
-const defaultPopoverHeight = 420
-const POPOVER_SIZE_STORAGE_KEY = 'tdv_column_filter_popover_size_v1'
+const compactPopoverWidth = 420
+const showAdvancedOverlay = ref(false)
 
-function loadSavedPopoverSize(): { width: number; height: number } | null {
+// Overlay size and resize
+const defaultOverlayWidth = 720
+const defaultOverlayHeight = 640
+const OVERLAY_SIZE_STORAGE_KEY = 'tdv_column_filter_overlay_size_v1'
+const STATS_TABLE_HEIGHT_STORAGE_KEY = 'tdv_column_filter_stats_table_height_v1'
+
+function clampSize(width: number, height: number): { width: number; height: number } {
+  return {
+    width: Math.max(420, Math.min(window.innerWidth - 32, width)),
+    height: Math.max(420, Math.min(window.innerHeight - 32, height)),
+  }
+}
+
+function clampSizeForPosition(width: number, height: number, left: number, top: number): { width: number; height: number } {
+  return {
+    width: Math.max(420, Math.min(window.innerWidth - left - 16, width)),
+    height: Math.max(420, Math.min(window.innerHeight - top - 16, height)),
+  }
+}
+
+function getCenteredOverlayPosition(width: number, height: number): { left: number; top: number } {
+  return {
+    left: Math.max(16, Math.round((window.innerWidth - width) / 2)),
+    top: Math.max(16, Math.round((window.innerHeight - height) / 2)),
+  }
+}
+
+function loadSavedOverlaySize(): { width: number; height: number } | null {
   try {
-    const raw = localStorage.getItem(POPOVER_SIZE_STORAGE_KEY)
+    const raw = localStorage.getItem(OVERLAY_SIZE_STORAGE_KEY)
     if (!raw) return null
     const parsed = JSON.parse(raw) as { width?: number; height?: number }
     const width = Number(parsed.width)
     const height = Number(parsed.height)
     if (!Number.isFinite(width) || !Number.isFinite(height)) return null
-    return {
-      width: Math.max(350, width),
-      height: Math.max(350, height),
-    }
+    return clampSize(width, height)
   } catch {
     return null
   }
 }
 
-function savePopoverSize(width: number, height: number) {
+function saveOverlaySize(width: number, height: number) {
   try {
-    localStorage.setItem(POPOVER_SIZE_STORAGE_KEY, JSON.stringify({ width, height }))
+    localStorage.setItem(OVERLAY_SIZE_STORAGE_KEY, JSON.stringify({ width, height }))
   } catch {
     // Ignore storage errors.
   }
 }
 
-const savedPopoverSize = loadSavedPopoverSize()
-const popoverWidth = ref(savedPopoverSize?.width ?? defaultPopoverWidth)
-const popoverHeight = ref(savedPopoverSize?.height ?? defaultPopoverHeight)
+function loadSavedStatsTableHeight(): number {
+  try {
+    const raw = localStorage.getItem(STATS_TABLE_HEIGHT_STORAGE_KEY)
+    const height = raw ? Number(JSON.parse(raw)) : NaN
+    return Number.isFinite(height) ? Math.max(120, Math.min(520, height)) : 180
+  } catch {
+    return 180
+  }
+}
+
+function saveStatsTableHeight(height: number) {
+  try {
+    localStorage.setItem(STATS_TABLE_HEIGHT_STORAGE_KEY, JSON.stringify(height))
+  } catch {
+    // Ignore storage errors.
+  }
+}
+
+const savedOverlaySize = loadSavedOverlaySize()
+const overlayWidth = ref(savedOverlaySize?.width ?? defaultOverlayWidth)
+const overlayHeight = ref(savedOverlaySize?.height ?? defaultOverlayHeight)
+const overlayPosition = getCenteredOverlayPosition(overlayWidth.value, overlayHeight.value)
+const overlayLeft = ref(overlayPosition.left)
+const overlayTop = ref(overlayPosition.top)
 const isResizing = ref(false)
 const resizeStartX = ref(0)
 const resizeStartY = ref(0)
 const resizeStartWidth = ref(0)
 const resizeStartHeight = ref(0)
+const isMovingOverlay = ref(false)
+const moveStartX = ref(0)
+const moveStartY = ref(0)
+const moveStartLeft = ref(0)
+const moveStartTop = ref(0)
+const statsTableHeight = ref(loadSavedStatsTableHeight())
+const isResizingStatsTable = ref(false)
+const statsResizeStartY = ref(0)
+const statsResizeStartHeight = ref(0)
+
+function clampOverlayPosition(left: number, top: number): { left: number; top: number } {
+  return {
+    left: Math.max(16, Math.min(window.innerWidth - overlayWidth.value - 16, left)),
+    top: Math.max(16, Math.min(window.innerHeight - overlayHeight.value - 16, top)),
+  }
+}
 
 function startResize(e: MouseEvent) {
   e.preventDefault()
   e.stopPropagation()
+  const dialogEl = (e.currentTarget as HTMLElement | null)?.closest('.column-filter-dialog') as HTMLElement | null
+  if (dialogEl) {
+    const rect = dialogEl.getBoundingClientRect()
+    overlayLeft.value = rect.left
+    overlayTop.value = rect.top
+  }
   isResizing.value = true
   resizeStartX.value = e.clientX
   resizeStartY.value = e.clientY
-  resizeStartWidth.value = popoverWidth.value
-  resizeStartHeight.value = popoverHeight.value
+  resizeStartWidth.value = overlayWidth.value
+  resizeStartHeight.value = overlayHeight.value
   document.addEventListener('mousemove', onResize)
   document.addEventListener('mouseup', stopResize)
 }
@@ -218,15 +282,73 @@ function onResize(e: MouseEvent) {
   if (!isResizing.value) return
   const deltaX = e.clientX - resizeStartX.value
   const deltaY = e.clientY - resizeStartY.value
-  popoverWidth.value = Math.max(350, Math.min(window.innerWidth * 0.9, resizeStartWidth.value + deltaX))
-  popoverHeight.value = Math.max(350, Math.min(window.innerHeight * 0.8, resizeStartHeight.value + deltaY))
+  const size = clampSizeForPosition(
+    resizeStartWidth.value + deltaX,
+    resizeStartHeight.value + deltaY,
+    overlayLeft.value,
+    overlayTop.value
+  )
+  overlayWidth.value = size.width
+  overlayHeight.value = size.height
 }
 
 function stopResize() {
   isResizing.value = false
   document.removeEventListener('mousemove', onResize)
   document.removeEventListener('mouseup', stopResize)
-  savePopoverSize(popoverWidth.value, popoverHeight.value)
+  saveOverlaySize(overlayWidth.value, overlayHeight.value)
+}
+
+function startOverlayMove(e: MouseEvent) {
+  const target = e.target as HTMLElement | null
+  if (target?.closest('button, .p-dialog-header-close, .resize-handle')) return
+
+  e.preventDefault()
+  isMovingOverlay.value = true
+  moveStartX.value = e.clientX
+  moveStartY.value = e.clientY
+  moveStartLeft.value = overlayLeft.value
+  moveStartTop.value = overlayTop.value
+  document.addEventListener('mousemove', onOverlayMove)
+  document.addEventListener('mouseup', stopOverlayMove)
+}
+
+function onOverlayMove(e: MouseEvent) {
+  if (!isMovingOverlay.value) return
+  const deltaX = e.clientX - moveStartX.value
+  const deltaY = e.clientY - moveStartY.value
+  const position = clampOverlayPosition(moveStartLeft.value + deltaX, moveStartTop.value + deltaY)
+  overlayLeft.value = position.left
+  overlayTop.value = position.top
+}
+
+function stopOverlayMove() {
+  isMovingOverlay.value = false
+  document.removeEventListener('mousemove', onOverlayMove)
+  document.removeEventListener('mouseup', stopOverlayMove)
+}
+
+function startStatsTableResize(e: MouseEvent) {
+  e.preventDefault()
+  e.stopPropagation()
+  isResizingStatsTable.value = true
+  statsResizeStartY.value = e.clientY
+  statsResizeStartHeight.value = statsTableHeight.value
+  document.addEventListener('mousemove', onStatsTableResize)
+  document.addEventListener('mouseup', stopStatsTableResize)
+}
+
+function onStatsTableResize(e: MouseEvent) {
+  if (!isResizingStatsTable.value) return
+  const deltaY = e.clientY - statsResizeStartY.value
+  statsTableHeight.value = Math.max(120, Math.min(520, statsResizeStartHeight.value + deltaY))
+}
+
+function stopStatsTableResize() {
+  isResizingStatsTable.value = false
+  document.removeEventListener('mousemove', onStatsTableResize)
+  document.removeEventListener('mouseup', stopStatsTableResize)
+  saveStatsTableHeight(statsTableHeight.value)
 }
 
 onBeforeUnmount(() => {
@@ -235,6 +357,10 @@ onBeforeUnmount(() => {
   document.removeEventListener('mousemove', handleDocumentMouseMove)
   document.removeEventListener('mousemove', onResize)
   document.removeEventListener('mouseup', stopResize)
+  document.removeEventListener('mousemove', onOverlayMove)
+  document.removeEventListener('mouseup', stopOverlayMove)
+  document.removeEventListener('mousemove', onStatsTableResize)
+  document.removeEventListener('mouseup', stopStatsTableResize)
 })
 
 // Sync with props
@@ -246,11 +372,11 @@ watch(() => props.fieldQuery, (fq) => {
   if (isJsMode) {
     localQuery.value = fq.jsExpression === 'true' ? '' : fq.jsExpression!
   } else {
-    localQuery.value = fq.query
+    localQuery.value = fq.query || ''
   }
-  localIsRegex.value = fq.isRegex
-  localIsNegate.value = fq.isNegate
-  localIsArray.value = fq.isArray
+  localIsRegex.value = !!fq.isRegex
+  localIsNegate.value = !!fq.isNegate
+  localIsArray.value = !!fq.isArray
   localIsPattern.value = fq.isPattern || false
   localIsDisabled.value = fq.isDisabled || false
   localIsJs.value = isJsMode
@@ -279,14 +405,6 @@ watch(breakdownField, () => {
     ...props.fieldQuery,
     statisticBreakdownField: breakdownField.value || undefined,
   })
-})
-
-// Enlarge popover when stats are shown (to fit 30 values)
-const statsExpandedHeight = 600
-watch(showStats, (isShowing) => {
-  if (isShowing && popoverHeight.value < statsExpandedHeight) {
-    popoverHeight.value = statsExpandedHeight
-  }
 })
 
 // Extract field names from pattern (e.g., "Order:${orderId}" -> ["orderId"], "user:$name" -> ["name"])
@@ -343,6 +461,17 @@ function onPopoverHide() {
   isPopoverVisible.value = false
   cancelAutoClose()
   document.removeEventListener('mousemove', handleDocumentMouseMove)
+}
+
+function openAdvancedOverlay() {
+  hide()
+  const size = clampSize(overlayWidth.value, overlayHeight.value)
+  overlayWidth.value = size.width
+  overlayHeight.value = size.height
+  const position = getCenteredOverlayPosition(size.width, size.height)
+  overlayLeft.value = position.left
+  overlayTop.value = position.top
+  showAdvancedOverlay.value = true
 }
 
 function applyFilter() {
@@ -799,105 +928,65 @@ function toggleColorPicker(value: string) {
     :baseZIndex="1100"
     @show="onPopoverShow"
     @hide="onPopoverHide"
-    :style="{ width: popoverWidth + 'px', height: popoverHeight + 'px' }"
+    :style="{ width: compactPopoverWidth + 'px' }"
     class="column-filter-popover"
-    :pt="{ content: { style: 'height: 100%; display: flex; flex-direction: column;' } }"
   >
+    <div class="compact-filter-content">
+      <ColumnFilterBasicControls
+        v-model:query="localQuery"
+        v-model:is-regex="localIsRegex"
+        v-model:is-negate="localIsNegate"
+        v-model:is-array="localIsArray"
+        v-model:is-disabled="localIsDisabled"
+        v-model:is-js="localIsJs"
+        :field="field"
+        :show-advanced="true"
+        @apply="debouncedApplyFilter"
+        @clear="clearFilter"
+        @keydown="handleKeydown"
+        @advanced="openAdvancedOverlay"
+        @hide-column="emit('hide-column'); hide()"
+      />
+    </div>
+  </Popover>
+
+  <Dialog
+    v-model:visible="showAdvancedOverlay"
+    modal
+    dismissableMask
+    appendTo="body"
+    class="column-filter-dialog"
+    :style="{
+      width: overlayWidth + 'px',
+      height: overlayHeight + 'px',
+      left: overlayLeft + 'px',
+      top: overlayTop + 'px'
+    }"
+    :draggable="false"
+    :closable="true"
+    :pt="{
+      content: { style: 'height: 100%; display: flex; flex-direction: column; min-height: 0;' },
+      header: { style: 'padding: 0.35rem 0.75rem; min-height: 0; cursor: move;', onMousedown: startOverlayMove }
+    }"
+  >
+    <template #header>
+      <span class="advanced-filter-title">{{ title }}</span>
+    </template>
     <div class="filter-content">
-      <!-- Filter Input -->
-      <div class="filter-input-row" :class="{ 'filter-paused': localIsDisabled }">
-        <div class="filter-input-wrapper">
-          <InputText
-            ref="inputRef"
-            v-model="localQuery"
-            :placeholder="localIsJs ? 'JS expression, e.g.: $.length > 10 ($ = field value)' : `Search ${field}...`"
-            class="filter-input"
-            :class="{ 'js-mode-input': localIsJs }"
-            :disabled="localIsDisabled"
-            @keydown="handleKeydown"
-            @input="debouncedApplyFilter"
-          />
-          <button
-            v-if="localQuery"
-            class="input-clear-btn"
-            @click="clearFilter"
-            type="button"
-            tabindex="-1"
-          >
-            <i class="pi pi-times"></i>
-          </button>
-        </div>
-      </div>
-      
-      <!-- Filter Options -->
-      <div class="filter-options" :class="{ 'filter-paused': localIsDisabled, 'filter-js-mode': localIsJs }">
-        <ToggleButton
-          v-model="localIsNegate"
-          onLabel="!"
-          offLabel="!"
-          @change="debouncedApplyFilter"
-          v-tooltip.top="'Negate filter (exclude matches)'"
-          class="filter-option-btn"
-          :class="{ 'is-active': localIsNegate && !localIsJs }"
-          :style="localIsNegate && !localIsJs ? { background: '#3b82f6', borderColor: '#3b82f6', color: 'white' } : {}"
-          :disabled="localIsDisabled || localIsJs"
-        />
-        <ToggleButton
-          v-model="localIsRegex"
-          onLabel=".*"
-          offLabel=".*"
-          @change="debouncedApplyFilter"
-          v-tooltip.top="'Regex matching'"
-          class="filter-option-btn"
-          :class="{ 'is-active': localIsRegex && !localIsJs }"
-          :style="localIsRegex && !localIsJs ? { background: '#3b82f6', borderColor: '#3b82f6', color: 'white' } : {}"
-          :disabled="localIsDisabled || localIsJs"
-        />
-        <ToggleButton
-          v-model="localIsArray"
-          onLabel="[]"
-          offLabel="[]"
-          @change="debouncedApplyFilter"
-          v-tooltip.top="'Array (comma-separated values)'"
-          class="filter-option-btn"
-          :class="{ 'is-active': localIsArray && !localIsJs }"
-          :style="localIsArray && !localIsJs ? { background: '#3b82f6', borderColor: '#3b82f6', color: 'white' } : {}"
-          :disabled="localIsDisabled || localIsJs"
-        />
-        <ToggleButton
-          v-model="localIsJs"
-          onLabel="JS"
-          offLabel="JS"
-          @change="debouncedApplyFilter"
-          v-tooltip.top="'JavaScript expression (use $ for field value)'"
-          class="filter-option-btn"
-          :class="{ 'is-js-active': localIsJs }"
-          :style="localIsJs ? { background: '#0ea5e9', borderColor: '#0ea5e9', color: 'white' } : {}"
-          :disabled="localIsDisabled"
-        />
-        <div class="filter-options-separator"></div>
-        <ToggleButton
-          v-model="localIsDisabled"
-          onLabel="||"
-          offLabel="||"
-          @change="debouncedApplyFilter"
-          v-tooltip.top="'Pause Filter'"
-          class="filter-option-btn pause-btn"
-          :class="{ 'is-paused-active': localIsDisabled }"
-          :style="localIsDisabled ? { background: '#f59e0b', borderColor: '#f59e0b', color: 'white' } : {}"
-        />
-        <div class="filter-options-spacer"></div>
-        <Button
-          icon="pi pi-eye-slash"
-          size="small"
-          text
-          severity="secondary"
-          @click="emit('hide-column'); hide()"
-          v-tooltip.top="'Hide column'"
-          class="hide-column-btn"
-        />
-      </div>
-      
+      <ColumnFilterBasicControls
+        v-model:query="localQuery"
+        v-model:is-regex="localIsRegex"
+        v-model:is-negate="localIsNegate"
+        v-model:is-array="localIsArray"
+        v-model:is-disabled="localIsDisabled"
+        v-model:is-js="localIsJs"
+        :field="field"
+        @apply="debouncedApplyFilter"
+        @clear="clearFilter"
+        @keydown="handleKeydown"
+        @hide-column="emit('hide-column'); showAdvancedOverlay = false"
+      />
+
       <!-- Extended Fields Section -->
       <div class="extended-fields-section">
         <div class="extended-fields-header" @click="showExtendedFields = !showExtendedFields">
@@ -1065,7 +1154,11 @@ user=${userId}, action=$action"
               @click="copyBreakdownStats"
             />
           </div>
-          <div v-if="statisticRows.length > 0" class="stats-breakdown-table-wrap">
+          <div
+            v-if="statisticRows.length > 0"
+            class="stats-breakdown-table-wrap"
+            :style="{ height: statsTableHeight + 'px' }"
+          >
             <table class="stats-breakdown-table">
               <thead>
                 <tr>
@@ -1120,6 +1213,11 @@ user=${userId}, action=$action"
               </tbody>
             </table>
           </div>
+          <div
+            v-if="statisticRows.length > 0"
+            class="stats-breakdown-resize-handle"
+            @mousedown="startStatsTableResize"
+          ></div>
         </div>
 
         <!-- Top Values -->
@@ -1234,10 +1332,37 @@ user=${userId}, action=$action"
     </div>
     <!-- Resize handle -->
     <div class="resize-handle" @mousedown="startResize"></div>
-  </Popover>
+  </Dialog>
 </template>
 
 <style scoped>
+.compact-filter-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.advanced-filter-title {
+  font-weight: 600;
+  color: var(--tdv-text);
+}
+
+:global(.column-filter-dialog.p-dialog) {
+  position: fixed;
+  margin: 0;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 32px);
+}
+
+:global(.column-filter-dialog .p-dialog-header) {
+  gap: 0.5rem;
+}
+
+:global(.column-filter-dialog .p-dialog-content) {
+  position: relative;
+  overflow: hidden;
+}
+
 .filter-content {
   display: flex;
   flex-direction: column;
@@ -1275,52 +1400,6 @@ user=${userId}, action=$action"
   opacity: 0.8;
 }
 
-.filter-input-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.filter-input-wrapper {
-  position: relative;
-  flex: 1;
-  display: flex;
-  align-items: center;
-}
-
-.filter-input {
-  flex: 1;
-  padding-right: 28px;
-}
-
-.input-clear-btn {
-  position: absolute;
-  right: 6px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 20px;
-  height: 20px;
-  border: none;
-  background: transparent;
-  color: var(--tdv-text-muted);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  padding: 0;
-  transition: all 0.15s ease;
-}
-
-.input-clear-btn:hover {
-  background: var(--tdv-surface-hover);
-  color: var(--tdv-text);
-}
-
-.input-clear-btn i {
-  font-size: 10px;
-}
-
 .textarea-wrapper {
   position: relative;
   flex: 1;
@@ -1356,178 +1435,6 @@ user=${userId}, action=$action"
 
 .textarea-clear-btn i {
   font-size: 10px;
-}
-
-.filter-textarea {
-  flex: 1;
-  font-family: 'JetBrains Mono', 'Consolas', monospace;
-  font-size: 13px;
-  padding: 8px;
-  border: 1px solid var(--tdv-surface-border);
-  border-radius: var(--tdv-radius-sm);
-  resize: vertical;
-  min-height: 60px;
-  background: var(--tdv-surface-light);
-  color: var(--tdv-text-primary);
-}
-
-.filter-textarea:focus {
-  outline: none;
-  border-color: var(--tdv-primary);
-}
-
-.filter-options {
-  display: flex;
-  gap: 4px;
-  align-items: center;
-}
-
-.filter-option-btn {
-  width: 32px;
-  min-width: 32px;
-  max-width: 32px;
-  height: 26px;
-  font-family: 'JetBrains Mono', monospace;
-  font-weight: 600;
-  font-size: 0.7rem;
-  padding: 0;
-  background: var(--tdv-surface-light);
-  border: 1px solid var(--tdv-surface-border);
-  color: var(--tdv-text);
-}
-
-/* Dark mode: improve button contrast */
-:global(.dark-mode) .filter-option-btn {
-  background: #4b5563 !important;
-  border: 1.5px solid #9ca3af !important;
-  color: #f3f4f6 !important;
-}
-
-:global(.dark-mode) .filter-option-btn:hover {
-  background: #6b7280 !important;
-  border-color: #d1d5db !important;
-}
-
-.filter-option-btn :deep(.p-togglebutton-content) {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
-}
-
-.filter-option-btn :deep(.p-togglebutton-label) {
-  font-size: 0.7rem;
-  line-height: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.filter-option-btn :deep(.p-togglebutton-icon) {
-  font-size: 0.75rem;
-  margin: 0 !important;
-}
-
-/* Active state - make it visually obvious */
-/* Use :global to override PrimeVue's styling with high specificity */
-:global(.filter-option-btn.is-active),
-:global(.filter-option-btn.is-active.p-togglebutton),
-:global(.filter-option-btn.is-active.p-togglebutton-checked),
-:global(button.p-togglebutton.filter-option-btn.is-active) {
-  background: #3b82f6 !important;
-  background-color: #3b82f6 !important;
-  border-color: #3b82f6 !important;
-  color: white !important;
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
-}
-
-:global(.filter-option-btn.is-active .p-togglebutton-label),
-:global(.filter-option-btn.is-active .p-togglebutton-icon),
-:global(.filter-option-btn.is-active span),
-:global(.filter-option-btn.is-active .p-togglebutton-content) {
-  color: white !important;
-}
-
-/* PrimeVue Aura sets background on .p-togglebutton-content - override it */
-:global(.filter-option-btn.is-active .p-togglebutton-content) {
-  background: #3b82f6 !important;
-  background-color: #3b82f6 !important;
-}
-
-:global(.dark-mode) .filter-option-btn.is-active {
-  background: #3b82f6 !important;
-  border-color: #60a5fa !important;
-  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.4);
-}
-
-/* Pause button active state */
-:global(.filter-option-btn.is-paused-active),
-:global(.filter-option-btn.is-paused-active.p-togglebutton),
-:global(.filter-option-btn.is-paused-active.p-togglebutton-checked),
-:global(button.p-togglebutton.filter-option-btn.is-paused-active) {
-  background: #f59e0b !important;
-  background-color: #f59e0b !important;
-  border-color: #f59e0b !important;
-  color: white !important;
-  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.3);
-}
-
-:global(.filter-option-btn.is-paused-active .p-togglebutton-label),
-:global(.filter-option-btn.is-paused-active .p-togglebutton-icon),
-:global(.filter-option-btn.is-paused-active span),
-:global(.filter-option-btn.is-paused-active .p-togglebutton-content) {
-  color: white !important;
-}
-
-:global(.filter-option-btn.is-paused-active .p-togglebutton-content) {
-  background: #f59e0b !important;
-  background-color: #f59e0b !important;
-}
-
-:global(.dark-mode) .filter-option-btn.is-paused-active {
-  background: #f59e0b !important;
-  border-color: #fbbf24 !important;
-  box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.4);
-}
-
-/* Disabled/paused state for other buttons */
-.filter-paused .filter-option-btn:not(.pause-btn) {
-  opacity: 0.5;
-  pointer-events: none;
-}
-
-.filter-paused .filter-input {
-  opacity: 0.5;
-}
-
-.filter-paused .input-clear-btn {
-  opacity: 0.5;
-  pointer-events: none;
-}
-
-.filter-options-separator {
-  width: 1px;
-  height: 20px;
-  background: var(--tdv-surface-border);
-  margin: 0 2px;
-}
-
-.filter-options-spacer {
-  flex: 1;
-}
-
-.pause-btn {
-  width: 32px;
-  min-width: 32px;
-}
-
-.hide-column-btn {
-  padding: 0.25rem;
-}
-
-.hide-column-btn :deep(.p-button-icon) {
-  font-size: 0.85rem;
 }
 
 .pattern-preview {
@@ -1741,46 +1648,6 @@ user=${userId}, action=$action"
   border-color: var(--tdv-primary);
 }
 
-/* JS mode input styling */
-.js-mode-input {
-  font-family: var(--tdv-font-mono);
-}
-
-/* JS button active state - use a distinct color */
-:global(.filter-option-btn.is-js-active),
-:global(.filter-option-btn.is-js-active.p-togglebutton),
-:global(.filter-option-btn.is-js-active.p-togglebutton-checked),
-:global(button.p-togglebutton.filter-option-btn.is-js-active) {
-  background: #0ea5e9 !important;
-  background-color: #0ea5e9 !important;
-  border-color: #0ea5e9 !important;
-  color: white !important;
-  box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.3);
-}
-
-:global(.filter-option-btn.is-js-active .p-togglebutton-label),
-:global(.filter-option-btn.is-js-active .p-togglebutton-icon),
-:global(.filter-option-btn.is-js-active span),
-:global(.filter-option-btn.is-js-active .p-togglebutton-content) {
-  color: white !important;
-}
-
-:global(.filter-option-btn.is-js-active .p-togglebutton-content) {
-  background: #0ea5e9 !important;
-  background-color: #0ea5e9 !important;
-}
-
-:global(.dark-mode) .filter-option-btn.is-js-active {
-  background: #0ea5e9 !important;
-  border-color: #38bdf8 !important;
-  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.4);
-}
-
-/* Disabled state for buttons when JS mode is active */
-.filter-js-mode .filter-option-btn:not(.is-js-active):not(.pause-btn) {
-  opacity: 0.5;
-}
-
 .stats-section {
   margin-top: 4px;
   border: 1px solid var(--tdv-surface-border);
@@ -1849,11 +1716,32 @@ user=${userId}, action=$action"
 }
 
 .stats-breakdown-table-wrap {
-  max-height: 180px;
   overflow: auto;
   border: 1px solid var(--tdv-surface-border);
   border-radius: 4px;
   background: var(--tdv-surface);
+}
+
+.stats-breakdown-resize-handle {
+  height: 8px;
+  cursor: ns-resize;
+  position: relative;
+}
+
+.stats-breakdown-resize-handle::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 3px;
+  width: 48px;
+  height: 2px;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: var(--tdv-surface-border);
+}
+
+.stats-breakdown-resize-handle:hover::after {
+  background: var(--tdv-text-muted);
 }
 
 .stats-breakdown-table {
