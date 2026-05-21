@@ -87,6 +87,7 @@ export interface Query {
   sortField: string
   sortDir: 'asc' | 'desc' | ''
   jsQuery: string
+  jsQueryDisabled?: boolean
   columns: Column[]
 }
 
@@ -129,6 +130,7 @@ export interface PathRule {
   pathPattern: string  // Glob pattern (e.g., "/logs/*", "**.errors")
   columns: Column[]
   jsQuery?: string
+  jsQueryDisabled?: boolean
   expandLevel?: number
 }
 
@@ -195,6 +197,7 @@ export function findMatchingPathRule(preset: QueryPreset, path: string): PathRul
 export function getPresetConfigForPath(preset: QueryPreset, path: string): {
   columns: Column[]
   jsQuery?: string
+  jsQueryDisabled?: boolean
   expandLevel?: number
 } | null {
   const matchingRule = findMatchingPathRule(preset, path)
@@ -203,6 +206,7 @@ export function getPresetConfigForPath(preset: QueryPreset, path: string): {
     return {
       columns: matchingRule.columns,
       jsQuery: matchingRule.jsQuery,
+      jsQueryDisabled: matchingRule.jsQueryDisabled,
       expandLevel: matchingRule.expandLevel,
     }
   }
@@ -245,6 +249,7 @@ export function createDefaultQuery(): Query {
     sortField: '',
     sortDir: '',
     jsQuery: '$',
+    jsQueryDisabled: false,
     columns: [],
   }
 }

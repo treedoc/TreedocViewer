@@ -14,6 +14,7 @@ function cleanPathRuleForSave(rule: PathRule): PathRule {
     pathPattern: rule.pathPattern,
     columns: rule.columns.map(cleanColumnForSave) as Column[],
     ...(rule.jsQuery ? { jsQuery: rule.jsQuery } : {}),
+    ...(rule.jsQueryDisabled ? { jsQueryDisabled: rule.jsQueryDisabled } : {}),
     ...(rule.expandLevel !== undefined ? { expandLevel: rule.expandLevel } : {}),
   }
 }
@@ -80,6 +81,7 @@ function migratePreset(raw: any): QueryPreset {
     pathPattern: '**',
     columns,
     ...(raw.jsQuery ? { jsQuery: raw.jsQuery } : {}),
+    ...(raw.jsQueryDisabled ? { jsQueryDisabled: raw.jsQueryDisabled } : {}),
     ...(raw.expandLevel !== undefined ? { expandLevel: raw.expandLevel } : {}),
   }
   

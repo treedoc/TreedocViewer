@@ -168,8 +168,10 @@ const colorPalette = [
   { bg: 'rgba(99, 255, 132, 0.6)', border: 'rgba(99, 255, 132, 1)' },
 ]
 
+type TimeUnit = 'second' | 'minute' | 'hour' | 'day' | 'week' | 'month'
+
 // Get time unit for chart.js based on bucket size
-function getTimeUnit(bucket: TimeBucket): 'second' | 'minute' | 'hour' | 'day' | 'week' | 'month' {
+function getTimeUnit(bucket: TimeBucket): TimeUnit {
   switch (bucket) {
     case 'second': return 'second'
     case 'minute': 
@@ -209,6 +211,37 @@ function getBucketDuration(bucket: TimeBucket): number {
     case 'month': return 30 * 24 * 60 * 60 * 1000
     default: return 60 * 1000
   }
+}
+
+function getUnitDuration(unit: TimeUnit): number {
+  switch (unit) {
+    case 'second': return 1000
+    case 'minute': return 60 * 1000
+    case 'hour': return 60 * 60 * 1000
+    case 'day': return 24 * 60 * 60 * 1000
+    case 'week': return 7 * 24 * 60 * 60 * 1000
+    case 'month': return 30 * 24 * 60 * 60 * 1000
+  }
+}
+
+function getSafeTimeTickConfig(bucket: TimeBucket, range: { min?: number; max?: number }): { unit: TimeUnit; stepSize?: number } {
+  const units: TimeUnit[] = ['second', 'minute', 'hour', 'day', 'week', 'month']
+  const maxGeneratedTicks = 1000
+  const rangeMs = range.min !== undefined && range.max !== undefined ? range.max - range.min : 0
+  let unit = getTimeUnit(bucket)
+  let stepSize = getStepSize(bucket)
+
+  for (const candidate of units.slice(units.indexOf(unit))) {
+    const candidateStep = candidate === unit ? stepSize : 1
+    const tickCount = rangeMs / (getUnitDuration(candidate) * candidateStep)
+    if (tickCount <= maxGeneratedTicks) {
+      return { unit: candidate, stepSize: candidateStep }
+    }
+  }
+
+  unit = 'month'
+  stepSize = Math.max(1, Math.ceil(rangeMs / (getUnitDuration(unit) * maxGeneratedTicks)))
+  return { unit, stepSize }
 }
 
 // Calculate time range with padding to include edge data points
@@ -290,8 +323,7 @@ const chartJsData = computed<ChartData<'bar'>>(() => {
 // Chart.js options
 const chartOptions = computed<ChartOptions<'bar'>>(() => {
   const isStacked = !!(groupColumn.value && uniqueGroups.value.length > 0)
-  const timeUnit = getTimeUnit(bucketSize.value)
-  const stepSize = getStepSize(bucketSize.value)
+  const tickConfig = getSafeTimeTickConfig(bucketSize.value, effectiveTimeRange.value)
   
   const options: ChartOptions<'bar'> = {
     responsive: true,
@@ -347,7 +379,7 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => {
         min: effectiveTimeRange.value.min,
         max: effectiveTimeRange.value.max,
         time: {
-          unit: timeUnit,
+          unit: tickConfig.unit,
           displayFormats: {
             second: 'HH:mm:ss',
             minute: 'HH:mm',
@@ -361,7 +393,7 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => {
           source: 'auto',
           autoSkip: true,
           maxRotation: 45,
-          stepSize: stepSize
+          stepSize: tickConfig.stepSize
         }
       },
       y: {

@@ -33,6 +33,7 @@ import { onMounted } from 'vue'
 export interface CurrentState {
   columns: Column[]
   jsQuery: string
+  jsQueryDisabled?: boolean
   expandLevel?: number
   currentPath?: string  // Current selected node path for path-based rules
 }
@@ -163,6 +164,7 @@ function buildPathRuleFromCurrentState(pathPattern: string): PathRule {
     pathPattern,
     columns: buildColumnsWithColors().map(cleanColumnForSave) as Column[],
     jsQuery: props.currentState.jsQuery,
+    jsQueryDisabled: props.currentState.jsQueryDisabled,
     expandLevel: props.currentState.expandLevel,
   }
 }
@@ -1049,6 +1051,7 @@ function handleConflictOverwrite() {
     pathPattern: '**',
     columns: data.columns || [],
     jsQuery: data.jsQuery,
+    jsQueryDisabled: data.jsQueryDisabled,
     expandLevel: data.expandLevel,
   }]
   
@@ -1085,6 +1088,7 @@ function handleConflictRename() {
     pathPattern: '**',
     columns: data.columns || [],
     jsQuery: data.jsQuery,
+    jsQueryDisabled: data.jsQueryDisabled,
     expandLevel: data.expandLevel,
   }]
   

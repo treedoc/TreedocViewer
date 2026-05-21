@@ -106,6 +106,9 @@ const expandControlRef = ref<InstanceType<typeof ExpandControl>>()
 const isColumnExpanded = ref(false)
 const showAdvancedQuery = ref(false)
 const jsQuery = ref('$')
+const appliedJsQuery = ref('$')
+const jsQueryDebounceTimer = ref<ReturnType<typeof setTimeout> | null>(null)
+const jsQueryDisabled = ref(false)
 const extendedFields = ref('')
 const showExtendedFields = ref(false)
 const selectedPresetName = ref<string | null>(null)
@@ -254,7 +257,7 @@ function hasDisabledFilter(field: string): boolean {
 
 const activeFilterCount = computed(() => {
   const columnFilterCount = Object.values(fieldQueries.value).filter(fq => isFilterActive(fq)).length
-  const hasJsQueryFilter = jsQuery.value.trim() !== '$'
+  const hasJsQueryFilter = jsQuery.value.trim() !== '$' && !jsQueryDisabled.value
   return columnFilterCount + (hasJsQueryFilter ? 1 : 0)
 })
 
@@ -279,6 +282,7 @@ const currentPresetState = computed(() => ({
     ...(fieldQueries.value[c.field] ? { ...fieldQueries.value[c.field] } : {}),
   })),
   jsQuery: jsQuery.value,
+  jsQueryDisabled: jsQueryDisabled.value,
   expandLevel: expandControlRef.value?.state?.expandLevel,
   currentPath: localSelectedNode.value?.pathAsString || '',
 }))
@@ -327,7 +331,8 @@ function applyPreset(preset: QueryPreset) {
   fieldQueries.value = columnsToFieldQueries(config.columns)
 
   // Apply JS query
-  jsQuery.value = config.jsQuery || '$'
+  applyJsQueryImmediately(config.jsQuery || '$')
+  jsQueryDisabled.value = config.jsQueryDisabled || false
 
   // Apply value colors from preset columns
   applyValueColorsFromColumns(config.columns)
@@ -520,7 +525,7 @@ const filteredData = computed(() => {
   const config: ProcessingConfig = {
     fieldQueries: fieldQueries.value,
     columnOrder: columns.value.map(c => c.field),
-    jsQuery: jsQuery.value,
+    jsQuery: jsQueryDisabled.value ? '$' : appliedJsQuery.value,
     valueToString: valueToSearchString
   }
   
@@ -834,7 +839,8 @@ function buildTableInternal(node: TDNode | null, restoreState = true) {
   if (cachedState && restoreState) {
     isColumnExpanded.value = cachedState.isColumnExpanded
     // Restore query state
-    jsQuery.value = cachedState.query.jsQuery || '$'
+    applyJsQueryImmediately(cachedState.query.jsQuery || '$')
+    jsQueryDisabled.value = cachedState.query.jsQueryDisabled || false
     // Restore field queries and extendedFields from cached columns
     const cachedColumns = cachedState.query.columns || []
     for (const col of cachedColumns) {
@@ -1026,7 +1032,13 @@ function clearAllFilters() {
     nextQueries[field] = clearFilterFields(fq)
   }
   fieldQueries.value = nextQueries
-  jsQuery.value = '$'
+  applyJsQueryImmediately('$')
+  jsQueryDisabled.value = false
+}
+
+function clearJsQuery() {
+  applyJsQueryImmediately('$')
+  jsQueryDisabled.value = false
 }
 
 function filterCellValue(field: string, value: any, isNegate: boolean) {
@@ -1235,6 +1247,35 @@ function rebuildTable() {
   first.value = 0
 }
 
+function clearJsQueryDebounceTimer() {
+  if (jsQueryDebounceTimer.value) {
+    clearTimeout(jsQueryDebounceTimer.value)
+    jsQueryDebounceTimer.value = null
+  }
+}
+
+function scheduleApplyJsQuery(value: string) {
+  clearJsQueryDebounceTimer()
+  jsQueryDebounceTimer.value = setTimeout(() => {
+    appliedJsQuery.value = value
+    jsQueryDebounceTimer.value = null
+  }, 1000)
+}
+
+function applyJsQueryImmediately(value: string) {
+  clearJsQueryDebounceTimer()
+  jsQuery.value = value
+  appliedJsQuery.value = value
+}
+
+function toggleJsQueryDisabled() {
+  jsQueryDisabled.value = !jsQueryDisabled.value
+  clearJsQueryDebounceTimer()
+  if (!jsQueryDisabled.value) {
+    applyJsQueryImmediately(jsQuery.value)
+  }
+}
+
 function toggleExtendedFields() {
   showExtendedFields.value = !showExtendedFields.value
 }
@@ -1250,6 +1291,7 @@ function saveCurrentTableState() {
         sortField: sortField.value,
         sortDir,
         jsQuery: jsQuery.value,
+        jsQueryDisabled: jsQueryDisabled.value,
         columns: columns.value.map(c => ({
           ...c,
           ...(fieldQueries.value[c.field] ? { ...fieldQueries.value[c.field] } : {}),
@@ -1280,7 +1322,13 @@ function saveCurrentTableState() {
 
 // Save state before component unmounts (e.g., when toggling fullscreen)
 onBeforeUnmount(() => {
+  clearJsQueryDebounceTimer()
   saveCurrentTableState()
+})
+
+watch(jsQuery, (value) => {
+  if (value === appliedJsQuery.value) return
+  scheduleApplyJsQuery(value)
 })
 
 watch(
@@ -1447,7 +1495,7 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
         <Button
           icon="pi pi-code"
           size="small"
-          :severity="showAdvancedQuery ? 'primary' : 'secondary'"
+          :severity="showAdvancedQuery ? 'primary' : (jsQueryDisabled && jsQuery.trim() !== '$' ? 'warning' : 'secondary')"
           text
           @click="showAdvancedQuery = !showAdvancedQuery"
           v-tooltip.top="'Advanced JS Query'"
@@ -1503,7 +1551,7 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
       </div>
     </div>
     
-    <div v-if="showAdvancedQuery" class="advanced-query">
+    <div v-if="showAdvancedQuery" class="advanced-query" :class="{ 'query-paused': jsQueryDisabled }">
       <label>
         JS Query:
         <div class="input-with-clear">
@@ -1512,6 +1560,17 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
             placeholder="Custom query in JS. E.g. $.name.length > 10"
             :storage-key="STORAGE_KEY_JS_QUERY"
             input-class="query-input"
+            :disabled="jsQueryDisabled"
+          />
+          <Button
+            label="||"
+            size="small"
+            :severity="jsQueryDisabled ? 'warning' : 'secondary'"
+            text
+            class="js-query-pause-btn"
+            :class="{ 'is-paused-active': jsQueryDisabled }"
+            @click="toggleJsQueryDisabled"
+            v-tooltip.top="jsQueryDisabled ? 'Resume JS Query' : 'Pause JS Query'"
           />
           <Button
             v-if="jsQuery && jsQuery !== '$'"
@@ -1520,7 +1579,8 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
             severity="secondary"
             text
             class="clear-btn"
-            @click="jsQuery = '$'"
+            :disabled="jsQueryDisabled"
+            @click="clearJsQuery"
             v-tooltip.top="'Clear JS Query'"
           />
         </div>
@@ -1800,6 +1860,27 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
 
 .clear-btn {
   flex-shrink: 0;
+}
+
+.js-query-pause-btn {
+  flex-shrink: 0;
+  min-width: 32px;
+}
+
+.advanced-query.query-paused .query-input {
+  opacity: 0.5;
+}
+
+.advanced-query.query-paused .clear-btn {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.js-query-pause-btn.is-paused-active {
+  background: #f59e0b !important;
+  border-color: #f59e0b !important;
+  color: white !important;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.3);
 }
 
 .query-input {

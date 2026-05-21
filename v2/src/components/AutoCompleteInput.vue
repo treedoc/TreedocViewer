@@ -9,6 +9,7 @@ const props = defineProps<{
   placeholder?: string
   storageKey: string
   inputClass?: string
+  disabled?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -120,6 +121,7 @@ watch(() => props.modelValue, () => {
       :value="modelValue"
       :placeholder="placeholder"
       :class="inputClass"
+      :disabled="disabled"
       @focus="handleFocus"
       @blur="handleBlur"
       @input="handleInput"
