@@ -154,7 +154,7 @@ function toggleCopyMenu(event: Event) {
 }
 
 function copyTable(format: TableCopyFormat) {
-  copyTableData(filteredData.value as any, visibleColumns.value as any, format)
+  copyTableData(sortedData.value as any, visibleColumns.value as any, format)
 }
 
 function handleFileSelect(event: Event) {
