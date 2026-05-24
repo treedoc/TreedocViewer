@@ -2,7 +2,7 @@
   "name": "treedoc-viewer-vscode",
   "displayName": "TreeDoc Viewer",
   "description": "View JSON files with the TreeDoc Viewer tree, source, and table views.",
-  "version": "0.0.8",
+  "version": "0.0.10",
   "publisher": "treedoc",
   "repository": {
     "type": "git",
@@ -92,11 +92,11 @@
     "package": "vsce package"
   },
   "devDependencies": {
-    "@vitejs/plugin-vue": "^5.2.1",
+    "@vitejs/plugin-vue": "^6.0.7",
     "@vscode/vsce": "^3.2.1",
-    "vite": "^6.1.0",
-    "typescript": "~5.7.2",
-    "vue-tsc": "^2.2.0"
+    "typescript": "~6.0.3",
+    "vite": "^8.0.14",
+    "vue-tsc": "^3.3.1"
   },
   "dependencies": {
     "@codemirror/lang-javascript": "^6.2.2",
@@ -106,12 +106,12 @@
     "chart.js": "^4.5.1",
     "chartjs-adapter-date-fns": "^3.0.0",
     "codemirror": "^6.0.1",
-    "date-fns": "^4.1.0",
+    "date-fns": "^4.3.0",
     "lodash-es": "^4.17.21",
-    "pinia": "^2.2.8",
+    "pinia": "^3.0.4",
     "primeicons": "^7.0.0",
     "primevue": "^4.2.5",
-    "splitpanes": "^3.1.5",
+    "splitpanes": "^4.0.4",
     "treedoc": "^0.3.48",
     "vue": "^3.5.13",
     "vue-chartjs": "^5.3.3",
