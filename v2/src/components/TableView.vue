@@ -102,6 +102,7 @@ const { textWrap, maxPane } = storeToRefs(store)
 
 const localSelectedNode = shallowRef<TDNode | null>(null)
 
+const tableViewRootRef = ref<HTMLElement | null>(null)
 const expandControlRef = ref<InstanceType<typeof ExpandControl>>()
 const isColumnExpanded = ref(false)
 const showAdvancedQuery = ref(false)
@@ -154,7 +155,8 @@ function toggleCopyMenu(event: Event) {
 }
 
 function copyTable(format: TableCopyFormat) {
-  copyTableData(sortedData.value as any, visibleColumns.value as any, format)
+  const selected = getSelectedTableDataForCopy()
+  copyTableData(selected.data as any, selected.columns as any, format)
 }
 
 function handleFileSelect(event: Event) {
@@ -231,6 +233,66 @@ const currentColumnPatternExtract = computed(() => {
 const sortField = ref<string>('')
 const sortOrder = ref<1 | -1 | 0>(0)
 const stringSortCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' })
+
+type TableSelectionMode = 'row' | 'cell'
+
+interface TableSelection {
+  mode: TableSelectionMode
+  startRow: number
+  endRow: number
+  startCol: number
+  endCol: number
+}
+
+const tableSelection = ref<TableSelection | null>(null)
+const isDraggingSelection = ref(false)
+const suppressNextCellClick = ref(false)
+
+const normalizedSelection = computed(() => {
+  const selection = tableSelection.value
+  if (!selection) return null
+  return {
+    mode: selection.mode,
+    startRow: Math.min(selection.startRow, selection.endRow),
+    endRow: Math.max(selection.startRow, selection.endRow),
+    startCol: Math.min(selection.startCol, selection.endCol),
+    endCol: Math.max(selection.startCol, selection.endCol),
+  }
+})
+
+const selectedTableData = computed(() => getSelectedTableDataForCopy())
+
+const selectionStats = computed(() => {
+  const selection = normalizedSelection.value
+  if (!selection) return null
+
+  const selected = selectedTableData.value
+  const rowCount = selected.data.length
+  const columnCount = selected.columns.length
+  let nonEmptyCellCount = 0
+  let numericCellCount = 0
+  let sum = 0
+
+  for (const row of selected.data) {
+    for (const column of selected.columns) {
+      const value = getNumericSelectionValue(row[column.field])
+      if (!value.hasValue) continue
+      nonEmptyCellCount++
+      if (value.numberValue !== null) {
+        numericCellCount++
+        sum += value.numberValue
+      }
+    }
+  }
+
+  return {
+    rowCount,
+    columnCount,
+    cellCount: rowCount * columnCount,
+    sum,
+    showSum: nonEmptyCellCount > 0 && numericCellCount === nonEmptyCellCount,
+  }
+})
 
 function createFieldQuery(field: string): FieldQuery {
   return {
@@ -721,6 +783,243 @@ const paginatedData = computed(() => {
   return sortedData.value.slice(first.value, first.value + rows.value)
 })
 
+function isRowSelectionColumn(field: string): boolean {
+  return field === COL_NO || field === COL_KEY
+}
+
+function getVisibleColumnIndex(field: string): number {
+  return visibleColumns.value.findIndex(col => col.field === field)
+}
+
+function isSelectionInteractiveTarget(target: EventTarget | null, field: string): boolean {
+  if (!(target instanceof HTMLElement)) return false
+  if (target.closest('button, input, textarea, select, [contenteditable="true"], .hover-button-bar, .p-button')) {
+    return true
+  }
+  return !isRowSelectionColumn(field) && !!target.closest('a')
+}
+
+function getSelectionCellFromEvent(event: MouseEvent): { rowIndex: number, field: string } | null {
+  if (!(event.target instanceof HTMLElement)) return null
+  const cell = event.target.closest('.cell-outer')
+    || event.target.closest('td')?.querySelector('.cell-outer')
+  if (!(cell instanceof HTMLElement)) return null
+
+  const rowIndex = Number(cell.dataset.rowIndex)
+  const field = cell.dataset.field
+  if (!Number.isInteger(rowIndex) || !field) return null
+  return { rowIndex, field }
+}
+
+function clearTableSelection() {
+  tableSelection.value = null
+  isDraggingSelection.value = false
+  window.removeEventListener('mouseup', finishSelectionDrag)
+}
+
+function finishSelectionDrag() {
+  isDraggingSelection.value = false
+  window.removeEventListener('mouseup', finishSelectionDrag)
+}
+
+function onCellMouseDown(event: MouseEvent, rowIndex: number, field: string) {
+  if (event.button !== 0 || isSelectionInteractiveTarget(event.target, field)) return
+
+  const colIndex = getVisibleColumnIndex(field)
+  if (colIndex < 0) return
+
+  const mode: TableSelectionMode = isRowSelectionColumn(field) ? 'row' : 'cell'
+  const endCol = mode === 'row' ? visibleColumns.value.length - 1 : colIndex
+  tableSelection.value = {
+    mode,
+    startRow: rowIndex,
+    endRow: rowIndex,
+    startCol: mode === 'row' ? 0 : colIndex,
+    endCol,
+  }
+  isDraggingSelection.value = true
+  suppressNextCellClick.value = false
+  event.preventDefault()
+  window.addEventListener('mouseup', finishSelectionDrag)
+}
+
+function onTableMouseDown(event: MouseEvent) {
+  tableViewRootRef.value?.focus()
+  const cell = getSelectionCellFromEvent(event)
+  if (!cell) return
+  onCellMouseDown(event, cell.rowIndex, cell.field)
+}
+
+function onCellMouseEnter(rowIndex: number, field: string) {
+  if (!isDraggingSelection.value || !tableSelection.value) return
+
+  const colIndex = getVisibleColumnIndex(field)
+  if (colIndex < 0) return
+
+  const selection = tableSelection.value
+  if (selection.endRow !== rowIndex || selection.endCol !== colIndex) {
+    suppressNextCellClick.value = true
+  }
+  selection.endRow = rowIndex
+  if (selection.mode === 'row') {
+    selection.endCol = visibleColumns.value.length - 1
+  } else {
+    selection.endCol = colIndex
+  }
+}
+
+function onTableMouseOver(event: MouseEvent) {
+  const cell = getSelectionCellFromEvent(event)
+  if (!cell) return
+  onCellMouseEnter(cell.rowIndex, cell.field)
+}
+
+function onCellClick(event: MouseEvent) {
+  if (!suppressNextCellClick.value) return
+  event.preventDefault()
+  event.stopPropagation()
+  suppressNextCellClick.value = false
+}
+
+function clampSelectionRow(rowIndex: number): number {
+  return Math.max(0, Math.min(rowIndex, paginatedData.value.length - 1))
+}
+
+function clampSelectionCol(colIndex: number): number {
+  return Math.max(0, Math.min(colIndex, visibleColumns.value.length - 1))
+}
+
+function getKeyboardSelectionCell(): { row: number, col: number } | null {
+  if (paginatedData.value.length === 0 || visibleColumns.value.length === 0) return null
+  const selection = tableSelection.value
+  if (!selection) return { row: 0, col: 0 }
+  return {
+    row: clampSelectionRow(selection.endRow),
+    col: clampSelectionCol(selection.endCol),
+  }
+}
+
+function scrollSelectionAnchorIntoView() {
+  const selection = tableSelection.value
+  if (!selection) return
+  nextTick(() => {
+    const field = visibleColumns.value[clampSelectionCol(selection.endCol)]?.field
+    if (!field) return
+    const selector = `.cell-outer[data-row-index="${clampSelectionRow(selection.endRow)}"][data-field="${CSS.escape(field)}"]`
+    tableViewRootRef.value?.querySelector(selector)?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  })
+}
+
+function onTableKeyDown(event: KeyboardEvent) {
+  if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) return
+  if (event.altKey || event.metaKey || event.ctrlKey) return
+  if (event.target instanceof HTMLElement) {
+    const target = event.target
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return
+  }
+
+  const current = getKeyboardSelectionCell()
+  if (!current) return
+
+  const delta = {
+    row: event.key === 'ArrowUp' ? -1 : event.key === 'ArrowDown' ? 1 : 0,
+    col: event.key === 'ArrowLeft' ? -1 : event.key === 'ArrowRight' ? 1 : 0,
+  }
+  const nextRow = clampSelectionRow(current.row + delta.row)
+  const nextCol = clampSelectionCol(current.col + delta.col)
+
+  if (event.shiftKey && tableSelection.value) {
+    tableSelection.value = {
+      ...tableSelection.value,
+      mode: 'cell',
+      endRow: nextRow,
+      endCol: nextCol,
+    }
+  } else if (event.shiftKey) {
+    tableSelection.value = {
+      mode: 'cell',
+      startRow: current.row,
+      startCol: current.col,
+      endRow: nextRow,
+      endCol: nextCol,
+    }
+  } else {
+    tableSelection.value = {
+      mode: 'cell',
+      startRow: nextRow,
+      endRow: nextRow,
+      startCol: nextCol,
+      endCol: nextCol,
+    }
+  }
+
+  event.preventDefault()
+  event.stopPropagation()
+  scrollSelectionAnchorIntoView()
+}
+
+function isRowSelected(rowIndex: number): boolean {
+  const selection = normalizedSelection.value
+  if (!selection || selection.mode !== 'row') return false
+  return rowIndex >= selection.startRow && rowIndex <= selection.endRow
+}
+
+function isCellSelected(rowIndex: number, field: string): boolean {
+  const selection = normalizedSelection.value
+  if (!selection) return false
+  const colIndex = getVisibleColumnIndex(field)
+  if (colIndex < 0) return false
+  return rowIndex >= selection.startRow
+    && rowIndex <= selection.endRow
+    && colIndex >= selection.startCol
+    && colIndex <= selection.endCol
+}
+
+function isSelectionAnchor(rowIndex: number, field: string): boolean {
+  const selection = tableSelection.value
+  if (!selection) return false
+  return selection.startRow === rowIndex && selection.startCol === getVisibleColumnIndex(field)
+}
+
+function getNumericSelectionValue(value: any): { hasValue: boolean, numberValue: number | null } {
+  const normalized = normalizeSortValue(value)
+  if (normalized === undefined || normalized === null || normalized === '') {
+    return { hasValue: false, numberValue: null }
+  }
+  if (typeof normalized === 'number') {
+    return { hasValue: true, numberValue: Number.isFinite(normalized) ? normalized : null }
+  }
+  if (typeof normalized === 'string') {
+    const trimmed = normalized.trim()
+    if (!trimmed) return { hasValue: false, numberValue: null }
+    const parsed = Number(trimmed)
+    return { hasValue: true, numberValue: Number.isFinite(parsed) ? parsed : null }
+  }
+  return { hasValue: true, numberValue: null }
+}
+
+function formatSelectionSum(value: number): string {
+  return new Intl.NumberFormat(undefined, { maximumFractionDigits: 6 }).format(value)
+}
+
+function getSelectedTableDataForCopy(): { data: TableRow[], columns: TableColumn[] } {
+  const selection = normalizedSelection.value
+  if (!selection) {
+    return { data: sortedData.value, columns: visibleColumns.value }
+  }
+
+  const selectedRows = paginatedData.value.slice(selection.startRow, selection.endRow + 1)
+  const selectedColumns = selection.mode === 'row'
+    ? visibleColumns.value
+    : visibleColumns.value.slice(selection.startCol, selection.endCol + 1)
+
+  if (selectedRows.length === 0 || selectedColumns.length === 0) {
+    return { data: sortedData.value, columns: visibleColumns.value }
+  }
+
+  return { data: selectedRows, columns: selectedColumns }
+}
+
 
 // Get the value for an extended field, preferring TDNode if available
 function getExtValue(val: any): any {
@@ -1017,12 +1316,14 @@ function onKeyPress(e: KeyboardEvent) {
 function onPage(event: { first: number; rows: number }) {
   first.value = event.first
   rows.value = event.rows
+  clearTableSelection()
 }
 
 function onSort(event: DataTableSortEvent) {
   sortField.value = typeof event.sortField === 'string' ? event.sortField : ''
   sortOrder.value = event.sortOrder ?? 0
   first.value = 0
+  clearTableSelection()
 }
 
 function clearAllFilters() {
@@ -1034,10 +1335,12 @@ function clearAllFilters() {
   fieldQueries.value = nextQueries
   applyJsQueryImmediately('$')
   jsQueryDisabled.value = false
+  clearTableSelection()
 }
 
 function clearJsQuery() {
   applyJsQueryImmediately('$')
+  clearTableSelection()
   jsQueryDisabled.value = false
 }
 
@@ -1245,6 +1548,7 @@ function rebuildTable() {
   const node = localSelectedNode.value
   if (node) buildTable(toRaw(node), false)
   first.value = 0
+  clearTableSelection()
 }
 
 function clearJsQueryDebounceTimer() {
@@ -1322,6 +1626,7 @@ function saveCurrentTableState() {
 
 // Save state before component unmounts (e.g., when toggling fullscreen)
 onBeforeUnmount(() => {
+  window.removeEventListener('mouseup', finishSelectionDrag)
   clearJsQueryDebounceTimer()
   saveCurrentTableState()
 })
@@ -1343,6 +1648,7 @@ watch(
     if (newNode) {
       buildTable(newNode)
       first.value = 0
+      clearTableSelection()
     }
     // logger.log(`Selected node changed end`)
   },
@@ -1366,7 +1672,12 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
 </script>
 
 <template>
-  <div class="table-view" tabindex="0">
+  <div
+    ref="tableViewRootRef"
+    class="table-view"
+    tabindex="0"
+    @keydown="onTableKeyDown"
+  >
     <!-- Column Filter Popover -->
     <ColumnFilterDialog
       v-if="activeFilterColumn"
@@ -1640,7 +1951,12 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
       @update:time-range="onChartTimeRange"
     />
     
-    <div class="table-content">
+    <div
+      class="table-content"
+      :class="{ 'selection-dragging': isDraggingSelection }"
+      @mousedown="onTableMouseDown"
+      @mouseover="onTableMouseOver"
+    >
       <DataTable
         :value="paginatedData"
         :sortField="sortField"
@@ -1680,7 +1996,20 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
             </div>
           </template>
           <template #body="{ data, index }">
-            <div class="cell-outer" :class="{ 'has-color': getCellColorStyle(data, col.field) }" :style="getCellColorStyle(data, col.field)">
+            <div
+              class="cell-outer"
+              :data-row-index="index"
+              :data-field="col.field"
+              :class="{
+                'has-color': getCellColorStyle(data, col.field),
+                'is-selected': isCellSelected(index, col.field),
+                'is-row-selected': isRowSelected(index),
+                'is-selection-anchor': isSelectionAnchor(index, col.field),
+                'is-row-selector': isRowSelectionColumn(col.field)
+              }"
+              :style="getCellColorStyle(data, col.field)"
+              @click.capture="onCellClick"
+            >
               <div class="cell-wrapper">
                 <div class="cell-content">
                   <template v-if="isKeyColumn(col.field)">
@@ -1766,6 +2095,12 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
         @page="onPage"
       >
         <template #end>
+          <span v-if="selectionStats && selectionStats.cellCount > 1" class="paginator-selection">
+            Selected: {{ selectionStats.rowCount }} rows x {{ selectionStats.columnCount }} cols
+            <template v-if="selectionStats.showSum">
+              | Sum: {{ formatSelectionSum(selectionStats.sum) }}
+            </template>
+          </span>
           <span class="paginator-total">
             <template v-if="activeFilterCount > 0">
               <i class="pi pi-filter"></i>
@@ -1977,13 +2312,19 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
   width: 1.5rem;
 }
 
-.paginator-total {
+.paginator-total,
+.paginator-selection {
   display: flex;
   align-items: center;
   gap: 4px;
   font-size: 0.75rem;
   color: var(--tdv-text-muted);
   margin-left: 8px;
+}
+
+.paginator-selection {
+  color: var(--tdv-text);
+  font-weight: 500;
 }
 
 .paginator-total .pi-filter {
@@ -2093,7 +2434,36 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
 .cell-outer {
   position: relative;
   display: block;
-  width: 100%;
+  box-sizing: border-box;
+  width: calc(100% + 8px);
+  min-height: 1.25rem;
+  margin: -3px -4px;
+  padding: 3px 4px;
+  border-radius: 0;
+}
+
+.table-content.selection-dragging {
+  user-select: none;
+}
+
+.cell-outer.is-row-selector {
+  cursor: row-resize;
+}
+
+.cell-outer.is-selected {
+  outline: 1px solid color-mix(in srgb, var(--p-primary-color) 45%, transparent);
+  outline-offset: -2px;
+}
+
+.cell-outer.is-selection-anchor {
+  outline: 2px solid var(--p-primary-color);
+  outline-offset: -2px;
+}
+
+.cell-outer.is-selected > .cell-wrapper,
+.cell-outer.is-row-selected > .cell-wrapper {
+  position: relative;
+  z-index: 1;
 }
 
 /* When cell has color, create an absolute overlay for the background */
@@ -2108,6 +2478,11 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
   background-color: var(--cell-bg-color);
   z-index: 0;
   pointer-events: none;
+}
+
+.cell-outer.has-color.is-selected::before,
+.cell-outer.has-color.is-row-selected::before {
+  opacity: 0.25;
 }
 
 .cell-outer.has-color > .cell-wrapper {
@@ -2189,6 +2564,18 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
   border-right: 1px solid var(--tdv-surface-border);
   position: relative;
   overflow: visible !important; /* Allow hover button bar to overflow cell boundaries */
+}
+
+:deep(.p-datatable-tbody > tr > td:has(.cell-outer.is-selected)),
+:deep(.p-datatable-tbody > tr > td:has(.cell-outer.is-row-selected)) {
+  background: color-mix(in srgb, var(--p-primary-color) 16%, var(--tdv-surface)) !important;
+  border-color: color-mix(in srgb, var(--p-primary-color) 16%, var(--tdv-surface)) !important;
+}
+
+:deep(.p-datatable-tbody > tr:hover > td:has(.cell-outer.is-selected)),
+:deep(.p-datatable-tbody > tr:hover > td:has(.cell-outer.is-row-selected)) {
+  background: color-mix(in srgb, var(--p-primary-color) 18%, var(--tdv-surface)) !important;
+  border-color: color-mix(in srgb, var(--p-primary-color) 18%, var(--tdv-surface)) !important;
 }
 
 /* Ensure hovered cell's button bar appears above other cells */
