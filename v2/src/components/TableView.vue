@@ -260,7 +260,7 @@ const normalizedSelection = computed(() => {
   }
 })
 
-const selectedTableData = computed(() => getSelectedTableDataForCopy())
+const selectedTableData = computed(() => getSelectedRangeTableData())
 
 const selectionStats = computed(() => {
   const selection = normalizedSelection.value
@@ -1002,10 +1002,10 @@ function formatSelectionSum(value: number): string {
   return new Intl.NumberFormat(undefined, { maximumFractionDigits: 6 }).format(value)
 }
 
-function getSelectedTableDataForCopy(): { data: TableRow[], columns: TableColumn[] } {
+function getSelectedRangeTableData(): { data: TableRow[], columns: TableColumn[] } {
   const selection = normalizedSelection.value
   if (!selection) {
-    return { data: sortedData.value, columns: visibleColumns.value }
+    return { data: [], columns: [] }
   }
 
   const selectedRows = paginatedData.value.slice(selection.startRow, selection.endRow + 1)
@@ -1014,10 +1014,24 @@ function getSelectedTableDataForCopy(): { data: TableRow[], columns: TableColumn
     : visibleColumns.value.slice(selection.startCol, selection.endCol + 1)
 
   if (selectedRows.length === 0 || selectedColumns.length === 0) {
-    return { data: sortedData.value, columns: visibleColumns.value }
+    return { data: [], columns: [] }
   }
 
   return { data: selectedRows, columns: selectedColumns }
+}
+
+function getSelectedTableDataForCopy(): { data: TableRow[], columns: TableColumn[] } {
+  const selection = normalizedSelection.value
+  if (!selection) {
+    return { data: sortedData.value, columns: visibleColumns.value }
+  }
+
+  const selected = getSelectedRangeTableData()
+  if (selected.data.length * selected.columns.length <= 1) {
+    return { data: sortedData.value, columns: visibleColumns.value }
+  }
+
+  return selected
 }
 
 

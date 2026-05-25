@@ -5,7 +5,7 @@ import Popover from 'primevue/popover'
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
 import ProgressBar from 'primevue/progressbar'
-import Select from 'primevue/select'
+import MultiSelect from 'primevue/multiselect'
 import HoverButtonBar, { type HoverButton } from './HoverButtonBar.vue'
 import ColumnFilterBasicControls from './ColumnFilterBasicControls.vue'
 import type { TDNode } from 'treedoc'
@@ -29,7 +29,9 @@ export interface ColumnStatistic {
 }
 
 interface StatisticTableRow {
+  key: string
   value: string
+  values: string[]
   count: number
   percent: number
   uniqueCount: number
@@ -159,8 +161,19 @@ const localLinkExpression = ref(props.fieldQuery.linkExpression || '')
 const showExtendedFields = ref(false)
 const showFormat = ref(false)
 const selectedValues = ref<string[]>([])
-const breakdownField = ref(props.fieldQuery.statisticBreakdownField || '')
+const BREAKDOWN_FIELDS_DEBOUNCE_MS = 1000
+
+function getFieldQueryBreakdownFields(fq: FieldQuery): string[] {
+  return fq.statisticBreakdownFields?.length
+    ? [...fq.statisticBreakdownFields]
+    : (fq.statisticBreakdownField ? [fq.statisticBreakdownField] : [])
+}
+
+const initialBreakdownFields = getFieldQueryBreakdownFields(props.fieldQuery)
+const pendingBreakdownFields = ref<string[]>([...initialBreakdownFields])
+const breakdownFields = ref<string[]>([...initialBreakdownFields])
 const selectedBreakdownValue = ref<string | null>(null)
+let isSyncingBreakdownFields = false
 
 const compactPopoverWidth = 420
 const showAdvancedOverlay = ref(false)
@@ -354,6 +367,8 @@ function stopStatsTableResize() {
 onBeforeUnmount(() => {
   isPopoverVisible.value = false
   cancelAutoClose()
+  debouncedApplyFilter.cancel()
+  debouncedApplyBreakdownFields.cancel()
   document.removeEventListener('mousemove', handleDocumentMouseMove)
   document.removeEventListener('mousemove', onResize)
   document.removeEventListener('mouseup', stopResize)
@@ -362,6 +377,17 @@ onBeforeUnmount(() => {
   document.removeEventListener('mousemove', onStatsTableResize)
   document.removeEventListener('mouseup', stopStatsTableResize)
 })
+
+const debouncedApplyBreakdownFields = debounce(() => {
+  const fields = [...pendingBreakdownFields.value]
+  selectedBreakdownValue.value = null
+  breakdownFields.value = fields
+  emit('update:fieldQuery', {
+    ...props.fieldQuery,
+    statisticBreakdownField: fields.length === 1 ? fields[0] : undefined,
+    statisticBreakdownFields: fields.length > 0 ? fields : undefined,
+  })
+}, BREAKDOWN_FIELDS_DEBOUNCE_MS)
 
 // Sync with props
 watch(() => props.fieldQuery, (fq) => {
@@ -384,7 +410,14 @@ watch(() => props.fieldQuery, (fq) => {
   localPatternExtract.value = fq.patternExtract || ''
   localPatternFilter.value = fq.patternFilter || false
   localLinkExpression.value = fq.linkExpression || ''
-  breakdownField.value = fq.statisticBreakdownField || ''
+  const fields = getFieldQueryBreakdownFields(fq)
+  debouncedApplyBreakdownFields.cancel()
+  isSyncingBreakdownFields = true
+  pendingBreakdownFields.value = [...fields]
+  breakdownFields.value = fields
+  nextTick(() => {
+    isSyncingBreakdownFields = false
+  })
   // Auto-show/hide extended fields section based on content
   showExtendedFields.value = !!(fq.extendedFields || fq.patternExtract)
   // Auto-show format section if it has content
@@ -399,13 +432,10 @@ watch(() => props.field, () => {
   selectedBreakdownValue.value = null
 }, { immediate: true })
 
-watch(breakdownField, () => {
-  selectedBreakdownValue.value = null
-  emit('update:fieldQuery', {
-    ...props.fieldQuery,
-    statisticBreakdownField: breakdownField.value || undefined,
-  })
-})
+watch(pendingBreakdownFields, () => {
+  if (isSyncingBreakdownFields) return
+  debouncedApplyBreakdownFields()
+}, { deep: true })
 
 // Extract field names from pattern (e.g., "Order:${orderId}" -> ["orderId"], "user:$name" -> ["name"])
 // Supports multiple patterns separated by newlines
@@ -755,11 +785,36 @@ const breakdownColumns = computed(() => {
     .map(col => ({ label: col.header || col.field, value: col.field }))
 })
 
+const selectedBreakdownColumns = computed(() => {
+  return breakdownFields.value
+    .map(field => props.columns.find(col => col.field === field))
+    .filter((col): col is { field: string; header: string } => !!col)
+})
+
+const selectedBreakdownLabels = computed(() => {
+  return selectedBreakdownColumns.value.map(col => col.header || col.field)
+})
+
+const breakdownFieldsKey = computed(() => breakdownFields.value.join('\u0000'))
+
+function getBreakdownValues(row: any): string[] {
+  return breakdownFields.value.map(field => valueToSearchString(row[field]))
+}
+
+function getBreakdownKey(values: string[]): string {
+  return JSON.stringify(values)
+}
+
+function getBreakdownDisplayValue(values: string[]): string {
+  if (values.length === 0) return 'Global'
+  return values.map(value => value || '(empty)').join(' / ')
+}
+
 const selectedBreakdownRows = computed(() => {
-  if (!breakdownField.value || selectedBreakdownValue.value === null) {
+  if (breakdownFields.value.length === 0 || selectedBreakdownValue.value === null) {
     return props.filteredData
   }
-  return props.filteredData.filter(row => valueToSearchString(row[breakdownField.value]) === selectedBreakdownValue.value)
+  return props.filteredData.filter(row => getBreakdownKey(getBreakdownValues(row)) === selectedBreakdownValue.value)
 })
 
 const scopedColumnStats = computed<ColumnStatistic>(() => {
@@ -770,22 +825,25 @@ const displayedTopValues = computed(() => scopedColumnStats.value.topValues)
 const hasNumericStatisticRows = computed(() => columnStats.value.numericCount > 0)
 
 const selectedBreakdownLabel = computed(() => {
-  if (!breakdownField.value || selectedBreakdownValue.value === null) return ''
-  const column = props.columns.find(col => col.field === breakdownField.value)
-  const label = column?.header || breakdownField.value
-  return `${label}: ${selectedBreakdownValue.value || '(empty)'}`
+  if (breakdownFields.value.length === 0 || selectedBreakdownValue.value === null) return ''
+  const row = statisticRows.value.find(item => item.key === selectedBreakdownValue.value)
+  if (!row) return ''
+  return selectedBreakdownLabels.value
+    .map((label, index) => `${label}: ${row.values[index] || '(empty)'}`)
+    .join(', ')
 })
 
-const statisticValueHeader = computed(() => {
-  const column = props.columns.find(col => col.field === breakdownField.value)
-  return column?.header || breakdownField.value || 'Value'
+const statisticValueHeaders = computed(() => {
+  return selectedBreakdownLabels.value.length > 0 ? selectedBreakdownLabels.value : ['Value']
 })
 
-function createStatisticTableRow(value: string, rows: any[], totalBase: number): StatisticTableRow {
+function createStatisticTableRow(values: string[], rows: any[], totalBase: number): StatisticTableRow {
   const stats = calculateColumnStats(rows, props.field)
   const isNumeric = stats.numericCount > 0
   return {
-    value,
+    key: getBreakdownKey(values),
+    value: getBreakdownDisplayValue(values),
+    values,
     count: rows.length,
     percent: hasNumericStatisticRows.value
       ? (totalBase ? (stats.sum / totalBase) * 100 : 0)
@@ -805,23 +863,24 @@ const statisticRows = computed<StatisticTableRow[]>(() => {
   if (!showStats.value) return []
 
   const totalBase = columnStats.value.sum
-  if (!breakdownField.value) {
-    return [createStatisticTableRow('Global', props.filteredData, totalBase)]
+  if (breakdownFields.value.length === 0) {
+    return [createStatisticTableRow(['Global'], props.filteredData, totalBase)]
   }
 
-  const groups = new Map<string, any[]>()
+  const groups = new Map<string, { values: string[], rows: any[] }>()
   for (const row of props.filteredData) {
-    const key = valueToSearchString(row[breakdownField.value])
-    const rows = groups.get(key)
-    if (rows) {
-      rows.push(row)
+    const values = getBreakdownValues(row)
+    const key = getBreakdownKey(values)
+    const group = groups.get(key)
+    if (group) {
+      group.rows.push(row)
     } else {
-      groups.set(key, [row])
+      groups.set(key, { values, rows: [row] })
     }
   }
 
-  return Array.from(groups.entries())
-    .map(([value, rows]) => createStatisticTableRow(value, rows, totalBase))
+  return Array.from(groups.values())
+    .map(group => createStatisticTableRow(group.values, group.rows, totalBase))
     .sort((a, b) => {
       if (hasNumericStatisticRows.value) {
         return b.total - a.total || b.count - a.count
@@ -840,14 +899,13 @@ function formatNumber(val: number): string {
 }
 
 function copyBreakdownStats() {
-  const breakdownColumn = props.columns.find(col => col.field === breakdownField.value)
-  const breakdownLabel = breakdownColumn?.header || breakdownField.value || 'Value'
+  const breakdownLabels = statisticValueHeaders.value
   const headers = hasNumericStatisticRows.value
-    ? [breakdownLabel, 'Count', 'Unique', 'Total', 'Percent', 'Max', 'Avg', 'P99', 'P90', 'P50']
-    : [breakdownLabel, 'Count', 'Unique', 'Percent']
+    ? [...breakdownLabels, 'Count', 'Unique', 'Total', 'Percent', 'Max', 'Avg', 'P99', 'P90', 'P50']
+    : [...breakdownLabels, 'Count', 'Unique', 'Percent']
   const rows = statisticRows.value.map(row => {
     const common = [
-      row.value,
+      ...row.values,
       row.count,
       row.uniqueCount,
     ]
@@ -1133,14 +1191,15 @@ user=${userId}, action=$action"
         <div class="stats-breakdown">
           <div class="stats-breakdown-controls">
             <label v-if="breakdownColumns.length > 0" class="stats-breakdown-label">Break down by</label>
-            <Select
+            <MultiSelect
               v-if="breakdownColumns.length > 0"
-              v-model="breakdownField"
+              v-model="pendingBreakdownFields"
               :options="breakdownColumns"
               optionLabel="label"
               optionValue="value"
-              placeholder="Select column"
-              showClear
+              placeholder="Select columns"
+              display="chip"
+              filter
               class="stats-breakdown-select"
             />
             <Button
@@ -1156,13 +1215,14 @@ user=${userId}, action=$action"
           </div>
           <div
             v-if="statisticRows.length > 0"
+            v-memo="[breakdownFieldsKey, selectedBreakdownValue, filteredData, field, statsTableHeight]"
             class="stats-breakdown-table-wrap"
             :style="{ height: statsTableHeight + 'px' }"
           >
             <table class="stats-breakdown-table">
               <thead>
                 <tr>
-                  <th>{{ statisticValueHeader }}</th>
+                  <th v-for="header in statisticValueHeaders" :key="header">{{ header }}</th>
                   <th>Count</th>
                   <th>Unique</th>
                   <th v-if="hasNumericStatisticRows">Total</th>
@@ -1177,11 +1237,18 @@ user=${userId}, action=$action"
               <tbody>
                 <tr
                   v-for="row in statisticRows"
-                  :key="row.value"
-                  :class="{ 'is-selected': breakdownField && selectedBreakdownValue === row.value }"
-                  @click="breakdownField && (selectedBreakdownValue = selectedBreakdownValue === row.value ? null : row.value)"
+                  :key="row.key"
+                  :class="{ 'is-selected': breakdownFields.length > 0 && selectedBreakdownValue === row.key }"
+                  @click="breakdownFields.length > 0 && (selectedBreakdownValue = selectedBreakdownValue === row.key ? null : row.key)"
                 >
-                  <td class="breakdown-value" :title="row.value">{{ row.value || '(empty)' }}</td>
+                  <td
+                    v-for="(value, index) in row.values"
+                    :key="`${row.key}-${index}`"
+                    class="breakdown-value"
+                    :title="value"
+                  >
+                    {{ value || '(empty)' }}
+                  </td>
                   <td>{{ row.count }}</td>
                   <td>{{ row.uniqueCount }}</td>
                   <td v-if="hasNumericStatisticRows" class="breakdown-total-cell">
