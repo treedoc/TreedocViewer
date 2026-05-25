@@ -2,8 +2,9 @@
   "name": "treedoc-viewer-vscode",
   "displayName": "TreeDoc Viewer",
   "description": "View JSON files with the TreeDoc Viewer tree, source, and table views.",
-  "version": "0.0.13",
+  "version": "0.0.16",
   "publisher": "treedoc",
+  "icon": "images/favicon_256.png",
   "repository": {
     "type": "git",
     "url": "https://github.com/treedoc/TreedocViewer.git"
