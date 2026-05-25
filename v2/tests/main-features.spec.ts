@@ -220,12 +220,18 @@ test.describe('TreeDoc Viewer - Main UI Features', () => {
 
       await expect(page.locator('.stats-breakdown-table')).toBeVisible();
       await expect(page.locator('.stats-breakdown-table tbody tr')).toHaveCount(1);
-      await expect(page.locator('.stats-breakdown-table tbody tr').first()).toContainText('Global');
+      await expect(page.locator('.stats-breakdown-table-wrap')).toHaveClass(/is-compact/);
+      await expect(page.locator('.stats-breakdown-resize-handle')).toHaveCount(0);
+      await expect(page.locator('.stats-breakdown-table thead')).not.toContainText('Value');
+      await expect(page.locator('.stats-breakdown-table thead')).not.toContainText('%');
+      await expect(page.locator('.stats-breakdown-table tbody tr').first()).not.toContainText('Global');
 
       await page.locator('.stats-breakdown-select').click();
       await page.locator('.p-select-option').filter({ hasText: 'status' }).click();
 
       await expect(page.locator('.stats-breakdown-table')).toBeVisible();
+      await expect(page.locator('.stats-breakdown-table-wrap')).not.toHaveClass(/is-compact/);
+      await expect(page.locator('.stats-breakdown-resize-handle')).toBeVisible();
       await expect(page.locator('.stats-breakdown-table thead')).toContainText('Count');
       await expect(page.locator('.stats-breakdown-table thead')).toContainText('Unique');
       await expect(page.locator('.stats-breakdown-table thead')).toContainText('Total');
@@ -248,7 +254,7 @@ test.describe('TreeDoc Viewer - Main UI Features', () => {
       await expect(page.locator('.stats-breakdown-table')).toBeVisible();
       await expect(page.locator('.stats-breakdown-table thead')).toContainText('Count');
       await expect(page.locator('.stats-breakdown-table thead')).toContainText('Unique');
-      await expect(page.locator('.stats-breakdown-table thead')).toContainText('%');
+      await expect(page.locator('.stats-breakdown-table thead')).not.toContainText('%');
       await expect(page.locator('.stats-breakdown-table thead')).not.toContainText('Total');
       await expect(page.locator('.stats-breakdown-table thead')).not.toContainText('Max');
       await expect(page.locator('.stats-breakdown-table thead')).not.toContainText('P99');

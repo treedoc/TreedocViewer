@@ -162,6 +162,7 @@ const showExtendedFields = ref(false)
 const showFormat = ref(false)
 const selectedValues = ref<string[]>([])
 const BREAKDOWN_FIELDS_DEBOUNCE_MS = 1000
+const MAX_DISPLAYED_BREAKDOWN_ROWS = 2000
 
 function getFieldQueryBreakdownFields(fq: FieldQuery): string[] {
   return fq.statisticBreakdownFields?.length
@@ -823,6 +824,7 @@ const scopedColumnStats = computed<ColumnStatistic>(() => {
 
 const displayedTopValues = computed(() => scopedColumnStats.value.topValues)
 const hasNumericStatisticRows = computed(() => columnStats.value.numericCount > 0)
+const hasBreakdownFields = computed(() => breakdownFields.value.length > 0)
 
 const selectedBreakdownLabel = computed(() => {
   if (breakdownFields.value.length === 0 || selectedBreakdownValue.value === null) return ''
@@ -834,7 +836,7 @@ const selectedBreakdownLabel = computed(() => {
 })
 
 const statisticValueHeaders = computed(() => {
-  return selectedBreakdownLabels.value.length > 0 ? selectedBreakdownLabels.value : ['Value']
+  return selectedBreakdownLabels.value
 })
 
 function createStatisticTableRow(values: string[], rows: any[], totalBase: number): StatisticTableRow {
@@ -864,7 +866,7 @@ const statisticRows = computed<StatisticTableRow[]>(() => {
 
   const totalBase = columnStats.value.sum
   if (breakdownFields.value.length === 0) {
-    return [createStatisticTableRow(['Global'], props.filteredData, totalBase)]
+    return [createStatisticTableRow([], props.filteredData, totalBase)]
   }
 
   const groups = new Map<string, { values: string[], rows: any[] }>()
@@ -887,6 +889,10 @@ const statisticRows = computed<StatisticTableRow[]>(() => {
       }
       return b.count - a.count
     })
+})
+
+const displayedStatisticRows = computed(() => {
+  return statisticRows.value.slice(0, MAX_DISPLAYED_BREAKDOWN_ROWS)
 })
 
 watch(() => displayedTopValues.value.map(item => item.val).join('\u0000'), (topValuesKey) => {
@@ -1215,9 +1221,10 @@ user=${userId}, action=$action"
           </div>
           <div
             v-if="statisticRows.length > 0"
-            v-memo="[breakdownFieldsKey, selectedBreakdownValue, filteredData, field, statsTableHeight]"
+            v-memo="[breakdownFieldsKey, selectedBreakdownValue, filteredData, field, statsTableHeight, hasBreakdownFields, displayedStatisticRows]"
             class="stats-breakdown-table-wrap"
-            :style="{ height: statsTableHeight + 'px' }"
+            :class="{ 'is-compact': !hasBreakdownFields }"
+            :style="hasBreakdownFields ? { height: statsTableHeight + 'px' } : undefined"
           >
             <table class="stats-breakdown-table">
               <thead>
@@ -1226,7 +1233,7 @@ user=${userId}, action=$action"
                   <th>Count</th>
                   <th>Unique</th>
                   <th v-if="hasNumericStatisticRows">Total</th>
-                  <th>%</th>
+                  <th v-if="hasBreakdownFields">%</th>
                   <th v-if="hasNumericStatisticRows">Max</th>
                   <th v-if="hasNumericStatisticRows">Avg</th>
                   <th v-if="hasNumericStatisticRows">P99</th>
@@ -1236,7 +1243,7 @@ user=${userId}, action=$action"
               </thead>
               <tbody>
                 <tr
-                  v-for="row in statisticRows"
+                  v-for="row in displayedStatisticRows"
                   :key="row.key"
                   :class="{ 'is-selected': breakdownFields.length > 0 && selectedBreakdownValue === row.key }"
                   @click="breakdownFields.length > 0 && (selectedBreakdownValue = selectedBreakdownValue === row.key ? null : row.key)"
@@ -1261,7 +1268,7 @@ user=${userId}, action=$action"
                       />
                     </div>
                   </td>
-                  <td class="breakdown-percent-cell">
+                  <td v-if="hasBreakdownFields" class="breakdown-percent-cell">
                     <template v-if="!hasNumericStatisticRows">
                       <ProgressBar
                         :value="row.percent"
@@ -1281,7 +1288,7 @@ user=${userId}, action=$action"
             </table>
           </div>
           <div
-            v-if="statisticRows.length > 0"
+            v-if="statisticRows.length > 0 && hasBreakdownFields"
             class="stats-breakdown-resize-handle"
             @mousedown="startStatsTableResize"
           ></div>
@@ -1789,6 +1796,10 @@ user=${userId}, action=$action"
   background: var(--tdv-surface);
 }
 
+.stats-breakdown-table-wrap.is-compact {
+  overflow: hidden;
+}
+
 .stats-breakdown-resize-handle {
   height: 8px;
   cursor: ns-resize;
@@ -1838,9 +1849,23 @@ user=${userId}, action=$action"
   cursor: pointer;
 }
 
-.stats-breakdown-table tbody tr:hover,
-.stats-breakdown-table tbody tr.is-selected {
-  background: var(--tdv-primary-light);
+.stats-breakdown-table-wrap.is-compact tbody tr {
+  cursor: default;
+}
+
+.stats-breakdown-table tbody tr:hover {
+  background: var(--tdv-hover-bg);
+}
+
+.stats-breakdown-table tbody tr.is-selected,
+.stats-breakdown-table tbody tr.is-selected:hover {
+  background: var(--tdv-selection-bg);
+  color: var(--tdv-text-bright);
+  box-shadow: inset 3px 0 0 var(--tdv-primary);
+}
+
+.stats-breakdown-table tbody tr.is-selected .breakdown-percent-label {
+  color: var(--tdv-text-bright);
 }
 
 .breakdown-value,
