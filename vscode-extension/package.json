@@ -2,7 +2,7 @@
   "name": "treedoc-viewer-vscode",
   "displayName": "TreeDoc Viewer",
   "description": "View JSON, YAML, XML, CSV, TSV, and other files with the TreeDoc Viewer with Tree and Table which supports powerful features like column extensions, column filtering, aggregation, and more.",
-  "version": "0.0.17",
+  "version": "0.0.19",
   "publisher": "treedoc",
   "icon": "images/favicon_256.png",
   "repository": {
@@ -90,7 +90,8 @@
     "build:webview": "../v2/node_modules/.bin/vite build --config webview/vite.config.ts",
     "build": "npm run build:webview",
     "watch:webview": "../v2/node_modules/.bin/vite build --watch --config webview/vite.config.ts",
-    "package": "vsce package"
+    "package": "vsce package",
+    "patch": "npm run build && vsce package && vsce publish patch"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.7",
