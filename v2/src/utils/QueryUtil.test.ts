@@ -352,6 +352,24 @@ describe('createExtendedFieldsFunc', () => {
     expect(result).toEqual({})
   })
 
+  it('should stop evaluating extended fields after repeated runtime errors', () => {
+    const func = createExtendedFieldsFunc('bad: $.missing.nested.value')
+    expect(func).not.toBeNull()
+    let accessCount = 0
+    const obj = {
+      get missing() {
+        accessCount++
+        throw new Error('missing')
+      }
+    }
+
+    for (let i = 0; i < 105; i++) {
+      expect(func!(obj)).toEqual({})
+    }
+
+    expect(accessCount).toBe(100)
+  })
+
   it('should support spread operator for keys ending with _', () => {
     // test spread support
     const func = createExtendedFieldsFunc('info_: $.details, name: $.name')
@@ -377,6 +395,17 @@ describe('createExtendedFieldsFunc', () => {
     const result = func!({ a: 1, b: 2, x: 3 })
     expect(result.arr).toEqual([1, 2])
     expect(result.obj).toEqual({ x: 3 })
+  })
+
+  it('should handle bracket paths for keys with special characters', () => {
+    const func = createExtendedFieldsFunc('userName: $["user-name"], nested: $.meta["request.id"]')
+    expect(func).not.toBeNull()
+    const result = func!({
+      'user-name': 'Ada',
+      meta: { 'request.id': 'req-1' }
+    })
+    expect(result.userName).toBe('Ada')
+    expect(result.nested).toBe('req-1')
   })
 })
 

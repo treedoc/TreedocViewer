@@ -5,6 +5,9 @@
 import type { FieldQuery } from '@/models/types'
 import { TDJSONParser, TDJSONWriter, TDJSONWriterOption, TDObjectCoder, TDNodeType } from 'treedoc'
 
+const MAX_EXPRESSION_ERRORS = 100
+const invalidRegexPatterns = new Set<string>()
+
 /**
  * Serialize an array of patterns to a compact string.
  * Uses TDJSONWriter for compact output - values are only quoted when necessary.
@@ -193,6 +196,15 @@ export function matchFieldQuery(value: string, fq: FieldQuery): boolean {
   let matched = false
   for (const q of queries) {
     if (fq.isRegex) {
+      if (invalidRegexPatterns.has(q)) {
+        // Invalid regex, fall back to string match
+        if (value.toLowerCase().includes(q.toLowerCase())) {
+          matched = true
+          break
+        }
+        continue
+      }
+
       try {
         const regex = new RegExp(q, 'i')
         if (regex.test(value)) {
@@ -200,6 +212,7 @@ export function matchFieldQuery(value: string, fq: FieldQuery): boolean {
           break
         }
       } catch {
+        invalidRegexPatterns.add(q)
         // Invalid regex, fall back to string match
         if (value.toLowerCase().includes(q.toLowerCase())) {
           matched = true
@@ -235,8 +248,11 @@ export function createExtendedFieldsFunc(expression: string): ((obj: any) => Rec
       }
     `
     const func = new Function('$', exp) as (obj: any) => any
+    let errorCount = 0
 
     return (obj: any) => {
+      if (errorCount >= MAX_EXPRESSION_ERRORS) return {}
+
       try {
         const evaluated = func(obj)
         if (!evaluated || typeof evaluated !== 'object') return {}
@@ -252,7 +268,12 @@ export function createExtendedFieldsFunc(expression: string): ((obj: any) => Rec
         }
         return result
       } catch (e) {
-        console.warn('Error evaluating extended fields:', e)
+        errorCount++
+        if (errorCount === 1) {
+          console.warn('Error evaluating extended fields:', e)
+        } else if (errorCount === MAX_EXPRESSION_ERRORS) {
+          console.warn(`Extended fields expression failed ${MAX_EXPRESSION_ERRORS} times; ignoring it for remaining rows.`)
+        }
         return {}
       }
     }

@@ -44,10 +44,20 @@ describe('getCellObject', () => {
     const result = getCellObject('[1, 2, 3]')
     expect(result).toEqual([1, 2, 3])
   })
+
+  it('should parse JSON strings with surrounding whitespace', () => {
+    const result = getCellObject(' \n\t {"name": "test"} \r\n ')
+    expect(result).toEqual({ name: 'test' })
+  })
   
   it('should return null for non-JSON strings', () => {
     expect(getCellObject('hello world')).toBeNull()
     expect(getCellObject('not json')).toBeNull()
+  })
+
+  it('should return null for large non-JSON strings without copying', () => {
+    const largeText = 'x'.repeat(1_000_000)
+    expect(getCellObject(largeText)).toBeNull()
   })
   
   it('should return null for invalid JSON strings', () => {
@@ -62,6 +72,19 @@ describe('getCellObject', () => {
       toObject: (deep: boolean) => ({ converted: true })
     }
     expect(getCellObject(mockTDNode)).toEqual({ converted: true })
+  })
+
+  it('should parse JSON from simple TDNode values', () => {
+    const mockTDNode = {
+      type: 2,
+      key: 'payload',
+      value: '{"status": "Success", "user-name": "Ada"}'
+    }
+
+    expect(getCellObject(mockTDNode)).toEqual({
+      status: 'Success',
+      'user-name': 'Ada'
+    })
   })
 })
 
@@ -451,6 +474,40 @@ describe('TableDataProcessor', () => {
       expect(result[0].n).toBe('test')
       expect(result[0].v).toBe(42)
     })
+
+    it('should extract fields from JSON strings stored in simple TDNode cells', () => {
+      const data: TableRow[] = [
+        {
+          payload: {
+            type: 2,
+            key: 'payload',
+            value: '{"status": "Success", "user-name": "Ada"}'
+          }
+        },
+        {
+          payload: {
+            type: 2,
+            key: 'payload',
+            value: '{"status": "Failed", "user-name": "Lin"}'
+          }
+        }
+      ]
+
+      const derivedColumnsSet = new Set<string>()
+      const derivedColumns: string[] = []
+      const derivedColumnSources = new Map<string, string>()
+
+      const result = processor.applyExtendedFields(
+        data, 'payload', 'status: $.status, userName: $["user-name"]',
+        derivedColumnsSet, derivedColumns, derivedColumnSources
+      )
+
+      expect(result[0].status).toBe('Success')
+      expect(result[0].userName).toBe('Ada')
+      expect(result[1].status).toBe('Failed')
+      expect(result[1].userName).toBe('Lin')
+      expect(derivedColumns).toEqual(['status', 'userName'])
+    })
     
     it('should handle rows without the field', () => {
       const data: TableRow[] = [
@@ -608,6 +665,26 @@ describe('TableDataProcessor', () => {
       // Bob's row should return true (default) due to error
       expect(result).toHaveLength(2)
     })
+
+    it('should stop evaluating JS query after repeated runtime errors', () => {
+      let accessCount = 0
+      const data: TableRow[] = Array.from({ length: 105 }, () => {
+        const row: TableRow = {}
+        Object.defineProperty(row, 'nested', {
+          enumerable: true,
+          get() {
+            accessCount++
+            throw new Error('missing')
+          }
+        })
+        return row
+      })
+
+      const result = processor.applyJsQuery(data, '$.nested.value > 0')
+
+      expect(result).toHaveLength(105)
+      expect(accessCount).toBe(100)
+    })
   })
   
   describe('recursive field processing', () => {
@@ -739,6 +816,33 @@ describe('TableDataProcessor', () => {
       const result = processor.processData(data, config)
       
       expect(result.data.length).toBe(2)
+    })
+
+    it('should stop evaluating JS expression filter after repeated runtime errors', () => {
+      let accessCount = 0
+      const data: TableRow[] = Array.from({ length: 105 }, () => {
+        const value: Record<string, any> = {}
+        Object.defineProperty(value, 'nested', {
+          enumerable: true,
+          get() {
+            accessCount++
+            throw new Error('missing')
+          }
+        })
+        return { value }
+      })
+
+      const config: ProcessingConfig = {
+        fieldQueries: {
+          value: createFieldQuery({ jsExpression: '$.nested.value > 0' })
+        },
+        columnOrder: ['value']
+      }
+
+      const result = processor.processData(data, config)
+
+      expect(result.data).toHaveLength(105)
+      expect(accessCount).toBe(100)
     })
 
     it('should work with object field values', () => {

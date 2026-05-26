@@ -7,6 +7,8 @@
 import type { FieldQuery } from '@/models/types'
 import { matchFieldQuery, matchPattern, createExtendedFieldsFunc, parsePatterns } from './QueryUtil'
 
+const MAX_EXPRESSION_ERRORS = 100
+
 /**
  * Recursively remove $$-prefixed keys from an object (TDNode internal metadata)
  */
@@ -69,26 +71,55 @@ export interface ProcessingConfig {
  * Convert a cell value to an object for extended field processing
  */
 export function getCellObject(cellValue: any): any {
-  if (cellValue && typeof cellValue === 'object' && 'type' in cellValue && 'children' in cellValue) {
-    // It's a TDNode - convert to object
-    return cellValue.toObject?.(true) ?? cellValue
+  if (cellValue && typeof cellValue === 'object' && 'type' in cellValue) {
+    // Simple TDNode cells can contain JSON text, especially when loaded from CSV.
+    if (cellValue.type === TDNodeTypeEnum.SIMPLE && 'value' in cellValue) {
+      return getCellObject(cellValue.value)
+    }
+
+    if ('children' in cellValue) {
+      // It's a complex TDNode - convert to object
+      return cellValue.toObject?.(true) ?? cellValue
+    }
+
+    return cellValue
   } else if (cellValue && typeof cellValue === 'object') {
     // Plain object - use directly
     return cellValue
   } else if (typeof cellValue === 'string') {
-    // Try to parse as JSON if it looks like JSON
-    const trimmed = cellValue.trim()
-    if ((trimmed.startsWith('{') && trimmed.endsWith('}')) ||
-      (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
-      try {
-        return JSON.parse(trimmed)
-      } catch {
-        return null  // Looks like JSON but failed to parse
-      }
+    if (!looksLikeJsonContainer(cellValue)) {
+      return null
     }
-    return null  // Plain string, not JSON
+
+    try {
+      return JSON.parse(cellValue)
+    } catch {
+      return null  // Looks like JSON but failed to parse
+    }
   }
   return null  // Primitive (number, boolean, null, undefined)
+}
+
+function looksLikeJsonContainer(value: string): boolean {
+  let start = 0
+  let end = value.length - 1
+
+  while (start <= end && isJsonWhitespace(value.charCodeAt(start))) {
+    start++
+  }
+  while (end >= start && isJsonWhitespace(value.charCodeAt(end))) {
+    end--
+  }
+
+  if (start > end) return false
+
+  const first = value[start]
+  const last = value[end]
+  return (first === '{' && last === '}') || (first === '[' && last === ']')
+}
+
+function isJsonWhitespace(charCode: number): boolean {
+  return charCode === 0x20 || charCode === 0x0a || charCode === 0x0d || charCode === 0x09
 }
 
 /**
@@ -377,7 +408,10 @@ export class TableDataProcessor {
   applyJsExpressionFilter(data: TableRow[], field: string, jsExpression: string): TableRow[] {
     try {
       const filterFn = new Function('$', `return ${jsExpression}`) as (value: any) => boolean
+      let errorCount = 0
       return data.filter(row => {
+        if (errorCount >= MAX_EXPRESSION_ERRORS) return true
+
         try {
           const value = row[field]
           // For TDNode values, convert to plain object
@@ -385,6 +419,7 @@ export class TableDataProcessor {
             (value?.toObject ? value.toObject(true) : value)
           return filterFn(plainValue)
         } catch {
+          errorCount++
           return true
         }
       })
@@ -400,11 +435,15 @@ export class TableDataProcessor {
   applyJsQuery(data: TableRow[], jsQuery: string): TableRow[] {
     try {
       const queryFn = new Function('$', `return ${jsQuery}`) as (obj: any) => boolean
+      let errorCount = 0
       return data.filter(row => {
+        if (errorCount >= MAX_EXPRESSION_ERRORS) return true
+
         try {
           const obj = row.__node?.toObject?.(true) ?? row
           return queryFn(obj)
         } catch {
+          errorCount++
           return true
         }
       })

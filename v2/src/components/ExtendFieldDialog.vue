@@ -48,8 +48,7 @@ function isTDNode(value: any): value is TDNode {
     typeof value === 'object' &&
     value !== null &&
     'type' in value &&
-    typeof value.type === 'number' &&
-    'children' in value // TDNode always has children array (even if empty)
+    typeof value.type === 'number'
   )
 }
 
@@ -151,6 +150,22 @@ interface JsonPathInfo {
   isArray: boolean
 }
 
+function isPlainPathKey(key: string): boolean {
+  return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(key)
+}
+
+function appendJsonPathKey(prefix: string, key: string): string {
+  return isPlainPathKey(key)
+    ? `${prefix}.${key}`
+    : `${prefix}[${JSON.stringify(key)}]`
+}
+
+function normalizeFieldName(key: string): string {
+  const normalized = key.replace(/[^A-Za-z0-9_$]+/g, '_').replace(/^_+|_+$/g, '')
+  if (!normalized) return '_'
+  return /^[A-Za-z_$]/.test(normalized) ? normalized : `_${normalized}`
+}
+
 function extractJsonPaths(obj: any, prefix: string = '$', depth: number = 0, visited: WeakSet<object> = new WeakSet()): JsonPathInfo[] {
   const paths: JsonPathInfo[] = []
   const MAX_DEPTH = 10
@@ -166,9 +181,9 @@ function extractJsonPaths(obj: any, prefix: string = '$', depth: number = 0, vis
     if (visited.has(obj)) return paths
     visited.add(obj)
     
-    // For arrays, sample the first item - use optional chaining for safe access
+    // For arrays, sample the first item
     if (obj.length > 0 && typeof obj[0] === 'object' && obj[0] !== null) {
-      const childPaths = extractJsonPaths(obj[0], `${prefix}?.[0]`, depth + 1, visited)
+      const childPaths = extractJsonPaths(obj[0], `${prefix}[0]`, depth + 1, visited)
       paths.push(...childPaths)
     }
   } else if (typeof obj === 'object') {
@@ -180,18 +195,18 @@ function extractJsonPaths(obj: any, prefix: string = '$', depth: number = 0, vis
       // Skip internal/circular properties and TDNode metadata ($$-prefixed keys)
       if (skipKeys.has(key) || key.startsWith('$$')) continue
       
-      // Use optional chaining for safe property access
-      const path = `${prefix}?.${key}`
+      const path = appendJsonPathKey(prefix, key)
       const sampleValue = formatSampleValue(value)
       
       // Add this path as a leaf or branch
       if (value === null || typeof value !== 'object') {
         // Leaf node
+        const customName = normalizeFieldName(key)
         paths.push({
           path,
           name: key,
           depth,
-          customName: key,
+          customName,
           selected: false,
           sampleValue,
           rawValue: value,
@@ -199,11 +214,12 @@ function extractJsonPaths(obj: any, prefix: string = '$', depth: number = 0, vis
         })
       } else if (Array.isArray(value)) {
         // Array - add the array itself and recurse into first item
+        const customName = normalizeFieldName(key)
         paths.push({
           path,
           name: key,
           depth,
-          customName: key,
+          customName,
           selected: false,
           sampleValue: formatSampleValue(value),
           rawValue: value,
@@ -211,18 +227,18 @@ function extractJsonPaths(obj: any, prefix: string = '$', depth: number = 0, vis
         })
         if (value.length > 0 && typeof value[0] === 'object' && value[0] !== null) {
           if (!visited.has(value[0])) {
-            // Use optional chaining for safe array access
-            const childPaths = extractJsonPaths(value[0], `${path}?.[0]`, depth + 1, visited)
+            const childPaths = extractJsonPaths(value[0], `${path}[0]`, depth + 1, visited)
             paths.push(...childPaths)
           }
         }
       } else {
         // Object - add the object itself and recurse
+        const customName = normalizeFieldName(key)
         paths.push({
           path,
           name: key,
           depth,
-          customName: key,
+          customName,
           selected: false,
           sampleValue: '{...}',
           rawValue: value,
@@ -274,7 +290,7 @@ function parseExistingExtendedFields(extendedFields: string | undefined): Map<st
   if (!extendedFields) return map
   
   // Parse comma or newline separated entries like "name: $.path, other: $.other.path"
-  const entries = extendedFields.split(/[,\n]/).map(e => e.trim()).filter(e => e)
+  const entries = splitTopLevelFields(extendedFields).map(e => e.trim()).filter(e => e)
   for (const entry of entries) {
     const colonIdx = entry.indexOf(':')
     if (colonIdx > 0) {
@@ -284,6 +300,57 @@ function parseExistingExtendedFields(extendedFields: string | undefined): Map<st
     }
   }
   return map
+}
+
+function splitTopLevelFields(value: string): string[] {
+  const entries: string[] = []
+  let current = ''
+  let quote: string | null = null
+  let escaped = false
+  let depth = 0
+
+  for (const char of value) {
+    if (quote) {
+      current += char
+      if (escaped) {
+        escaped = false
+      } else if (char === '\\') {
+        escaped = true
+      } else if (char === quote) {
+        quote = null
+      }
+      continue
+    }
+
+    if (char === '"' || char === "'") {
+      quote = char
+      current += char
+      continue
+    }
+
+    if (char === '[' || char === '(' || char === '{') {
+      depth++
+      current += char
+      continue
+    }
+
+    if (char === ']' || char === ')' || char === '}') {
+      depth = Math.max(0, depth - 1)
+      current += char
+      continue
+    }
+
+    if ((char === ',' || char === '\n') && depth === 0) {
+      entries.push(current)
+      current = ''
+      continue
+    }
+
+    current += char
+  }
+
+  entries.push(current)
+  return entries
 }
 
 // Extract field names from pattern (same as ColumnFilterDialog)
