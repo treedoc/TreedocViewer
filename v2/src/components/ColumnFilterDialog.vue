@@ -26,6 +26,7 @@ export interface ColumnStatistic {
   p90: number
   p99: number
   topValues: { val: string; count: number; percent: number }[]
+  allValues: { val: string; count: number; percent: number }[]
 }
 
 interface StatisticTableRow {
@@ -718,6 +719,7 @@ function calculateColumnStats(rows: any[], field: string): ColumnStatistic {
     p90: 0,
     p99: 0,
     topValues: [],
+    allValues: [],
   }
   
   if (!showStats.value || !rows.length) return stat
@@ -763,14 +765,15 @@ function calculateColumnStats(rows: any[], field: string): ColumnStatistic {
     stat.p99 = numericValues[Math.floor(numericValues.length * 0.99)] || 0
   }
   
-  // Sort by count and get top values
+  // Sort by count and keep all values for copy/export while displaying only the top values.
   const sortedKeys = Object.keys(valueCounts).sort((a, b) => valueCounts[b] - valueCounts[a])
   stat.uniqueCount = sortedKeys.length
-  stat.topValues = sortedKeys.slice(0, 30).map(key => ({
+  stat.allValues = sortedKeys.map(key => ({
     val: key,
     count: valueCounts[key],
     percent: (valueCounts[key] / stat.total) * 100,
   }))
+  stat.topValues = stat.allValues.slice(0, 30)
   
   return stat
 }
@@ -942,7 +945,7 @@ function copyBreakdownStats() {
 
 function copyTopValues() {
   const headers = [props.title || props.field, 'Count', 'Percent']
-  const rows = displayedTopValues.value.map(item => [
+  const rows = scopedColumnStats.value.allValues.map(item => [
     item.val,
     item.count,
     item.percent.toFixed(1) + '%',
@@ -1341,7 +1344,7 @@ user=${userId}, action=$action"
               text
               severity="secondary"
               class="top-values-copy-btn"
-              v-tooltip.top="'Copy top values'"
+              v-tooltip.top="'Copy all values'"
               @click="copyTopValues"
             />
           </div>
