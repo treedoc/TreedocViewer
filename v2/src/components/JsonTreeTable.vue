@@ -601,7 +601,7 @@ defineExpose({ openUrl })
           <div 
             class="pane-wrapper"
             :class="{ 'pane-focused': currentPane === 'source', 'resizing': isResizing }"
-            @click.stop="currentPane = 'source'"
+            @click="currentPane = 'source'"
             @keydown="onKeyDown($event, 'source')"
             tabindex="0"
           >
@@ -613,7 +613,7 @@ defineExpose({ openUrl })
           <div 
             class="pane-wrapper"
             :class="{ 'pane-focused': currentPane === 'tree', 'resizing': isResizing }"
-            @click.stop="currentPane = 'tree'"
+            @click="currentPane = 'tree'"
             @keydown="onKeyDown($event, 'tree')"
             tabindex="0"
           >
@@ -629,7 +629,7 @@ defineExpose({ openUrl })
           <div 
             class="pane-wrapper"
             :class="{ 'pane-focused': currentPane === 'table', 'resizing': isResizing }"
-            @click.stop="currentPane = 'table'"
+            @click="currentPane = 'table'"
             @keydown="onKeyDown($event, 'table')"
             tabindex="0"
           >

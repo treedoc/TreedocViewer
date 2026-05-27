@@ -84,6 +84,7 @@ function valueToSearchString(value: any): string {
 // Popover ref for programmatic control
 const popoverRef = ref()
 let autoCloseTimer: ReturnType<typeof setTimeout> | null = null
+let autoCloseOnShow = false
 const isPopoverVisible = ref(false)
 
 function getPopoverElement(): HTMLElement | null {
@@ -123,15 +124,27 @@ function handleDocumentMouseMove(event: MouseEvent) {
   }
 }
 
+function handleDocumentPointerDown(event: PointerEvent) {
+  if (!isPopoverVisible.value) return
+  const popoverEl = getPopoverElement()
+  const target = event.target as Node | null
+  if (!popoverEl || !target || popoverEl.contains(target)) return
+
+  hide()
+}
+
 // Expose methods for parent to control popover
-function show(event: Event) {
+function show(event: Event, options: { autoClose?: boolean } = {}) {
+  autoCloseOnShow = !!options.autoClose
   popoverRef.value?.show(event)
 }
 
 function hide() {
   cancelAutoClose()
+  autoCloseOnShow = false
   isPopoverVisible.value = false
   document.removeEventListener('mousemove', handleDocumentMouseMove)
+  document.removeEventListener('pointerdown', handleDocumentPointerDown, true)
   popoverRef.value?.hide()
 }
 
@@ -479,6 +492,11 @@ function onPopoverShow() {
   isPopoverVisible.value = true
   cancelAutoClose()
   document.addEventListener('mousemove', handleDocumentMouseMove)
+  document.addEventListener('pointerdown', handleDocumentPointerDown, true)
+  if (autoCloseOnShow) {
+    scheduleAutoClose()
+    autoCloseOnShow = false
+  }
   // Use setTimeout to ensure the popover is fully rendered
   setTimeout(() => {
     // Find the input element - PrimeVue Popover teleports content, so search document
@@ -492,8 +510,10 @@ function onPopoverShow() {
 
 function onPopoverHide() {
   isPopoverVisible.value = false
+  autoCloseOnShow = false
   cancelAutoClose()
   document.removeEventListener('mousemove', handleDocumentMouseMove)
+  document.removeEventListener('pointerdown', handleDocumentPointerDown, true)
 }
 
 function openAdvancedOverlay() {

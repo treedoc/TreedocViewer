@@ -180,6 +180,15 @@ test.describe('TreeDoc Viewer - Main UI Features', () => {
       await expect(page.locator('.p-popover')).toBeVisible({ timeout: 5000 });
     });
 
+    test('should close column filter popover on table click outside', async ({ page }) => {
+      await page.locator('.column-header').first().click();
+      await page.locator('.p-popover').waitFor({ state: 'visible' });
+
+      await page.locator('.p-datatable-tbody td').first().click();
+
+      await expect(page.locator('.p-popover')).not.toBeVisible({ timeout: 5000 });
+    });
+
     test('should have filter input field', async ({ page }) => {
       await page.locator('.column-header').first().click();
       await page.locator('.p-popover').waitFor({ state: 'visible' });

@@ -477,7 +477,7 @@ function onColumnHeaderMouseEnter(event: MouseEvent, col: TableColumn) {
         preventDefault: () => {},
         stopPropagation: () => {}
       }
-      columnFilterRef.value?.show(fakeEvent as unknown as Event)
+      columnFilterRef.value?.show(fakeEvent as unknown as Event, { autoClose: true })
     })
   }, 500)
 }
@@ -1937,7 +1937,7 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
           size="small"
           :severity="maxPane === 'table' ? 'primary' : 'secondary'"
           text
-          @click="store.toggleMaxPane('table')"
+          @click.stop="store.toggleMaxPane('table')"
           v-tooltip.top="'Toggle fullscreen <f>'"
         />
         
