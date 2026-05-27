@@ -2,7 +2,7 @@
   "name": "treedoc-viewer-vscode",
   "displayName": "TreeDoc Viewer",
   "description": "View JSON, YAML, XML, CSV, TSV, and other files with the TreeDoc Viewer with Tree and Table which supports powerful features like column extensions, column filtering, aggregation, and more.",
-  "version": "0.0.19",
+  "version": "0.0.20",
   "publisher": "treedoc",
   "icon": "images/favicon_256.png",
   "repository": {

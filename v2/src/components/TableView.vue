@@ -53,11 +53,10 @@ const CHART_TIME_RANGE_MARKER = '/*tdv_chart_time_range*/'
 const STORAGE_KEY_JS_QUERY = 'tdv_recent_js_queries'
 const STORAGE_KEY_EXTENDED_FIELDS = 'tdv_recent_extended_fields'
 const COLUMN_WIDTH_SAMPLE_ROWS = 20
-const COLUMN_WIDTH_SAMPLE_CHARS = 300
+const COLUMN_WIDTH_SAMPLE_CHARS = 120
 const COLUMN_WIDTH_MIN_PX = 40
-const COLUMN_WIDTH_MAX_WEIGHT_PX = 520
+const COLUMN_WIDTH_MAX_WEIGHT_PX = 360
 const COLUMN_WIDTH_CELL_PADDING_PX = 32
-let columnWidthMeasureContext: CanvasRenderingContext2D | null = null
 
 // Recursively remove $$-prefixed keys from an object (TDNode internal metadata)
 function cleanInternalKeys(obj: any): any {
@@ -723,34 +722,39 @@ const filteredData = computed(() => {
 })
 
 function getColumnSampleText(row: TableRow, field: string): string {
-  if (isComplexValue(row, field)) {
-    return getComplexValueSummary(row, field)
+  const value = row[field]
+  if (value && typeof value === 'object' && 'type' in value) {
+    const node = value as TDNode
+    if (node.type === TDNodeType.SIMPLE) {
+      return String(node.value ?? '')
+    }
+    return `${node.children?.length ?? 0} items`
   }
   return getCellValue(row, field)
 }
 
-function getTextWidth(text: string, font: string): number {
-  if (typeof document === 'undefined') {
-    return text.length * 8
-  }
-
-  if (!columnWidthMeasureContext) {
-    columnWidthMeasureContext = document.createElement('canvas').getContext('2d')
-  }
-
-  if (!columnWidthMeasureContext) {
-    return text.length * 8
-  }
-
-  columnWidthMeasureContext.font = font
-  return columnWidthMeasureContext.measureText(text).width
-}
-
-function getColumnTextWidth(text: string, font: string): number {
+function estimateTextWidth(text: string): number {
   const sample = text.length > COLUMN_WIDTH_SAMPLE_CHARS
     ? text.substring(0, COLUMN_WIDTH_SAMPLE_CHARS)
     : text
-  return getTextWidth(sample, font) + COLUMN_WIDTH_CELL_PADDING_PX
+  let width = 0
+
+  for (let i = 0; i < sample.length; i++) {
+    const code = sample.charCodeAt(i)
+    if (code <= 0x20) {
+      width += 4
+    } else if (code >= 0x4e00 && code <= 0x9fff) {
+      width += 13
+    } else if ((code >= 0x41 && code <= 0x5a) || (code >= 0x30 && code <= 0x39)) {
+      width += 8
+    } else if (code > 0x7f) {
+      width += 10
+    } else {
+      width += 7
+    }
+  }
+
+  return width + COLUMN_WIDTH_CELL_PADDING_PX
 }
 
 interface ColumnWidthLayout {
@@ -768,11 +772,11 @@ const columnWidthLayout = computed<ColumnWidthLayout>(() => {
   const weights = new Map<string, number>()
 
   for (const col of cols) {
-    let width = getColumnTextWidth(col.header, '600 14px system-ui, sans-serif')
+    let width = estimateTextWidth(col.header)
     for (const row of sampleRows) {
       width = Math.max(
         width,
-        getColumnTextWidth(getColumnSampleText(row, col.field), '400 13px system-ui, sans-serif')
+        estimateTextWidth(getColumnSampleText(row, col.field))
       )
     }
     weights.set(col.field, Math.min(Math.max(width, COLUMN_WIDTH_MIN_PX), COLUMN_WIDTH_MAX_WEIGHT_PX))

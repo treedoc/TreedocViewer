@@ -474,6 +474,23 @@ test.describe('TreeDoc Viewer - Main UI Features', () => {
       await ensureTableViewVisible(page);
     });
 
+    test('should not throw when toggling fullscreen', async ({ page }) => {
+      const pageErrors: Error[] = [];
+      page.on('pageerror', (error) => pageErrors.push(error));
+
+      const fullscreenBtn = page.locator('.table-view .pi-expand').locator('..');
+      await fullscreenBtn.click();
+      await page.locator('.p-datatable').waitFor({ state: 'visible', timeout: 5000 });
+      await fullscreenBtn.click();
+      await page.locator('.p-datatable').waitFor({ state: 'visible', timeout: 5000 });
+      await page.waitForTimeout(100);
+
+      const splitpanesIndexErrors = pageErrors
+        .map((error) => `${error.message}\n${error.stack ?? ''}`)
+        .filter((message) => message.includes('splitpanes') && message.includes('index'));
+      expect(splitpanesIndexErrors).toEqual([]);
+    });
+
     test('should preserve hidden columns after fullscreen toggle', async ({ page }) => {
       // Get initial column count
       const initialHeaders = await page.locator('.column-header').count();
