@@ -52,6 +52,12 @@ const CHART_TIME_RANGE_MARKER = '/*tdv_chart_time_range*/'
 
 const STORAGE_KEY_JS_QUERY = 'tdv_recent_js_queries'
 const STORAGE_KEY_EXTENDED_FIELDS = 'tdv_recent_extended_fields'
+const COLUMN_WIDTH_SAMPLE_ROWS = 20
+const COLUMN_WIDTH_SAMPLE_CHARS = 300
+const COLUMN_WIDTH_MIN_PX = 40
+const COLUMN_WIDTH_MAX_WEIGHT_PX = 520
+const COLUMN_WIDTH_CELL_PADDING_PX = 32
+let columnWidthMeasureContext: CanvasRenderingContext2D | null = null
 
 // Recursively remove $$-prefixed keys from an object (TDNode internal metadata)
 function cleanInternalKeys(obj: any): any {
@@ -715,6 +721,82 @@ const filteredData = computed(() => {
   // JS query is already applied by the processor
   return data as TableRow[]
 })
+
+function getColumnSampleText(row: TableRow, field: string): string {
+  if (isComplexValue(row, field)) {
+    return getComplexValueSummary(row, field)
+  }
+  return getCellValue(row, field)
+}
+
+function getTextWidth(text: string, font: string): number {
+  if (typeof document === 'undefined') {
+    return text.length * 8
+  }
+
+  if (!columnWidthMeasureContext) {
+    columnWidthMeasureContext = document.createElement('canvas').getContext('2d')
+  }
+
+  if (!columnWidthMeasureContext) {
+    return text.length * 8
+  }
+
+  columnWidthMeasureContext.font = font
+  return columnWidthMeasureContext.measureText(text).width
+}
+
+function getColumnTextWidth(text: string, font: string): number {
+  const sample = text.length > COLUMN_WIDTH_SAMPLE_CHARS
+    ? text.substring(0, COLUMN_WIDTH_SAMPLE_CHARS)
+    : text
+  return getTextWidth(sample, font) + COLUMN_WIDTH_CELL_PADDING_PX
+}
+
+interface ColumnWidthLayout {
+  tableStyle: string
+  columnStyles: Record<string, { width: string; minWidth: string }>
+}
+
+const columnWidthLayout = computed<ColumnWidthLayout>(() => {
+  const cols = visibleColumns.value
+  if (cols.length === 0) {
+    return { tableStyle: 'min-width: 100%', columnStyles: {} }
+  }
+
+  const sampleRows = filteredData.value.slice(0, COLUMN_WIDTH_SAMPLE_ROWS)
+  const weights = new Map<string, number>()
+
+  for (const col of cols) {
+    let width = getColumnTextWidth(col.header, '600 14px system-ui, sans-serif')
+    for (const row of sampleRows) {
+      width = Math.max(
+        width,
+        getColumnTextWidth(getColumnSampleText(row, col.field), '400 13px system-ui, sans-serif')
+      )
+    }
+    weights.set(col.field, Math.min(Math.max(width, COLUMN_WIDTH_MIN_PX), COLUMN_WIDTH_MAX_WEIGHT_PX))
+  }
+
+  const total = Array.from(weights.values()).reduce((sum, width) => sum + width, 0) || 1
+  const columnStyles: Record<string, { width: string; minWidth: string }> = {}
+  for (const col of cols) {
+    const weight = weights.get(col.field) ?? COLUMN_WIDTH_MIN_PX
+    columnStyles[col.field] = {
+      width: `${Math.round(weight)}px`,
+      minWidth: `${COLUMN_WIDTH_MIN_PX}px`,
+    }
+  }
+
+  return {
+    tableStyle: `min-width: max(100%, ${Math.round(total)}px)`,
+    columnStyles,
+  }
+})
+
+function getColumnWidthStyle(col: TableColumn): { width: string; minWidth: string } | undefined {
+  return columnWidthLayout.value.columnStyles[col.field]
+}
 
 function normalizeSortValue(value: any): any {
   if (value && typeof value === 'object') {
@@ -1980,7 +2062,7 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
         removableSort
         stripedRows
         size="small"
-        tableStyle="min-width: 100%"
+        :tableStyle="columnWidthLayout.tableStyle"
         resizableColumns
         columnResizeMode="expand"
         scrollable 
@@ -1991,6 +2073,9 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
           :key="col.field"
           :field="col.field"
           :sortable="col.sortable"
+          :style="getColumnWidthStyle(col)"
+          :headerStyle="getColumnWidthStyle(col)"
+          :bodyStyle="getColumnWidthStyle(col)"
         >
           <template #header="{ column }">
             <div 

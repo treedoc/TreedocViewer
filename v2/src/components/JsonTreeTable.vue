@@ -452,13 +452,7 @@ function handleGlobalKeydown(event: KeyboardEvent) {
     return
   }
   
-  if (event.key === 'Escape') {
-    // Escape only exits fullscreen
-    if (maxPane.value) {
-      event.preventDefault()
-      store.toggleMaxPane(maxPane.value)
-    }
-  } else if (event.key === 'f') {
+  if (event.key === 'f') {
     event.preventDefault()
     if (maxPane.value) {
       // Exit fullscreen

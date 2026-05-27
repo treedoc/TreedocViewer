@@ -164,6 +164,7 @@ const showFormat = ref(false)
 const selectedValues = ref<string[]>([])
 const BREAKDOWN_FIELDS_DEBOUNCE_MS = 1000
 const MAX_DISPLAYED_BREAKDOWN_ROWS = 2000
+const MAX_DISPLAYED_TOP_VALUES = 500
 
 function getFieldQueryBreakdownFields(fq: FieldQuery): string[] {
   return fq.statisticBreakdownFields?.length
@@ -773,7 +774,7 @@ function calculateColumnStats(rows: any[], field: string): ColumnStatistic {
     count: valueCounts[key],
     percent: (valueCounts[key] / stat.total) * 100,
   }))
-  stat.topValues = stat.allValues.slice(0, 30)
+  stat.topValues = stat.allValues.slice(0, MAX_DISPLAYED_TOP_VALUES)
   
   return stat
 }
