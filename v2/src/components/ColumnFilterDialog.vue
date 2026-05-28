@@ -440,8 +440,8 @@ watch(() => props.fieldQuery, (fq) => {
   showFormat.value = !!fq.linkExpression
 }, { immediate: true })
 
-// Auto-expand stats when row count is small (< 10000), otherwise collapse for performance
-const AUTO_EXPAND_THRESHOLD = 10000
+// Auto-expand stats when row count is small (< 100000), otherwise collapse for performance
+const AUTO_EXPAND_THRESHOLD = 100000
 watch(() => props.field, () => {
   showStats.value = props.filteredData.length < AUTO_EXPAND_THRESHOLD
   selectedValues.value = []
@@ -1302,7 +1302,7 @@ user=${userId}, action=$action"
                     </template>
                     <span class="breakdown-percent-label">{{ row.percent.toFixed(1) }}%</span>
                   </td>
-                  <td v-if="hasNumericStatisticRows">{{ row.max ?? '' }}</td>
+                  <td v-if="hasNumericStatisticRows">{{ row.isNumeric && typeof row.max === 'number' ? formatNumber(row.max) : '' }}</td>
                   <td v-if="hasNumericStatisticRows">{{ row.isNumeric ? formatNumber(row.avg) : '' }}</td>
                   <td v-if="hasNumericStatisticRows">{{ row.isNumeric ? formatNumber(row.p99) : '' }}</td>
                   <td v-if="hasNumericStatisticRows">{{ row.isNumeric ? formatNumber(row.p90) : '' }}</td>

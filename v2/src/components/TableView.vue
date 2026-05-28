@@ -247,6 +247,7 @@ interface TableSelection {
   endRow: number
   startCol: number
   endCol: number
+  cursorCol?: number
 }
 
 const tableSelection = ref<TableSelection | null>(null)
@@ -873,6 +874,14 @@ function isRowSelectionColumn(field: string): boolean {
   return field === COL_NO || field === COL_KEY
 }
 
+function getSelectionModeForField(field: string): TableSelectionMode {
+  return isRowSelectionColumn(field) ? 'row' : 'cell'
+}
+
+function getSelectionEndCol(mode: TableSelectionMode, colIndex: number): number {
+  return mode === 'row' ? visibleColumns.value.length - 1 : colIndex
+}
+
 function getVisibleColumnIndex(field: string): number {
   return visibleColumns.value.findIndex(col => col.field === field)
 }
@@ -909,19 +918,37 @@ function finishSelectionDrag() {
 }
 
 function onCellMouseDown(event: MouseEvent, rowIndex: number, field: string) {
-  if (event.button !== 0 || isSelectionInteractiveTarget(event.target, field)) return
+  if (event.button !== 0) return
+  if (!event.shiftKey && isSelectionInteractiveTarget(event.target, field)) return
 
   const colIndex = getVisibleColumnIndex(field)
   if (colIndex < 0) return
 
-  const mode: TableSelectionMode = isRowSelectionColumn(field) ? 'row' : 'cell'
-  const endCol = mode === 'row' ? visibleColumns.value.length - 1 : colIndex
+  const mode = getSelectionModeForField(field)
+  const endCol = getSelectionEndCol(mode, colIndex)
+  if (event.shiftKey && tableSelection.value) {
+    tableSelection.value = {
+      ...tableSelection.value,
+      mode,
+      startCol: mode === 'row' ? 0 : tableSelection.value.startCol,
+      endRow: rowIndex,
+      endCol,
+      cursorCol: colIndex,
+    }
+    isDraggingSelection.value = false
+    suppressNextCellClick.value = true
+    event.preventDefault()
+    window.removeEventListener('mouseup', finishSelectionDrag)
+    return
+  }
+
   tableSelection.value = {
     mode,
     startRow: rowIndex,
     endRow: rowIndex,
     startCol: mode === 'row' ? 0 : colIndex,
     endCol,
+    cursorCol: colIndex,
   }
   isDraggingSelection.value = true
   suppressNextCellClick.value = false
@@ -946,8 +973,12 @@ function onCellMouseEnter(rowIndex: number, field: string) {
   if (selection.endRow !== rowIndex || selection.endCol !== colIndex) {
     suppressNextCellClick.value = true
   }
+  const mode = selection.mode === 'row' ? 'row' : getSelectionModeForField(field)
+  selection.mode = mode
   selection.endRow = rowIndex
-  if (selection.mode === 'row') {
+  selection.cursorCol = colIndex
+  if (mode === 'row') {
+    selection.startCol = 0
     selection.endCol = visibleColumns.value.length - 1
   } else {
     selection.endCol = colIndex
@@ -981,7 +1012,7 @@ function getKeyboardSelectionCell(): { row: number, col: number } | null {
   if (!selection) return { row: 0, col: 0 }
   return {
     row: clampSelectionRow(selection.endRow),
-    col: clampSelectionCol(selection.endCol),
+    col: clampSelectionCol(selection.cursorCol ?? selection.endCol),
   }
 }
 
@@ -989,7 +1020,7 @@ function scrollSelectionAnchorIntoView() {
   const selection = tableSelection.value
   if (!selection) return
   nextTick(() => {
-    const field = visibleColumns.value[clampSelectionCol(selection.endCol)]?.field
+    const field = visibleColumns.value[clampSelectionCol(selection.cursorCol ?? selection.endCol)]?.field
     if (!field) return
     const selector = `.cell-outer[data-row-index="${clampSelectionRow(selection.endRow)}"][data-field="${CSS.escape(field)}"]`
     tableViewRootRef.value?.querySelector(selector)?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
@@ -1013,29 +1044,36 @@ function onTableKeyDown(event: KeyboardEvent) {
   }
   const nextRow = clampSelectionRow(current.row + delta.row)
   const nextCol = clampSelectionCol(current.col + delta.col)
+  const nextField = visibleColumns.value[nextCol]?.field
+  const nextMode = nextField ? getSelectionModeForField(nextField) : 'cell'
+  const nextEndCol = getSelectionEndCol(nextMode, nextCol)
 
   if (event.shiftKey && tableSelection.value) {
     tableSelection.value = {
       ...tableSelection.value,
-      mode: 'cell',
+      mode: nextMode,
+      startCol: nextMode === 'row' ? 0 : tableSelection.value.startCol,
       endRow: nextRow,
-      endCol: nextCol,
+      endCol: nextEndCol,
+      cursorCol: nextCol,
     }
   } else if (event.shiftKey) {
     tableSelection.value = {
-      mode: 'cell',
+      mode: nextMode,
       startRow: current.row,
-      startCol: current.col,
+      startCol: nextMode === 'row' ? 0 : current.col,
       endRow: nextRow,
-      endCol: nextCol,
+      endCol: nextEndCol,
+      cursorCol: nextCol,
     }
   } else {
     tableSelection.value = {
-      mode: 'cell',
+      mode: nextMode,
       startRow: nextRow,
       endRow: nextRow,
-      startCol: nextCol,
-      endCol: nextCol,
+      startCol: nextMode === 'row' ? 0 : nextCol,
+      endCol: nextEndCol,
+      cursorCol: nextCol,
     }
   }
 

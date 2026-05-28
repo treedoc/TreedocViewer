@@ -140,6 +140,37 @@ test.describe('TreeDoc Viewer - Main UI Features', () => {
     });
   });
 
+  test.describe('Table View - Selection', () => {
+    test.beforeEach(async ({ page }) => {
+      await enterJsonData(page, sampleData);
+      await ensureTableViewVisible(page);
+    });
+
+    test('should select a cell range with shift click', async ({ page }) => {
+      await page.locator('.cell-outer[data-row-index="0"][data-field="name"]').click();
+      await page.locator('.cell-outer[data-row-index="2"][data-field="value"]').click({ modifiers: ['Shift'] });
+
+      await expect(page.locator('.cell-outer.is-selected')).toHaveCount(9);
+      await expect(page.locator('.paginator-selection')).toContainText('Selected: 3 rows x 3 cols');
+    });
+
+    test('should select a row range with shift click on row selectors', async ({ page }) => {
+      await page.locator('.cell-outer[data-row-index="0"][data-field="#"]').click();
+      await page.locator('.cell-outer[data-row-index="3"][data-field="#"]').click({ modifiers: ['Shift'] });
+
+      await expect(page.locator('.cell-outer.is-row-selected')).toHaveCount(20);
+      await expect(page.locator('.paginator-selection')).toContainText('Selected: 4 rows x 5 cols');
+    });
+
+    test('should switch to row selection when keyboard cursor moves to row selector', async ({ page }) => {
+      await page.locator('.cell-outer[data-row-index="0"][data-field="id"]').click();
+      await page.keyboard.press('ArrowLeft');
+
+      await expect(page.locator('.cell-outer.is-row-selected')).toHaveCount(5);
+      await expect(page.locator('.paginator-selection')).toContainText('Selected: 1 rows x 5 cols');
+    });
+  });
+
   test.describe('Table View - Sorting', () => {
     test('should sort globally before pagination', async ({ page }) => {
       const largeData = Array.from({ length: 150 }, (_, i) => ({

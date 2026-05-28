@@ -117,7 +117,7 @@ class TreeDocJsonViewerProvider {
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${cspSource} https: data:; font-src ${cspSource} https://fonts.gstatic.com data:; style-src ${cspSource} https://fonts.googleapis.com 'unsafe-inline'; script-src ${cspSource} 'nonce-${nonce}' 'unsafe-eval'; connect-src https:;" />
     <link rel="stylesheet" href="${styleUri}">
-    <title>TreeDoc Viewer</title>
+    <title>TreeDoc</title>
   </head>
   <body>
     <div id="app"></div>

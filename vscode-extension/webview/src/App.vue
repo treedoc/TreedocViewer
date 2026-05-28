@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import Toast from 'primevue/toast'
 import { JsonTreeTable } from '../../../v2/src/lib'
+
+declare const __TREEDOC_VIEWER_VERSION__: string
 
 type VsCodeApi = {
   postMessage(message: unknown): void
@@ -21,7 +23,8 @@ declare global {
 
 const vscode = window.acquireVsCodeApi?.()
 const documentText = ref('{}')
-const title = ref('TreeDoc Viewer')
+const title = ref('TreeDoc')
+const titleTooltip = computed(() => `TreeDoc Viewer v${__TREEDOC_VIEWER_VERSION__}`)
 const viewerOptions = {
   showSource: false,
   showTree: true,
@@ -52,7 +55,7 @@ function loadInternalViewerUrl(href: string): boolean {
   vscode?.postMessage({
     type: 'openDocument',
     text,
-    title: 'TreeDoc Viewer: cell value',
+    title: 'TreeDoc: cell value',
   })
   localStorage.removeItem(dataKey)
   return true
@@ -72,7 +75,7 @@ onMounted(() => {
     const message = event.data
     if (message?.type === 'setDocument') {
       documentText.value = message.text || '{}'
-      title.value = message.fileName ? `TreeDoc Viewer: ${message.fileName}` : 'TreeDoc Viewer'
+      title.value = message.fileName ? `TreeDoc: ${message.fileName}` : 'TreeDoc'
     }
   })
 
@@ -107,7 +110,7 @@ onMounted(() => {
       root-object-key="root"
     >
       <template #title>
-        <div class="vscode-title">
+        <div class="vscode-title" :title="titleTooltip">
           <i class="pi pi-sitemap"></i>
           <strong>{{ title }}</strong>
         </div>
