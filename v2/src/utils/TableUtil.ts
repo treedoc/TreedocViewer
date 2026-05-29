@@ -109,12 +109,47 @@ export function copyCellValue(row: TableRow, field: string): void {
 /**
  * Copy table data to clipboard
  */
-export type TableCopyFormat = 'json' | 'csv' | 'markdown' | 'html'
+export type TableCopyFormat = 'json' | 'csv' | 'tsv' | 'markdown' | 'html'
 
 export function copyTableData(data: TableRow[], columns: TableColumn[], format: TableCopyFormat): void {
   const jsonData = getSerializableTableData(data, columns)
   const text = formatTableData(jsonData, columns, format)
-  navigator.clipboard.writeText(text)
+  writeFormattedTextToClipboard(text, getClipboardMimeType(format))
+}
+
+function getClipboardMimeType(format: TableCopyFormat): string {
+  switch (format) {
+    case 'csv':
+      return 'text/csv'
+    case 'tsv':
+      return 'text/tab-separated-values'
+    case 'markdown':
+      return 'text/markdown'
+    case 'html':
+      return 'text/html'
+    case 'json':
+    default:
+      return 'application/json'
+  }
+}
+
+function writeFormattedTextToClipboard(text: string, mimeType: string): void {
+  const clipboard = navigator.clipboard
+  if (!clipboard) return
+
+  if (clipboard.write && typeof ClipboardItem !== 'undefined') {
+    const item = new ClipboardItem({
+      [mimeType]: new Blob([text], { type: mimeType }),
+      'text/plain': new Blob([text], { type: 'text/plain' }),
+    })
+
+    clipboard.write([item]).catch(() => {
+      clipboard.writeText?.(text)
+    })
+    return
+  }
+
+  clipboard.writeText?.(text)
 }
 
 function getSerializableTableData(data: TableRow[], columns: TableColumn[]): Record<string, unknown>[] {
@@ -139,6 +174,8 @@ function formatTableData(data: Record<string, unknown>[], columns: TableColumn[]
   switch (format) {
     case 'csv':
       return toCSV(data)
+    case 'tsv':
+      return toTSV(data, columns)
     case 'markdown':
       return toMarkdownTable(data, columns)
     case 'html':
@@ -151,6 +188,17 @@ function formatTableData(data: Record<string, unknown>[], columns: TableColumn[]
 export function toCSV(val: any) {
   const obj = TDObjectCoder.encode(val);
   return CSVWriter.instance.writeAsString(obj);
+}
+
+function toTSV(data: Record<string, unknown>[], columns: TableColumn[]): string {
+  const fields = columns.map(c => c.field).filter(field => field !== '__node')
+  const headers = fields.map(field => columns.find(c => c.field === field)?.header || field)
+  const headerRow = headers.map(escapeTSVCell).join('\t')
+  const bodyRows = data.map(row => {
+    return fields.map(field => escapeTSVCell(valueToFlatString(row[field]))).join('\t')
+  })
+
+  return [headerRow, ...bodyRows].join('\n')
 }
 
 function toMarkdownTable(data: Record<string, unknown>[], columns: TableColumn[]): string {
@@ -197,6 +245,12 @@ function escapeMarkdownCell(value: string): string {
     .replace(/\\/g, '\\\\')
     .replace(/\|/g, '\\|')
     .replace(/\r?\n/g, '<br>')
+}
+
+function escapeTSVCell(value: string): string {
+  return value
+    .replace(/\t/g, ' ')
+    .replace(/\r?\n/g, ' ')
 }
 
 function escapeHtml(value: string): string {

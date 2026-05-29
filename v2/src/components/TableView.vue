@@ -151,6 +151,7 @@ function openFile() {
 const copyMenuItems = [
   { label: 'JSON', icon: 'pi pi-code', command: () => copyTable('json') },
   { label: 'CSV', icon: 'pi pi-file-export', command: () => copyTable('csv') },
+  { label: 'TSV', icon: 'pi pi-table', command: () => copyTable('tsv') },
   { label: 'Markdown', icon: 'pi pi-list', command: () => copyTable('markdown') },
   { label: 'HTML', icon: 'pi pi-globe', command: () => copyTable('html') },
 ]
