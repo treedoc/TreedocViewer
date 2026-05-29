@@ -254,6 +254,7 @@ interface TableSelection {
 const tableSelection = ref<TableSelection | null>(null)
 const isDraggingSelection = ref(false)
 const suppressNextCellClick = ref(false)
+const hoveredCell = ref<{ rowIndex: number, field: string } | null>(null)
 
 const normalizedSelection = computed(() => {
   const selection = tableSelection.value
@@ -987,9 +988,24 @@ function onCellMouseEnter(rowIndex: number, field: string) {
 }
 
 function onTableMouseOver(event: MouseEvent) {
+  if (!isDraggingSelection.value || !tableSelection.value) return
   const cell = getSelectionCellFromEvent(event)
   if (!cell) return
   onCellMouseEnter(cell.rowIndex, cell.field)
+}
+
+function onCellMouseEnterForActions(rowIndex: number, field: string) {
+  hoveredCell.value = { rowIndex, field }
+}
+
+function onCellMouseLeaveForActions(rowIndex: number, field: string) {
+  if (hoveredCell.value?.rowIndex === rowIndex && hoveredCell.value.field === field) {
+    hoveredCell.value = null
+  }
+}
+
+function isCellHovered(rowIndex: number, field: string): boolean {
+  return hoveredCell.value?.rowIndex === rowIndex && hoveredCell.value.field === field
 }
 
 function onCellClick(event: MouseEvent) {
@@ -2151,6 +2167,8 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
               }"
               :style="getCellColorStyle(data, col.field)"
               @click.capture="onCellClick"
+              @mouseenter="onCellMouseEnterForActions(index, col.field)"
+              @mouseleave="onCellMouseLeaveForActions(index, col.field)"
             >
               <div class="cell-wrapper">
                 <div class="cell-content">
@@ -2209,7 +2227,7 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
                 </div>
               </div>
               <HoverButtonBar
-                v-if="data[col.field] != null"
+                v-if="data[col.field] != null && isCellHovered(index, col.field)"
                 :buttons="getCellButtons(data, col.field)"
                 layout="absolute"
                 :position-below="index === 0"
@@ -2597,6 +2615,16 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
   outline-offset: -2px;
 }
 
+.cell-outer.is-selected,
+.cell-outer.is-row-selected {
+  background: color-mix(in srgb, var(--p-primary-color) 16%, var(--tdv-surface));
+}
+
+.cell-outer.is-selected:hover,
+.cell-outer.is-row-selected:hover {
+  background: color-mix(in srgb, var(--p-primary-color) 18%, var(--tdv-surface));
+}
+
 .cell-outer.is-selection-anchor {
   outline: 2px solid var(--p-primary-color);
   outline-offset: -2px;
@@ -2637,7 +2665,8 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
   width: 100%;
   max-width: 80vw;
   max-height: 50vh;
-  overflow: hidden;
+  overflow: auto;
+  overflow: overlay; /* Chromium overlay scrollbars */
   border-radius: 3px;
   scrollbar-width: thin;
 }
@@ -2659,11 +2688,6 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
 
 .cell-wrapper::-webkit-scrollbar-track {
   background: transparent;
-}
-
-.cell-outer:hover .cell-wrapper {
-  overflow: auto;
-  overflow: overlay; /* Chromium overlay scrollbars */
 }
 
 .cell-content {
@@ -2706,18 +2730,6 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
   border-right: 1px solid var(--tdv-surface-border);
   position: relative;
   overflow: visible !important; /* Allow hover button bar to overflow cell boundaries */
-}
-
-:deep(.p-datatable-tbody > tr > td:has(.cell-outer.is-selected)),
-:deep(.p-datatable-tbody > tr > td:has(.cell-outer.is-row-selected)) {
-  background: color-mix(in srgb, var(--p-primary-color) 16%, var(--tdv-surface)) !important;
-  border-color: color-mix(in srgb, var(--p-primary-color) 16%, var(--tdv-surface)) !important;
-}
-
-:deep(.p-datatable-tbody > tr:hover > td:has(.cell-outer.is-selected)),
-:deep(.p-datatable-tbody > tr:hover > td:has(.cell-outer.is-row-selected)) {
-  background: color-mix(in srgb, var(--p-primary-color) 18%, var(--tdv-surface)) !important;
-  border-color: color-mix(in srgb, var(--p-primary-color) 18%, var(--tdv-surface)) !important;
 }
 
 /* Ensure hovered cell's button bar appears above other cells */
