@@ -73,8 +73,7 @@ export const xmlStr = `<?xml version="1.0" encoding="UTF-8"?>
   </developers>
 </project>`
 
-export const csvStr = `
-field1,field2,field3
+export const csvStr = `field1,field2,field3
 v11,v12,v13
 v21, "v2l1
 V2l2" ,v23
