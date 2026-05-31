@@ -127,9 +127,13 @@ const rows = ref(100)
 // Chart state (lifted up to survive fullscreen toggle)
 const chartTimeColumn = ref('')
 const chartValueColumn = ref('')
+const chartValueColumns = ref<string[]>([])
 const chartGroupColumn = ref('')
+const chartGroupColumns = ref<string[]>([])
 const chartBucketSize = ref<import('@/utils/TableUtil').TimeBucket>('minute')
 const chartHiddenGroups = ref<Set<string>>(new Set())
+const chartShowCount = ref(true)
+const chartValueAgg = ref<'avg' | 'sum' | 'max'>('avg')
 const chartTimeSelectionStart = ref<number | null>(null)
 const chartTimeSelectionEnd = ref<number | null>(null)
 const chartTimeSelectionColumn = ref('')
@@ -1342,9 +1346,13 @@ function buildTableInternal(node: TDNode | null, restoreState = true) {
       showChart.value = cachedState.chartState.showChart ?? false
       chartTimeColumn.value = cachedState.chartState.timeColumn ?? ''
       chartValueColumn.value = cachedState.chartState.valueColumn ?? ''
+      chartValueColumns.value = cachedState.chartState.valueColumns ?? (cachedState.chartState.valueColumn ? [cachedState.chartState.valueColumn] : [])
       chartGroupColumn.value = cachedState.chartState.groupColumn ?? ''
+      chartGroupColumns.value = cachedState.chartState.groupColumns ?? (cachedState.chartState.groupColumn ? [cachedState.chartState.groupColumn] : [])
       chartBucketSize.value = (cachedState.chartState.bucketSize as import('@/utils/TableUtil').TimeBucket) ?? 'minute'
       chartHiddenGroups.value = new Set(cachedState.chartState.hiddenGroups ?? [])
+      chartShowCount.value = cachedState.chartState.showCount ?? true
+      chartValueAgg.value = cachedState.chartState.valueAgg ?? 'avg'
       chartTimeSelectionStart.value = cachedState.chartState.timeSelectionStart ?? null
       chartTimeSelectionEnd.value = cachedState.chartState.timeSelectionEnd ?? null
       chartTimeSelectionColumn.value = cachedState.chartState.timeSelectionColumn ?? ''
@@ -1794,9 +1802,13 @@ function saveCurrentTableState() {
         showChart: showChart.value,
         timeColumn: chartTimeColumn.value,
         valueColumn: chartValueColumn.value,
+        valueColumns: chartValueColumns.value,
         groupColumn: chartGroupColumn.value,
+        groupColumns: chartGroupColumns.value,
         bucketSize: chartBucketSize.value,
         hiddenGroups: Array.from(chartHiddenGroups.value),
+        showCount: chartShowCount.value,
+        valueAgg: chartValueAgg.value,
         timeSelectionStart: chartTimeSelectionStart.value,
         timeSelectionEnd: chartTimeSelectionEnd.value,
         timeSelectionColumn: chartTimeSelectionColumn.value
@@ -2118,18 +2130,26 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
       :columns="columns as any"
       :time-column-model="chartTimeColumn"
       :value-column-model="chartValueColumn"
+      :value-columns-model="chartValueColumns"
       :group-column-model="chartGroupColumn"
+      :group-columns-model="chartGroupColumns"
       :bucket-size-model="chartBucketSize"
       :hidden-groups-model="chartHiddenGroups"
+      :show-count-model="chartShowCount"
+      :value-agg-model="chartValueAgg"
       :time-selection-start-model="chartTimeSelectionStart"
       :time-selection-end-model="chartTimeSelectionEnd"
       @close="showChart = false"
       @update:group-filter="onChartGroupFilter"
       @update:time-column="chartTimeColumn = $event"
       @update:value-column="chartValueColumn = $event"
+      @update:value-columns="chartValueColumns = $event"
       @update:group-column="chartGroupColumn = $event"
+      @update:group-columns="chartGroupColumns = $event"
       @update:bucket-size="chartBucketSize = $event"
       @update:hidden-groups="chartHiddenGroups = $event"
+      @update:show-count="chartShowCount = $event"
+      @update:value-agg="chartValueAgg = $event"
       @update:time-range="onChartTimeRange"
     />
     

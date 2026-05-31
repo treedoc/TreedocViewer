@@ -18,11 +18,13 @@ import {
   type ChartOptions
 } from 'chart.js'
 import 'chartjs-adapter-date-fns'
-import type { TableRow, TableColumn, TimeBucket, TimeSeriesDataPoint } from '@/utils/TableUtil'
-import { detectTimeColumns, detectNumericColumns, detectGroupableColumns, detectBucketSize, aggregateByTime, detectColumnDateFormat } from '@/utils/TableUtil'
-import { formatDateLikeOriginal } from '@/utils/DateUtil'
+import type { TableRow, TableColumn, TimeBucket } from '@/utils/TableUtil'
+import { detectTimeColumns, detectNumericColumns, detectGroupableColumns, detectBucketSize, detectColumnDateFormat } from '@/utils/TableUtil'
+import { formatDateLikeOriginal, tryParseDate } from '@/utils/DateUtil'
 import Select from 'primevue/select'
+import MultiSelect from 'primevue/multiselect'
 import Button from 'primevue/button'
+import Checkbox from 'primevue/checkbox'
 
 // Register Chart.js components
 ChartJS.register(
@@ -45,9 +47,13 @@ const props = defineProps<{
   // Chart state props (for persistence across remounts)
   timeColumnModel?: string
   valueColumnModel?: string
+  valueColumnsModel?: string[]
   groupColumnModel?: string
+  groupColumnsModel?: string[]
   bucketSizeModel?: TimeBucket
   hiddenGroupsModel?: Set<string>
+  showCountModel?: boolean
+  valueAggModel?: ValueAggregation
   timeSelectionStartModel?: number | null
   timeSelectionEndModel?: number | null
 }>()
@@ -57,33 +63,90 @@ const emit = defineEmits<{
   'update:groupFilter': [field: string, values: string[]]
   'update:timeColumn': [value: string]
   'update:valueColumn': [value: string]
+  'update:valueColumns': [value: string[]]
   'update:groupColumn': [value: string]
+  'update:groupColumns': [value: string[]]
   'update:bucketSize': [value: TimeBucket]
   'update:hiddenGroups': [value: Set<string>]
+  'update:showCount': [value: boolean]
+  'update:valueAgg': [value: ValueAggregation]
   'update:time-range': [payload: { timeColumn: string; startMs: number | null; endMs: number | null }]
 }>()
 
+type ValueAggregation = 'avg' | 'sum' | 'max'
+type SeriesKind = 'count' | 'value'
+
+interface BucketData {
+  time: Date
+  count: number
+  countGroups: Record<string, number>
+  valueGroups: Record<string, Record<string, { sum: number; count: number; max: number }>>
+}
+
+interface SeriesSummary {
+  key: string
+  kind: SeriesKind
+  name: string
+  valueColumn?: string
+  groupParts: string[]
+  colorIndex: number
+  max: number
+  mean: number
+}
+
+const MAX_RENDERED_SERIES = 100
+const MAX_GROUPED_COUNT_SERIES = 100
+const TOOLTIP_SINGLE_SERIES_THRESHOLD = 30
+const DEBOUNCE_MS = 250
+
 // State - use props if provided, otherwise use local state
 const timeColumn = ref<string>(props.timeColumnModel || '')
-const valueColumn = ref<string>(props.valueColumnModel || '')
-const groupColumn = ref<string>(props.groupColumnModel || '')
+const valueColumns = ref<string[]>(props.valueColumnsModel?.length ? [...props.valueColumnsModel] : (props.valueColumnModel ? [props.valueColumnModel] : []))
+const groupColumns = ref<string[]>(props.groupColumnsModel?.length ? [...props.groupColumnsModel] : (props.groupColumnModel ? [props.groupColumnModel] : []))
+const effectiveValueColumns = ref<string[]>([...valueColumns.value])
+const effectiveGroupColumns = ref<string[]>([...groupColumns.value])
+const showCount = ref(props.showCountModel ?? true)
+const valueAgg = ref<ValueAggregation>(props.valueAggModel ?? 'avg')
 const bucketSize = ref<TimeBucket>(props.bucketSizeModel || 'minute')
 const autoDetectBucket = ref(!props.bucketSizeModel) // Auto-detect only if no saved bucket
 const isMaximized = ref(false)
 const hiddenGroups = ref<Set<string>>(props.hiddenGroupsModel ? new Set(props.hiddenGroupsModel) : new Set())
+const explicitlyShownValueSeries = ref<Set<string>>(new Set())
+const legendWidth = ref(320)
+const isResizingLegend = ref(false)
+const legendResizeRight = ref(0)
 const timeSelectionStart = ref<number | null>(props.timeSelectionStartModel ?? null)
 const timeSelectionEnd = ref<number | null>(props.timeSelectionEndModel ?? null)
 const chartRef = ref<any>(null)
 const isDraggingSelection = ref(false)
 const dragStartClientX = ref(0)
 const dragCurrentClientX = ref(0)
+let debounceTimer: ReturnType<typeof setTimeout> | null = null
+let resizeTimer: ReturnType<typeof setTimeout> | null = null
+let pendingResizeClientX: number | null = null
 
 // Emit state changes to parent
 watch(timeColumn, (val) => emit('update:timeColumn', val))
-watch(valueColumn, (val) => emit('update:valueColumn', val))
-watch(groupColumn, (val) => emit('update:groupColumn', val))
+watch(valueColumns, (val) => {
+  emit('update:valueColumns', [...val])
+  emit('update:valueColumn', val[0] || '')
+}, { deep: true })
+watch(groupColumns, (val) => {
+  emit('update:groupColumns', [...val])
+  emit('update:groupColumn', val[0] || '')
+}, { deep: true })
 watch(bucketSize, (val) => emit('update:bucketSize', val))
 watch(hiddenGroups, (val) => emit('update:hiddenGroups', val))
+watch(showCount, (val) => emit('update:showCount', val))
+watch(valueAgg, (val) => emit('update:valueAgg', val))
+
+watch([valueColumns, groupColumns], () => {
+  if (debounceTimer) clearTimeout(debounceTimer)
+  debounceTimer = setTimeout(() => {
+    effectiveValueColumns.value = [...valueColumns.value]
+    effectiveGroupColumns.value = [...groupColumns.value]
+  }, DEBOUNCE_MS)
+}, { deep: true })
 
 watch(
   [timeSelectionStart, timeSelectionEnd],
@@ -138,6 +201,10 @@ const groupColumnOptions = computed(() => {
   ]
 })
 
+const groupMultiSelectOptions = computed(() => groupColumnOptions.value.filter(option => option.value))
+const chartHasData = computed(() => chartBuckets.value.length > 0 && chartJsData.value.datasets.length > 0)
+const canSyncGroupFilter = computed(() => effectiveGroupColumns.value.length === 1 && groupedCountEnabled.value)
+
 // Auto-select first time column
 watch(timeColumns, (cols) => {
   if (cols.length > 0 && !timeColumn.value) {
@@ -152,44 +219,210 @@ watch([() => timeColumn.value, () => props.data], () => {
   }
 }, { immediate: true })
 
-// Reset hidden groups when group column changes
-watch(groupColumn, (newCol, oldCol) => {
+// Reset hidden series when grouping changes
+watch(groupColumns, (newCols, oldCols) => {
   hiddenGroups.value = new Set()
-  // Clear filter for old column
-  if (oldCol) {
-    emit('update:groupFilter', oldCol, [])
+  explicitlyShownValueSeries.value = new Set()
+  const newSet = new Set(newCols)
+  for (const oldCol of oldCols || []) {
+    if (!newSet.has(oldCol)) emit('update:groupFilter', oldCol, [])
   }
-})
+}, { deep: true })
 
 watch(timeColumn, () => {
   resetTimeSelection()
 })
 
-// Aggregate data
-const chartData = computed<TimeSeriesDataPoint[]>(() => {
+function getCellAnyValue(row: TableRow, field: string): unknown {
+  const val = row[field]
+  if (val && typeof val === 'object' && 'type' in val && 'value' in val) {
+    return (val as any).value
+  }
+  return val
+}
+
+function getNumericValue(row: TableRow, field: string): number | null {
+  const val = getCellAnyValue(row, field)
+  if (val === null || val === undefined || val === '') return null
+  const num = Number(val)
+  return Number.isFinite(num) ? num : null
+}
+
+function getStringValue(row: TableRow, field: string): string {
+  const val = getCellAnyValue(row, field)
+  if (val === null || val === undefined || val === '') return '(empty)'
+  return String(val)
+}
+
+function getGroupParts(row: TableRow): string[] {
+  return effectiveGroupColumns.value.map(field => getStringValue(row, field))
+}
+
+function getGroupKey(parts: string[]): string {
+  return parts.length ? parts.join(' | ') : 'All'
+}
+
+function getBucketKey(date: Date, bucket: TimeBucket): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  const hour = String(date.getHours()).padStart(2, '0')
+  const minute = date.getMinutes()
+
+  switch (bucket) {
+    case 'second':
+      return `${year}-${month}-${day} ${hour}:${String(minute).padStart(2, '0')}:${String(date.getSeconds()).padStart(2, '0')}`
+    case 'minute':
+      return `${year}-${month}-${day} ${hour}:${String(minute).padStart(2, '0')}`
+    case '5min':
+      return `${year}-${month}-${day} ${hour}:${String(Math.floor(minute / 5) * 5).padStart(2, '0')}`
+    case '10min':
+      return `${year}-${month}-${day} ${hour}:${String(Math.floor(minute / 10) * 10).padStart(2, '0')}`
+    case '30min':
+      return `${year}-${month}-${day} ${hour}:${String(Math.floor(minute / 30) * 30).padStart(2, '0')}`
+    case 'hour':
+      return `${year}-${month}-${day} ${hour}:00`
+    case 'day':
+      return `${year}-${month}-${day}`
+    case 'week': {
+      const d = new Date(date)
+      const dayOfWeek = d.getDay()
+      d.setDate(d.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1))
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    }
+    case 'month':
+      return `${year}-${month}`
+  }
+}
+
+function getBucketStartDate(key: string, bucket: TimeBucket): Date {
+  if (bucket === 'month') {
+    const [year, month] = key.split('-').map(Number)
+    return new Date(year, month - 1, 1)
+  }
+  if (bucket === 'day' || bucket === 'week') {
+    const [year, month, day] = key.split('-').map(Number)
+    return new Date(year, month - 1, day)
+  }
+  const [datePart, timePart] = key.split(' ')
+  const [year, month, day] = datePart.split('-').map(Number)
+  const [hour, minute, second = 0] = timePart.split(':').map(Number)
+  return new Date(year, month - 1, day, hour, minute, second)
+}
+
+const chartBuckets = computed<BucketData[]>(() => {
   if (!timeColumn.value || props.data.length === 0) return []
-  return aggregateByTime(
-    props.data,
-    timeColumn.value,
-    bucketSize.value,
-    valueColumn.value || undefined,
-    groupColumn.value || undefined
-  )
+
+  const buckets = new Map<string, BucketData>()
+
+  for (const row of props.data) {
+    const date = tryParseDate(getCellAnyValue(row, timeColumn.value))
+    if (!date) continue
+
+    const bucketKey = getBucketKey(date, bucketSize.value)
+    let bucket = buckets.get(bucketKey)
+    if (!bucket) {
+      bucket = {
+        time: getBucketStartDate(bucketKey, bucketSize.value),
+        count: 0,
+        countGroups: {},
+        valueGroups: {}
+      }
+      buckets.set(bucketKey, bucket)
+    }
+
+    const groupParts = getGroupParts(row)
+    const groupKey = getGroupKey(groupParts)
+    bucket.count++
+    bucket.countGroups[groupKey] = (bucket.countGroups[groupKey] || 0) + 1
+
+    for (const column of effectiveValueColumns.value) {
+      const numericValue = getNumericValue(row, column)
+      if (numericValue === null) continue
+      bucket.valueGroups[column] ||= {}
+      const stats = bucket.valueGroups[column][groupKey] ||= { sum: 0, count: 0, max: -Infinity }
+      stats.sum += numericValue
+      stats.count++
+      stats.max = Math.max(stats.max, numericValue)
+    }
+  }
+
+  return Array.from(buckets.values()).sort((a, b) => a.time.getTime() - b.time.getTime())
 })
 
-// Get all unique group values across all data points
-const uniqueGroups = computed<string[]>(() => {
-  if (!groupColumn.value) return []
-  const groups = new Set<string>()
-  for (const point of chartData.value) {
-    if (point.groups) {
-      for (const g of Object.keys(point.groups)) {
-        groups.add(g)
+const countGroupKeys = computed(() => {
+  const keys = new Set<string>()
+  for (const bucket of chartBuckets.value) {
+    for (const key of Object.keys(bucket.countGroups)) keys.add(key)
+  }
+  return Array.from(keys).sort()
+})
+
+const groupedCountEnabled = computed(() => effectiveGroupColumns.value.length > 0 && countGroupKeys.value.length <= MAX_GROUPED_COUNT_SERIES)
+
+function aggregateValues(values: number[]): { max: number; mean: number } {
+  if (values.length === 0) return { max: 0, mean: 0 }
+  return {
+    max: Math.max(...values),
+    mean: values.reduce((sum, value) => sum + value, 0) / values.length
+  }
+}
+
+function getValueForStats(stats: { sum: number; count: number; max: number } | undefined): number | null {
+  if (!stats || stats.count === 0) return null
+  if (valueAgg.value === 'sum') return stats.sum
+  if (valueAgg.value === 'max') return stats.max
+  return stats.sum / stats.count
+}
+
+const valueSeriesSummaries = computed<SeriesSummary[]>(() => {
+  const series = new Map<string, { valueColumn: string; groupParts: string[]; values: number[] }>()
+
+  for (const bucket of chartBuckets.value) {
+    for (const column of effectiveValueColumns.value) {
+      const groups = bucket.valueGroups[column] || {}
+      for (const [groupKey, stats] of Object.entries(groups)) {
+        const value = getValueForStats(stats)
+        if (value === null) continue
+        const key = `value:${column}:${groupKey}`
+        if (!series.has(key)) {
+          series.set(key, {
+            valueColumn: column,
+            groupParts: groupKey === 'All' ? [] : groupKey.split(' | '),
+            values: []
+          })
+        }
+        series.get(key)!.values.push(value)
       }
     }
   }
-  return Array.from(groups).sort()
+
+  return Array.from(series.entries()).map(([key, data]) => {
+    const stats = aggregateValues(data.values)
+    return {
+      key,
+      kind: 'value' as const,
+      name: data.groupParts.length ? `${data.valueColumn} | ${data.groupParts.join(' | ')}` : data.valueColumn,
+      valueColumn: data.valueColumn,
+      groupParts: data.groupParts,
+      colorIndex: 0,
+      max: stats.max,
+      mean: stats.mean
+    }
+  }).sort((a, b) => b.max - a.max).map((summary, index) => ({
+    ...summary,
+    colorIndex: index,
+  }))
 })
+
+function isValueSeriesVisible(series: SeriesSummary, index: number): boolean {
+  if (hiddenGroups.value.has(series.key)) return false
+  return index < MAX_RENDERED_SERIES || explicitlyShownValueSeries.value.has(series.key)
+}
+
+const visibleValueSeries = computed(() => valueSeriesSummaries.value.filter((series, index) => isValueSeriesVisible(series, index)))
+const totalSeriesCount = computed(() => (showCount.value ? (groupedCountEnabled.value ? countGroupKeys.value.length : 1) : 0) + visibleValueSeries.value.length)
+const allValueSeriesHidden = computed(() => valueSeriesSummaries.value.length > 0 && valueSeriesSummaries.value.every((series, index) => !isValueSeriesVisible(series, index)))
 
 // Color palette for stacked bars
 const colorPalette = [
@@ -261,6 +494,10 @@ function getUnitDuration(unit: TimeUnit): number {
   }
 }
 
+function getSeriesColor(series: SeriesSummary) {
+  return colorPalette[(series.colorIndex + 2) % colorPalette.length]
+}
+
 function getSafeTimeTickConfig(bucket: TimeBucket, range: { min?: number; max?: number }): { unit: TimeUnit; stepSize?: number } {
   const units: TimeUnit[] = ['second', 'minute', 'hour', 'day', 'week', 'month']
   const maxGeneratedTicks = 1000
@@ -283,9 +520,9 @@ function getSafeTimeTickConfig(bucket: TimeBucket, range: { min?: number; max?: 
 
 // Calculate time range with padding to include edge data points
 const timeRange = computed(() => {
-  if (chartData.value.length === 0) return { min: undefined, max: undefined }
+  if (chartBuckets.value.length === 0) return { min: undefined, max: undefined }
   
-  const times = chartData.value.map(d => d.time.getTime())
+  const times = chartBuckets.value.map(d => d.time.getTime())
   const minTime = Math.min(...times)
   const maxTime = Math.max(...times)
   const bucketDuration = getBucketDuration(bucketSize.value)
@@ -312,89 +549,89 @@ const effectiveTimeRange = computed(() => {
 const chartJsData = computed<ChartData<'bar'>>(() => {
   const datasets: any[] = []
   
-  if (groupColumn.value && uniqueGroups.value.length > 0) {
-    // Create stacked datasets for each group with {x, y} format
-    uniqueGroups.value.forEach((group, index) => {
+  if (showCount.value && groupedCountEnabled.value && countGroupKeys.value.length > 0) {
+    countGroupKeys.value.forEach((group, index) => {
       const color = colorPalette[index % colorPalette.length]
+      const key = `count:${group}`
       datasets.push({
         label: group,
-        data: chartData.value.map(d => ({ x: d.time.getTime(), y: d.groups?.[group] || 0 })),
+        data: chartBuckets.value.map(d => ({ x: d.time.getTime(), y: d.countGroups[group] || 0 })),
         backgroundColor: color.bg,
         borderColor: color.border,
         borderWidth: 1,
         yAxisID: 'y',
         stack: 'stack0',
-        hidden: hiddenGroups.value.has(group)
+        seriesKey: key,
+        hidden: hiddenGroups.value.has(key)
       })
     })
-  } else {
-    // Single dataset for row counts with {x, y} format
+  } else if (showCount.value) {
     datasets.push({
       label: 'Row Count',
-      data: chartData.value.map(d => ({ x: d.time.getTime(), y: d.count })),
+      data: chartBuckets.value.map(d => ({ x: d.time.getTime(), y: d.count })),
       backgroundColor: 'rgba(54, 162, 235, 0.6)',
       borderColor: 'rgba(54, 162, 235, 1)',
       borderWidth: 1,
-      yAxisID: 'y'
+      yAxisID: 'y',
+      seriesKey: 'count:All'
     })
   }
   
-  // Add value column as line if selected
-  if (valueColumn.value) {
+  visibleValueSeries.value.forEach((series, index) => {
+    const color = getSeriesColor(series)
     datasets.push({
-      label: `Avg ${valueColumn.value}`,
-      data: chartData.value.map(d => ({ x: d.time.getTime(), y: d.avgValue ?? null })),
+      label: `${valueAgg.value.toUpperCase()} ${series.name}`,
+      data: chartBuckets.value.map(bucket => {
+        const groupKey = getGroupKey(series.groupParts)
+        const value = getValueForStats(bucket.valueGroups[series.valueColumn!]?.[groupKey])
+        return { x: bucket.time.getTime(), y: value }
+      }),
       type: 'line' as const,
-      borderColor: 'rgba(255, 99, 132, 1)',
-      backgroundColor: 'rgba(255, 99, 132, 0.2)',
+      borderColor: color.border,
+      backgroundColor: color.bg,
       borderWidth: 2,
-      pointRadius: 3,
+      pointRadius: 2,
       yAxisID: 'y1',
+      seriesKey: series.key,
+      seriesKind: 'value',
       tension: 0.1
     })
-  }
+  })
   
   return { datasets }
 })
 
 // Chart.js options
 const chartOptions = computed<ChartOptions<'bar'>>(() => {
-  const isStacked = !!(groupColumn.value && uniqueGroups.value.length > 0)
+  const isStacked = !!(showCount.value && groupedCountEnabled.value)
   const tickConfig = getSafeTimeTickConfig(bucketSize.value, effectiveTimeRange.value)
   
   const options: ChartOptions<'bar'> = {
     responsive: true,
     maintainAspectRatio: false,
     interaction: {
-      mode: 'index',
+      mode: totalSeriesCount.value > TOOLTIP_SINGLE_SERIES_THRESHOLD ? 'nearest' : 'index',
       intersect: false
     },
     plugins: {
       legend: {
+        display: showCount.value,
         position: 'top',
+        labels: {
+          filter: (item: any, data: any) => {
+            const dataset = data.datasets[item.datasetIndex] as any
+            return dataset?.seriesKind !== 'value'
+          }
+        },
         onClick: (evt: any, legendItem: any, legend: any) => {
-            // Track hidden groups, then let user sync these selections on demand
-          if (groupColumn.value && uniqueGroups.value.length > 0) {
-            const groupName = legendItem.text
+          const dataset = legend.chart.data.datasets[legendItem.datasetIndex] as any
+          if (dataset?.seriesKind === 'value') return
+          const seriesKey = dataset?.seriesKey
+          if (seriesKey) {
             const newHiddenGroups = new Set(hiddenGroups.value)
-            
-            if (newHiddenGroups.has(groupName)) {
-              // Currently hidden, make it visible
-              newHiddenGroups.delete(groupName)
-            } else {
-              // Currently visible, hide it
-              newHiddenGroups.add(groupName)
-            }
-            
-            // Check if all groups would be hidden - if so, reset to show all
-            const visibleGroups = uniqueGroups.value.filter(g => !newHiddenGroups.has(g))
-            if (visibleGroups.length === 0) {
-              // All groups hidden - reset to show all
-              hiddenGroups.value = new Set()
-            } else {
-              // Replace the Set to trigger reactivity
-              hiddenGroups.value = newHiddenGroups
-            }
+            if (newHiddenGroups.has(seriesKey)) newHiddenGroups.delete(seriesKey)
+            else newHiddenGroups.add(seriesKey)
+            hiddenGroups.value = newHiddenGroups
           } else {
             // No grouping - use default Chart.js behavior
             const index = legendItem.datasetIndex
@@ -442,7 +679,11 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => {
           stepSize: tickConfig.stepSize
         }
       },
-      y: {
+    }
+  }
+
+  if (showCount.value) {
+    ;(options.scales as any).y = {
         type: 'linear',
         display: true,
         position: 'left',
@@ -452,19 +693,17 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => {
         },
         beginAtZero: true,
         stacked: isStacked
-      }
     }
   }
   
-  // Add second Y axis if value column is selected
-  if (valueColumn.value) {
+  if (effectiveValueColumns.value.length > 0) {
     (options.scales as any).y1 = {
       type: 'linear',
       display: true,
       position: 'right',
       title: {
         display: true,
-        text: `Avg ${valueColumn.value}`
+        text: valueAgg.value.toUpperCase()
       },
       grid: {
         drawOnChartArea: false
@@ -488,18 +727,98 @@ const bucketOptions = [
   { label: 'Month', value: 'month' }
 ]
 
+const valueAggOptions: { label: string; value: ValueAggregation }[] = [
+  { label: 'Avg', value: 'avg' },
+  { label: 'Sum', value: 'sum' },
+  { label: 'Max', value: 'max' }
+]
+
 function onBucketChange() {
   autoDetectBucket.value = false
 }
 
 function syncGroupsToTable() {
-  if (!groupColumn.value) return
-  const visibleGroups = uniqueGroups.value.filter(g => !hiddenGroups.value.has(g))
-  if (visibleGroups.length === uniqueGroups.value.length) {
-    emit('update:groupFilter', groupColumn.value, [])
+  if (effectiveGroupColumns.value.length !== 1 || !groupedCountEnabled.value) return
+  const field = effectiveGroupColumns.value[0]
+  const visibleGroups = countGroupKeys.value.filter(g => !hiddenGroups.value.has(`count:${g}`))
+  if (visibleGroups.length === countGroupKeys.value.length) {
+    emit('update:groupFilter', field, [])
     return
   }
-  emit('update:groupFilter', groupColumn.value, visibleGroups)
+  emit('update:groupFilter', field, visibleGroups)
+}
+
+function formatMetric(value: number): string {
+  if (!Number.isFinite(value)) return ''
+  return Math.abs(value) >= 1000 ? value.toLocaleString(undefined, { maximumFractionDigits: 1 }) : value.toLocaleString(undefined, { maximumFractionDigits: 3 })
+}
+
+function toggleSeriesVisibility(series: SeriesSummary, index: number) {
+  const next = new Set(hiddenGroups.value)
+  const nextExplicitlyShown = new Set(explicitlyShownValueSeries.value)
+
+  if (isValueSeriesVisible(series, index)) {
+    next.add(series.key)
+    nextExplicitlyShown.delete(series.key)
+  } else {
+    next.delete(series.key)
+    if (index >= MAX_RENDERED_SERIES) nextExplicitlyShown.add(series.key)
+  }
+
+  hiddenGroups.value = next
+  explicitlyShownValueSeries.value = nextExplicitlyShown
+}
+
+function toggleAllValueSeries() {
+  const next = new Set(hiddenGroups.value)
+  const nextExplicitlyShown = new Set<string>()
+
+  if (allValueSeriesHidden.value) {
+    valueSeriesSummaries.value.forEach((series, index) => {
+      if (index < MAX_RENDERED_SERIES) next.delete(series.key)
+      else next.add(series.key)
+    })
+  } else {
+    for (const series of valueSeriesSummaries.value) next.add(series.key)
+  }
+
+  hiddenGroups.value = next
+  explicitlyShownValueSeries.value = nextExplicitlyShown
+}
+
+function startLegendResize(event: MouseEvent) {
+  const chartRect = chartRef.value?.chart?.canvas?.getBoundingClientRect()
+  if (!chartRect) return
+  legendResizeRight.value = chartRect.right + legendWidth.value
+  isResizingLegend.value = true
+  window.addEventListener('mousemove', updateLegendResize)
+  window.addEventListener('mouseup', stopLegendResize)
+  event.preventDefault()
+}
+
+function updateLegendResize(event: MouseEvent) {
+  if (!isResizingLegend.value) return
+  pendingResizeClientX = event.clientX
+  if (resizeTimer) return
+  resizeTimer = setTimeout(() => {
+    resizeTimer = null
+    if (pendingResizeClientX == null) return
+    legendWidth.value = Math.max(220, Math.min(520, legendResizeRight.value - pendingResizeClientX))
+  }, 32)
+}
+
+function stopLegendResize() {
+  if (pendingResizeClientX != null) {
+    legendWidth.value = Math.max(220, Math.min(520, legendResizeRight.value - pendingResizeClientX))
+    pendingResizeClientX = null
+  }
+  if (resizeTimer) {
+    clearTimeout(resizeTimer)
+    resizeTimer = null
+  }
+  isResizingLegend.value = false
+  window.removeEventListener('mousemove', updateLegendResize)
+  window.removeEventListener('mouseup', stopLegendResize)
 }
 
 function getChartTimeFromClientX(clientX: number): number | null {
@@ -535,7 +854,7 @@ const dragOverlayStyle = computed(() => {
 })
 
 function startTimeSelectionDrag(event: MouseEvent) {
-  if (event.button !== 0 || !timeColumn.value || chartData.value.length === 0) return
+  if (event.button !== 0 || !timeColumn.value || chartBuckets.value.length === 0) return
   const chart = chartRef.value?.chart
   const canvas: HTMLCanvasElement | undefined = chart?.canvas
   const chartArea = chart?.chartArea
@@ -588,8 +907,12 @@ function endTimeSelectionDrag() {
 }
 
 onBeforeUnmount(() => {
+  if (debounceTimer) clearTimeout(debounceTimer)
+  if (resizeTimer) clearTimeout(resizeTimer)
   window.removeEventListener('mousemove', updateTimeSelectionDrag)
   window.removeEventListener('mouseup', endTimeSelectionDrag)
+  window.removeEventListener('mousemove', updateLegendResize)
+  window.removeEventListener('mouseup', stopLegendResize)
 })
 </script>
 
@@ -620,25 +943,45 @@ onBeforeUnmount(() => {
       
       <div class="control-group">
         <label>Group By:</label>
-        <Select
-          v-model="groupColumn"
-          :options="groupColumnOptions"
+        <MultiSelect
+          v-model="groupColumns"
+          :options="groupMultiSelectOptions"
           optionLabel="label"
           optionValue="value"
           placeholder="None"
-          class="control-select"
+          class="control-select multi-control"
+          display="chip"
+          :maxSelectedLabels="2"
         />
       </div>
       
       <div class="control-group">
-        <label>Value (avg):</label>
-        <Select
-          v-model="valueColumn"
-          :options="['', ...numericColumns]"
+        <label>Values:</label>
+        <MultiSelect
+          v-model="valueColumns"
+          :options="numericColumns"
           placeholder="None"
-          class="control-select"
+          class="control-select multi-control"
+          display="chip"
+          :maxSelectedLabels="2"
         />
       </div>
+
+      <div class="control-group">
+        <label>Value Agg:</label>
+        <Select
+          v-model="valueAgg"
+          :options="valueAggOptions"
+          optionLabel="label"
+          optionValue="value"
+          class="control-select agg-select"
+        />
+      </div>
+
+      <label class="control-group checkbox-control">
+        <Checkbox v-model="showCount" :binary="true" />
+        <span>Count</span>
+      </label>
 
       <div class="control-group">
         <Button
@@ -658,9 +1001,9 @@ onBeforeUnmount(() => {
           size="small"
           text
           severity="secondary"
-          :disabled="!groupColumn"
+          :disabled="!canSyncGroupFilter"
           @click="syncGroupsToTable"
-          v-tooltip.top="'Sync group selection to table'"
+          v-tooltip.top="canSyncGroupFilter ? 'Sync group selection to table' : 'Sync requires one grouped count column'"
         />
       </div>
       
@@ -683,19 +1026,99 @@ onBeforeUnmount(() => {
     </div>
     
     <div
-      class="chart-container"
+      class="chart-layout"
       :class="{ maximized: isMaximized }"
-      v-if="timeColumn && chartData.length > 0"
-      @mousedown.capture="startTimeSelectionDrag"
+      v-if="timeColumn && chartHasData"
     >
-      <Bar
-        ref="chartRef"
-        :data="chartJsData"
-        :options="chartOptions"
+      <div class="chart-container" @mousedown.capture="startTimeSelectionDrag">
+        <Bar
+          ref="chartRef"
+          :data="chartJsData"
+          :options="chartOptions"
+        />
+        <div v-if="isDraggingSelection" class="selection-overlay" :style="dragOverlayStyle" />
+      </div>
+
+      <div
+        v-if="valueColumns.length > 0"
+        class="legend-divider"
+        :class="{ resizing: isResizingLegend }"
+        @mousedown="startLegendResize"
       />
-      <div v-if="isDraggingSelection" class="selection-overlay" :style="dragOverlayStyle" />
+
+      <aside
+        v-if="valueColumns.length > 0"
+        class="value-legend"
+        :style="{ width: `${legendWidth}px` }"
+      >
+        <table>
+          <thead>
+            <tr>
+              <th class="visibility-col">
+                <Button
+                  :icon="allValueSeriesHidden ? 'pi pi-eye' : 'pi pi-eye-slash'"
+                  text
+                  size="small"
+                  severity="secondary"
+                  @click="toggleAllValueSeries"
+                  v-tooltip.top="allValueSeriesHidden ? 'Show all value series' : 'Hide all value series'"
+                />
+              </th>
+              <th class="color-col"></th>
+              <th>Name</th>
+              <th
+                v-for="groupColumnName in effectiveGroupColumns"
+                :key="groupColumnName"
+              >
+                {{ groupColumnName }}
+              </th>
+              <th class="numeric-col">Max</th>
+              <th class="numeric-col">Mean</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="(series, index) in valueSeriesSummaries"
+              :key="series.key"
+              :class="{ hidden: !isValueSeriesVisible(series, index) }"
+            >
+              <td class="visibility-col">
+                <Button
+                  :icon="isValueSeriesVisible(series, index) ? 'pi pi-eye' : 'pi pi-eye-slash'"
+                  text
+                  size="small"
+                  severity="secondary"
+                  @click="toggleSeriesVisibility(series, index)"
+                  v-tooltip.top="isValueSeriesVisible(series, index) ? 'Hide series' : 'Show series'"
+                />
+              </td>
+              <td class="color-col">
+                <span
+                  class="series-color"
+                  :style="{ backgroundColor: getSeriesColor(series).border }"
+                />
+              </td>
+              <td class="series-name" :title="series.name">{{ series.valueColumn }}</td>
+              <td
+                v-for="(_, index) in effectiveGroupColumns"
+                :key="`${series.key}:${index}`"
+                :title="series.groupParts[index] || ''"
+              >
+                {{ series.groupParts[index] || '' }}
+              </td>
+              <td class="numeric-col">{{ formatMetric(series.max) }}</td>
+              <td class="numeric-col">{{ formatMetric(series.mean) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </aside>
     </div>
     
+    <div class="no-data" v-else-if="timeColumn">
+      <i class="pi pi-info-circle"></i>
+      <span>Enable count or select value columns to display the chart</span>
+    </div>
+
     <div class="no-data" v-else-if="timeColumns.length === 0">
       <i class="pi pi-info-circle"></i>
       <span>No timestamp columns detected in the data</span>
@@ -743,6 +1166,19 @@ onBeforeUnmount(() => {
   min-width: 120px;
 }
 
+.multi-control {
+  min-width: 180px;
+  max-width: 280px;
+}
+
+.agg-select {
+  min-width: 90px;
+}
+
+.checkbox-control {
+  cursor: pointer;
+  user-select: none;
+}
 
 .chart-actions {
   margin-left: auto;
@@ -750,11 +1186,23 @@ onBeforeUnmount(() => {
   gap: 4px;
 }
 
+.chart-layout {
+  display: flex;
+  min-height: 250px;
+  height: 250px;
+  transition: height 0.2s ease;
+}
+
+.chart-layout.maximized {
+  height: calc(100vh - 300px);
+  min-height: 400px;
+}
+
 .chart-container {
   position: relative;
-  height: 250px;
+  flex: 1 1 auto;
+  min-width: 0;
   padding: 12px;
-  transition: height 0.2s ease;
 }
 
 .selection-overlay {
@@ -767,9 +1215,82 @@ onBeforeUnmount(() => {
   pointer-events: none;
 }
 
-.chart-container.maximized {
-  height: calc(100vh - 300px);
-  min-height: 400px;
+.legend-divider {
+  flex: 0 0 6px;
+  cursor: col-resize;
+  border-left: 1px solid var(--tdv-surface-border);
+  border-right: 1px solid var(--tdv-surface-border);
+  background: var(--tdv-surface-light);
+}
+
+.legend-divider:hover,
+.legend-divider.resizing {
+  background: var(--tdv-hover-bg);
+}
+
+.value-legend {
+  flex: 0 0 auto;
+  min-width: 220px;
+  max-width: 520px;
+  overflow: auto;
+  border-left: 1px solid var(--tdv-surface-border);
+}
+
+.value-legend table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 0.78rem;
+}
+
+.value-legend th,
+.value-legend td {
+  padding: 5px 6px;
+  border-bottom: 1px solid var(--tdv-surface-border);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
+}
+
+.value-legend th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--tdv-surface);
+  color: var(--tdv-text-muted);
+  font-weight: 600;
+}
+
+.value-legend tr.hidden {
+  opacity: 0.5;
+}
+
+.visibility-col {
+  width: 34px;
+  text-align: center;
+}
+
+.color-col {
+  width: 22px;
+  text-align: center;
+}
+
+.series-color {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  vertical-align: middle;
+}
+
+.series-name {
+  font-weight: 600;
+}
+
+.numeric-col {
+  width: 68px;
+  text-align: right !important;
 }
 
 .no-data {

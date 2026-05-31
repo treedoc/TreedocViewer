@@ -96,9 +96,13 @@ export interface ChartState {
   showChart?: boolean
   timeColumn?: string
   valueColumn?: string
+  valueColumns?: string[]
   groupColumn?: string
+  groupColumns?: string[]
   bucketSize?: string
   hiddenGroups?: string[]
+  showCount?: boolean
+  valueAgg?: 'avg' | 'sum' | 'max'
   timeSelectionStart?: number | null
   timeSelectionEnd?: number | null
   timeSelectionColumn?: string
