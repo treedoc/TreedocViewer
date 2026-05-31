@@ -19,7 +19,8 @@ import {
 } from 'chart.js'
 import 'chartjs-adapter-date-fns'
 import type { TableRow, TableColumn, TimeBucket, TimeSeriesDataPoint } from '@/utils/TableUtil'
-import { detectTimeColumns, detectNumericColumns, detectGroupableColumns, detectBucketSize, aggregateByTime } from '@/utils/TableUtil'
+import { detectTimeColumns, detectNumericColumns, detectGroupableColumns, detectBucketSize, aggregateByTime, detectColumnDateFormat } from '@/utils/TableUtil'
+import { formatDateLikeOriginal } from '@/utils/DateUtil'
 import Select from 'primevue/select'
 import Button from 'primevue/button'
 
@@ -98,8 +99,44 @@ watch(
 
 // Detect columns
 const timeColumns = computed(() => detectTimeColumns(props.data, props.columns))
+const timeColumnFormat = computed(() => timeColumn.value ? detectColumnDateFormat(props.data, timeColumn.value) : null)
 const numericColumns = computed(() => detectNumericColumns(props.data, props.columns))
-const groupableColumns = computed(() => detectGroupableColumns(props.data, props.columns, 100))
+const GROUP_BY_MAX_UNIQUE_VALUES = 1000
+const groupableColumns = computed(() => detectGroupableColumns(props.data, props.columns, GROUP_BY_MAX_UNIQUE_VALUES))
+
+const groupColumnCardinality = computed<Record<string, number>>(() => {
+  const result: Record<string, number> = {}
+
+  for (const col of props.columns) {
+    if (col.field === '__node') continue
+
+    const uniqueValues = new Set<string>()
+    for (const row of props.data) {
+      const val = row[col.field]
+      if (val && typeof val === 'object' && 'type' in val) {
+        uniqueValues.add(String((val as any).value ?? ''))
+      } else if (val === undefined || val === null) {
+        uniqueValues.add('')
+      } else {
+        uniqueValues.add(String(val))
+      }
+    }
+
+    result[col.field] = uniqueValues.size
+  }
+
+  return result
+})
+
+const groupColumnOptions = computed(() => {
+  return [
+    { label: 'None', value: '' },
+    ...groupableColumns.value.map(field => ({
+      label: `${field} (${groupColumnCardinality.value[field] ?? 0})`,
+      value: field,
+    }))
+  ]
+})
 
 // Auto-select first time column
 watch(timeColumns, (cols) => {
@@ -370,6 +407,15 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => {
       },
       title: {
         display: false
+      },
+      tooltip: {
+        callbacks: {
+          title: (items: any[]) => {
+            const x = items[0]?.parsed?.x
+            if (typeof x !== 'number') return ''
+            return formatDateLikeOriginal(new Date(x), timeColumnFormat.value)
+          }
+        }
       }
     },
     scales: {
@@ -576,7 +622,9 @@ onBeforeUnmount(() => {
         <label>Group By:</label>
         <Select
           v-model="groupColumn"
-          :options="['', ...groupableColumns]"
+          :options="groupColumnOptions"
+          optionLabel="label"
+          optionValue="value"
           placeholder="None"
           class="control-select"
         />

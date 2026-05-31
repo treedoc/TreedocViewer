@@ -5,7 +5,7 @@
 import type { TDNode } from 'treedoc'
 import { TDNodeType, TDJSONWriter, TDJSONWriterOption, TD, NodeFilter, TDObjectCoder, CSVWriter } from 'treedoc'
 import { toRaw } from 'vue'
-import { getTimestampHint, tryParseDate } from './DateUtil'
+import { detectDateFormat, getTimestampHint, tryParseDate, type DateFormatInfo } from './DateUtil'
 
 export type TimeBucket = 'second' | 'minute' | '5min' | '10min' | '30min' | 'hour' | 'day' | 'week' | 'month'
 
@@ -356,6 +356,18 @@ export function detectTimeColumns(data: TableRow[], columns: TableColumn[]): str
   }
 
   return timeColumns
+}
+
+export function detectColumnDateFormat(data: TableRow[], field: string): DateFormatInfo | null {
+  const sampleSize = Math.min(data.length, 50)
+
+  for (let i = 0; i < sampleSize; i++) {
+    const val = getCellAnyValue(data[i], field)
+    const format = detectDateFormat(val)
+    if (format) return format
+  }
+
+  return null
 }
 
 /**

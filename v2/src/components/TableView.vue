@@ -36,8 +36,10 @@ import {
   copyTableData,
   type TableCopyFormat,
   shouldExpandColumns,
-  detectTimeColumns
+  detectTimeColumns,
+  detectColumnDateFormat
 } from '@/utils/TableUtil'
+import { dateToNumericValue, formatDateLikeOriginal } from '@/utils/DateUtil'
 import { matchFieldQuery, matchPattern, createExtendedFieldsFunc, parsePatterns, serializePatterns } from '@/utils/QueryUtil'
 import { getValueColorStyle, applyValueColorsFromColumns } from '@/utils/ValueColorService'
 import { TableDataProcessor, type TableRow as ProcessorTableRow, type ProcessingConfig } from '@/utils/TableDataProcessor'
@@ -552,7 +554,7 @@ function onChartTimeRange(payload: { timeColumn: string; startMs: number | null;
 
   const lower = Math.min(payload.startMs, payload.endMs)
   const upper = Math.max(payload.startMs, payload.endMs)
-  const rangeExpression = buildChartTimeRangeExpression(lower, upper)
+  const rangeExpression = buildChartTimeRangeExpression(lower, upper, payload.timeColumn)
   const existing = fieldQueries.value[payload.timeColumn] || createFieldQuery(payload.timeColumn)
 
   fieldQueries.value[payload.timeColumn] = {
@@ -575,7 +577,32 @@ function clearChartTimeRangeFilter(field: string) {
   }
 }
 
-function buildChartTimeRangeExpression(startMs: number, endMs: number): string {
+function jsString(value: string): string {
+  return JSON.stringify(value)
+}
+
+function buildChartTimeRangeExpression(startMs: number, endMs: number, timeColumn: string): string {
+  const format = detectColumnDateFormat(tableData.value as any, timeColumn)
+  const startDate = new Date(startMs)
+  const endDate = new Date(endMs)
+
+  if (format?.kind === 'number' || format?.kind === 'numeric-string') {
+    const startValue = dateToNumericValue(startDate, format.numericUnit)
+    const endValue = dateToNumericValue(endDate, format.numericUnit)
+    return `${CHART_TIME_RANGE_MARKER} Number($) >= ${startValue} && Number($) <= ${endValue}`
+  }
+
+  if (format?.kind === 'string') {
+    const startValue = formatDateLikeOriginal(startDate, format)
+    const endValue = formatDateLikeOriginal(endDate, format)
+
+    if (format.sortable) {
+      return `${CHART_TIME_RANGE_MARKER} String($ ?? '') >= ${jsString(startValue)} && String($ ?? '') <= ${jsString(endValue)}`
+    }
+
+    return `${CHART_TIME_RANGE_MARKER} (() => { const t = Date.parse(String($ ?? '')); return !Number.isNaN(t) && t >= Date.parse(${jsString(startValue)}) && t <= Date.parse(${jsString(endValue)}); })()`
+  }
+
   return `${CHART_TIME_RANGE_MARKER} Number($) >= ${startMs} && Number($) <= ${endMs}`
 }
 
