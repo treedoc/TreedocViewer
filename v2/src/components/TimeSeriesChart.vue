@@ -56,6 +56,7 @@ const props = defineProps<{
   bucketSizeModel?: TimeBucket
   hiddenGroupsModel?: Set<string>
   showCountModel?: boolean
+  showValueSumModel?: boolean
   valueAggModel?: ValueAggregation
   timeSelectionStartModel?: number | null
   timeSelectionEndModel?: number | null
@@ -73,6 +74,7 @@ const emit = defineEmits<{
   'update:bucketSize': [value: TimeBucket]
   'update:hiddenGroups': [value: Set<string>]
   'update:showCount': [value: boolean]
+  'update:showValueSum': [value: boolean]
   'update:valueAgg': [value: ValueAggregation]
   'update:time-range': [payload: { timeColumn: string; startMs: number | null; endMs: number | null }]
 }>()
@@ -118,6 +120,7 @@ const groupColumns = ref<string[]>(props.groupColumnsModel?.length ? [...props.g
 const effectiveValueColumns = ref<string[]>([...valueColumns.value])
 const effectiveGroupColumns = ref<string[]>([...groupColumns.value])
 const showCount = ref(props.showCountModel ?? true)
+const showValueSum = ref(props.showValueSumModel ?? false)
 const valueAgg = ref<ValueAggregation>(props.valueAggModel ?? 'sum')
 const bucketSize = ref<TimeBucket>(props.bucketSizeModel || 'minute')
 const autoDetectBucket = ref(!props.bucketSizeModel) // Auto-detect only if no saved bucket
@@ -157,6 +160,7 @@ watch(groupColumns, (val) => {
 watch(bucketSize, (val) => emit('update:bucketSize', val))
 watch(hiddenGroups, (val) => emit('update:hiddenGroups', val))
 watch(showCount, (val) => emit('update:showCount', val))
+watch(showValueSum, (val) => emit('update:showValueSum', val))
 watch(valueAgg, (val) => emit('update:valueAgg', val))
 
 watch([valueColumns, groupColumns], () => {
@@ -213,10 +217,12 @@ const groupColumnCardinality = computed<Record<string, number>>(() => {
 const groupColumnOptions = computed(() => {
   return [
     { label: 'None', value: '' },
-    ...groupableColumns.value.map(field => ({
-      label: `${field} (${groupColumnCardinality.value[field] ?? 0})`,
-      value: field,
-    }))
+    ...groupableColumns.value
+      .filter(field => field !== timeColumn.value)
+      .map(field => ({
+        label: `${field} (${groupColumnCardinality.value[field] ?? 0})`,
+        value: field,
+      }))
   ]
 })
 
@@ -257,6 +263,9 @@ watch(groupColumns, (newCols, oldCols) => {
 }, { deep: true })
 
 watch(timeColumn, () => {
+  if (timeColumn.value && groupColumns.value.includes(timeColumn.value)) {
+    groupColumns.value = groupColumns.value.filter(field => field !== timeColumn.value)
+  }
   resetTimeSelection()
 })
 
@@ -448,7 +457,8 @@ function isValueSeriesVisible(series: SeriesSummary, index: number): boolean {
 }
 
 const visibleValueSeries = computed(() => valueSeriesSummaries.value.filter((series, index) => isValueSeriesVisible(series, index)))
-const totalSeriesCount = computed(() => (showCount.value ? (groupedCountEnabled.value ? countGroupKeys.value.length : 1) : 0) + visibleValueSeries.value.length)
+const hasVisibleValueSeries = computed(() => visibleValueSeries.value.length > 0)
+const totalSeriesCount = computed(() => (showCount.value ? (groupedCountEnabled.value ? countGroupKeys.value.length : 1) : 0) + visibleValueSeries.value.length + (showValueSum.value && hasVisibleValueSeries.value ? 1 : 0))
 const allValueSeriesHidden = computed(() => valueSeriesSummaries.value.length > 0 && valueSeriesSummaries.value.every((series, index) => !isValueSeriesVisible(series, index)))
 
 const filteredLegendRows = computed<LegendRow[]>(() => {
@@ -828,6 +838,33 @@ const chartJsData = computed<ChartData<'bar'>>(() => {
       tension: 0.1
     })
   })
+
+  if (showValueSum.value && visibleValueSeries.value.length > 0) {
+    datasets.push({
+      label: `SUM visible ${valueAgg.value.toUpperCase()}`,
+      data: chartBuckets.value.map(bucket => {
+        let sum = 0
+        let count = 0
+        for (const series of visibleValueSeries.value) {
+          const groupKey = getGroupKey(series.groupParts)
+          const value = getValueForStats(bucket.valueGroups[series.valueColumn!]?.[groupKey])
+          if (value === null || !Number.isFinite(value)) continue
+          sum += value
+          count++
+        }
+        return { x: bucket.time.getTime(), y: count > 0 ? sum : null }
+      }),
+      type: 'line' as const,
+      borderColor: 'rgba(17, 24, 39, 1)',
+      backgroundColor: 'rgba(17, 24, 39, 0.14)',
+      borderWidth: 3,
+      pointRadius: 0,
+      yAxisID: 'y1',
+      seriesKey: 'value-sum:visible',
+      seriesKind: 'value-sum',
+      tension: 0.1
+    })
+  }
   
   return { datasets }
 })
@@ -863,7 +900,7 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => {
         labels: {
           filter: (item: any, data: any) => {
             const dataset = data.datasets[item.datasetIndex] as any
-            return dataset?.seriesKind !== 'value'
+            return dataset?.seriesKind !== 'value' && dataset?.seriesKind !== 'value-sum'
           }
         },
         onClick: (evt: any, legendItem: any, legend: any) => {
@@ -1243,6 +1280,11 @@ onBeforeUnmount(() => {
       <label class="control-group checkbox-control">
         <Checkbox v-model="showCount" :binary="true" />
         <span>Count</span>
+      </label>
+
+      <label class="control-group checkbox-control">
+        <Checkbox v-model="showValueSum" :binary="true" :disabled="valueSeriesSummaries.length === 0" />
+        <span>Sum</span>
       </label>
 
       <div class="control-group">

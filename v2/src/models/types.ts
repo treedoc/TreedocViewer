@@ -102,6 +102,7 @@ export interface ChartState {
   bucketSize?: string
   hiddenGroups?: string[]
   showCount?: boolean
+  showValueSum?: boolean
   valueAgg?: 'avg' | 'sum' | 'max'
   timeSelectionStart?: number | null
   timeSelectionEnd?: number | null

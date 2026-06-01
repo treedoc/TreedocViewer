@@ -133,6 +133,7 @@ const chartGroupColumns = ref<string[]>([])
 const chartBucketSize = ref<import('@/utils/TableUtil').TimeBucket>('minute')
 const chartHiddenGroups = ref<Set<string>>(new Set())
 const chartShowCount = ref(true)
+const chartShowValueSum = ref(false)
 const chartValueAgg = ref<'avg' | 'sum' | 'max'>('sum')
 const chartTimeSelectionStart = ref<number | null>(null)
 const chartTimeSelectionEnd = ref<number | null>(null)
@@ -1390,6 +1391,7 @@ function buildTableInternal(node: TDNode | null, restoreState = true) {
       chartBucketSize.value = (cachedState.chartState.bucketSize as import('@/utils/TableUtil').TimeBucket) ?? 'minute'
       chartHiddenGroups.value = new Set(cachedState.chartState.hiddenGroups ?? [])
       chartShowCount.value = cachedState.chartState.showCount ?? true
+      chartShowValueSum.value = cachedState.chartState.showValueSum ?? false
       chartValueAgg.value = cachedState.chartState.valueAgg ?? 'sum'
       chartTimeSelectionStart.value = cachedState.chartState.timeSelectionStart ?? null
       chartTimeSelectionEnd.value = cachedState.chartState.timeSelectionEnd ?? null
@@ -1847,6 +1849,7 @@ function saveCurrentTableState() {
         bucketSize: chartBucketSize.value,
         hiddenGroups: Array.from(chartHiddenGroups.value),
         showCount: chartShowCount.value,
+        showValueSum: chartShowValueSum.value,
         valueAgg: chartValueAgg.value,
         timeSelectionStart: chartTimeSelectionStart.value,
         timeSelectionEnd: chartTimeSelectionEnd.value,
@@ -2180,6 +2183,7 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
       :bucket-size-model="chartBucketSize"
       :hidden-groups-model="chartHiddenGroups"
       :show-count-model="chartShowCount"
+      :show-value-sum-model="chartShowValueSum"
       :value-agg-model="chartValueAgg"
       :time-selection-start-model="chartTimeSelectionStart"
       :time-selection-end-model="chartTimeSelectionEnd"
@@ -2193,6 +2197,7 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
       @update:bucket-size="chartBucketSize = $event"
       @update:hidden-groups="chartHiddenGroups = $event"
       @update:show-count="chartShowCount = $event"
+      @update:show-value-sum="chartShowValueSum = $event"
       @update:value-agg="chartValueAgg = $event"
       @update:time-range="onChartTimeRange"
     />
