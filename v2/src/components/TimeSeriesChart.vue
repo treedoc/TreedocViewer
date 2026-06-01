@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch, onBeforeUnmount } from 'vue'
+import { computed, ref, watch, onBeforeUnmount, nextTick } from 'vue'
 import { Bar } from 'vue-chartjs'
 import {
   Chart as ChartJS,
@@ -25,6 +25,10 @@ import Select from 'primevue/select'
 import MultiSelect from 'primevue/multiselect'
 import Button from 'primevue/button'
 import Checkbox from 'primevue/checkbox'
+import Popover from 'primevue/popover'
+import ColumnFilterBasicControls from './ColumnFilterBasicControls.vue'
+import type { FieldQuery } from '@/models/types'
+import { matchFieldQuery } from '@/utils/QueryUtil'
 
 // Register Chart.js components
 ChartJS.register(
@@ -56,6 +60,7 @@ const props = defineProps<{
   valueAggModel?: ValueAggregation
   timeSelectionStartModel?: number | null
   timeSelectionEndModel?: number | null
+  chartHeight?: number
 }>()
 
 const emit = defineEmits<{
@@ -94,6 +99,14 @@ interface SeriesSummary {
   mean: number
 }
 
+interface LegendRow {
+  series: SeriesSummary
+  originalIndex: number
+}
+
+type LegendSortField = 'name' | 'max' | 'mean' | `group:${number}`
+type LegendSortOrder = 1 | -1
+
 const MAX_RENDERED_SERIES = 100
 const MAX_GROUPED_COUNT_SERIES = 100
 const TOOLTIP_SINGLE_SERIES_THRESHOLD = 30
@@ -106,7 +119,7 @@ const groupColumns = ref<string[]>(props.groupColumnsModel?.length ? [...props.g
 const effectiveValueColumns = ref<string[]>([...valueColumns.value])
 const effectiveGroupColumns = ref<string[]>([...groupColumns.value])
 const showCount = ref(props.showCountModel ?? true)
-const valueAgg = ref<ValueAggregation>(props.valueAggModel ?? 'avg')
+const valueAgg = ref<ValueAggregation>(props.valueAggModel ?? 'sum')
 const bucketSize = ref<TimeBucket>(props.bucketSizeModel || 'minute')
 const autoDetectBucket = ref(!props.bucketSizeModel) // Auto-detect only if no saved bucket
 const isMaximized = ref(false)
@@ -121,8 +134,15 @@ const chartRef = ref<any>(null)
 const isDraggingSelection = ref(false)
 const dragStartClientX = ref(0)
 const dragCurrentClientX = ref(0)
+const legendSortField = ref<LegendSortField>('max')
+const legendSortOrder = ref<LegendSortOrder>(-1)
+const legendFilterQueries = ref<Record<string, FieldQuery>>({})
+const activeLegendFilterField = ref<LegendSortField>('name')
+const activeLegendFilterTitle = ref('Name')
+const legendFilterPopoverRef = ref<InstanceType<typeof Popover> | null>(null)
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
 let resizeTimer: ReturnType<typeof setTimeout> | null = null
+let legendFilterHoverTimer: ReturnType<typeof setTimeout> | null = null
 let pendingResizeClientX: number | null = null
 
 // Emit state changes to parent
@@ -202,8 +222,16 @@ const groupColumnOptions = computed(() => {
 })
 
 const groupMultiSelectOptions = computed(() => groupColumnOptions.value.filter(option => option.value))
-const chartHasData = computed(() => chartBuckets.value.length > 0 && chartJsData.value.datasets.length > 0)
+const chartHasData = computed(() => chartBuckets.value.length > 0 && (showCount.value || valueSeriesSummaries.value.length > 0))
 const canSyncGroupFilter = computed(() => effectiveGroupColumns.value.length === 1 && groupedCountEnabled.value)
+const chartLayoutStyle = computed(() => {
+  if (isMaximized.value) return {}
+  const height = props.chartHeight ?? 250
+  return {
+    height: `${height}px`,
+    minHeight: `${height}px`
+  }
+})
 
 // Auto-select first time column
 watch(timeColumns, (cols) => {
@@ -424,6 +452,204 @@ const visibleValueSeries = computed(() => valueSeriesSummaries.value.filter((ser
 const totalSeriesCount = computed(() => (showCount.value ? (groupedCountEnabled.value ? countGroupKeys.value.length : 1) : 0) + visibleValueSeries.value.length)
 const allValueSeriesHidden = computed(() => valueSeriesSummaries.value.length > 0 && valueSeriesSummaries.value.every((series, index) => !isValueSeriesVisible(series, index)))
 
+const filteredLegendRows = computed<LegendRow[]>(() => {
+  const rows = valueSeriesSummaries.value
+    .map((series, originalIndex) => ({ series, originalIndex }))
+    .filter(({ series }) => {
+      if (!matchesLegendFilter('name', `${series.name} ${series.valueColumn || ''}`)) return false
+
+      for (let index = 0; index < effectiveGroupColumns.value.length; index++) {
+        if (!matchesLegendFilter(`group:${index}`, series.groupParts[index] || '')) return false
+      }
+
+      if (!matchesLegendMetricFilter('max', series.max)) return false
+      if (!matchesLegendMetricFilter('mean', series.mean)) return false
+      return true
+    })
+
+  const field = legendSortField.value
+  const order = legendSortOrder.value
+  return rows.sort((a, b) => compareLegendRows(a, b, field) * order)
+})
+
+function createLegendFilterQuery(field: LegendSortField): FieldQuery {
+  return {
+    field,
+    query: '',
+    isRegex: false,
+    isNegate: false,
+    isArray: false,
+    isPattern: false,
+    isDisabled: false,
+    patternFields: []
+  }
+}
+
+function getLegendFilterQuery(field: LegendSortField): FieldQuery {
+  if (!legendFilterQueries.value[field]) {
+    legendFilterQueries.value[field] = createLegendFilterQuery(field)
+  }
+  return legendFilterQueries.value[field]
+}
+
+const activeLegendFilterQuery = computed(() => getLegendFilterQuery(activeLegendFilterField.value))
+const activeLegendFilterText = computed({
+  get: () => {
+    const query = activeLegendFilterQuery.value
+    if (query.jsExpression) return query.jsExpression === 'true' ? '' : query.jsExpression
+    return query.query || ''
+  },
+  set: (value: string) => {
+    const query = activeLegendFilterQuery.value
+    if (query.jsExpression) {
+      query.jsExpression = value || 'true'
+      query.query = ''
+    } else {
+      query.query = value
+    }
+  }
+})
+const activeLegendFilterIsJs = computed({
+  get: () => !!activeLegendFilterQuery.value.jsExpression,
+  set: (value: boolean) => {
+    const query = activeLegendFilterQuery.value
+    if (value) {
+      query.jsExpression = query.query || 'true'
+      query.query = ''
+      query.isRegex = false
+      query.isNegate = false
+      query.isArray = false
+    } else {
+      query.query = query.jsExpression === 'true' ? '' : query.jsExpression || query.query || ''
+      query.jsExpression = undefined
+    }
+  }
+})
+
+function matchesLegendFilter(field: LegendSortField, value: string): boolean {
+  return matchesLegendFilterValue(field, value, value)
+}
+
+function matchesLegendFilterValue(field: LegendSortField, displayValue: string, rawValue: unknown): boolean {
+  const query = getLegendFilterQuery(field)
+  if (query.isDisabled) return true
+
+  if (query.jsExpression) {
+    if (query.jsExpression === 'true') return true
+    try {
+      const filterFn = new Function('$', `return ${query.jsExpression}`) as (value: unknown) => boolean
+      return !!filterFn(rawValue)
+    } catch {
+      return true
+    }
+  }
+
+  if (!query.query) return true
+  return matchFieldQuery(displayValue, query)
+}
+
+function matchesLegendMetricFilter(field: 'max' | 'mean', value: number): boolean {
+  return matchesLegendFilterValue(field, `${formatMetric(value)} ${String(value)}`, value)
+}
+
+function compareLegendRows(a: LegendRow, b: LegendRow, field: LegendSortField): number {
+  if (field === 'max' || field === 'mean') {
+    const diff = a.series[field] - b.series[field]
+    return diff === 0 ? a.originalIndex - b.originalIndex : diff
+  }
+
+  const aValue = field === 'name'
+    ? a.series.name
+    : a.series.groupParts[Number(field.split(':')[1])] || ''
+  const bValue = field === 'name'
+    ? b.series.name
+    : b.series.groupParts[Number(field.split(':')[1])] || ''
+  const diff = aValue.localeCompare(bValue, undefined, { numeric: true, sensitivity: 'base' })
+  return diff === 0 ? a.originalIndex - b.originalIndex : diff
+}
+
+function setLegendSort(field: LegendSortField) {
+  if (legendSortField.value === field) {
+    legendSortOrder.value = legendSortOrder.value === 1 ? -1 : 1
+  } else {
+    legendSortField.value = field
+    legendSortOrder.value = field === 'max' || field === 'mean' ? -1 : 1
+  }
+}
+
+function getLegendSortIcon(field: LegendSortField): string {
+  if (legendSortField.value !== field) return 'pi pi-sort-alt'
+  return legendSortOrder.value === 1 ? 'pi pi-sort-amount-up-alt' : 'pi pi-sort-amount-down'
+}
+
+function clearLegendFilters() {
+  legendFilterQueries.value = {}
+}
+
+function isLegendFilterActive(field: LegendSortField): boolean {
+  const query = legendFilterQueries.value[field]
+  return (!!query?.query?.trim() || (!!query?.jsExpression && query.jsExpression !== 'true')) && !query.isDisabled
+}
+
+function hasLegendFilter(field: LegendSortField): boolean {
+  const query = legendFilterQueries.value[field]
+  return !!query?.query?.trim() || (!!query?.jsExpression && query.jsExpression !== 'true')
+}
+
+function isLegendFilterDisabled(field: LegendSortField): boolean {
+  const query = legendFilterQueries.value[field]
+  return (!!query?.query?.trim() || (!!query?.jsExpression && query.jsExpression !== 'true')) && !!query.isDisabled
+}
+
+function clearLegendFilter(field: LegendSortField) {
+  legendFilterQueries.value[field] = createLegendFilterQuery(field)
+}
+
+function clearActiveLegendFilter() {
+  clearLegendFilter(activeLegendFilterField.value)
+}
+
+function showLegendFilterPopover(event: Event, field: LegendSortField, title: string) {
+  cancelLegendFilterHover()
+  legendFilterPopoverRef.value?.hide()
+  activeLegendFilterField.value = field
+  activeLegendFilterTitle.value = title
+  nextTick(() => {
+    legendFilterPopoverRef.value?.show(event)
+    setTimeout(() => {
+      const inputEl = document.querySelector('.legend-filter-popover input') as HTMLInputElement | null
+      inputEl?.focus()
+    }, 0)
+  })
+}
+
+function onLegendHeaderMouseEnter(event: MouseEvent, field: LegendSortField, title: string) {
+  const targetElement = event.currentTarget as HTMLElement
+  cancelLegendFilterHover()
+  legendFilterHoverTimer = setTimeout(() => {
+    const fakeEvent = {
+      currentTarget: targetElement,
+      target: targetElement,
+      preventDefault: () => {},
+      stopPropagation: () => {}
+    }
+    showLegendFilterPopover(fakeEvent as unknown as Event, field, title)
+  }, 500)
+}
+
+function cancelLegendFilterHover() {
+  if (legendFilterHoverTimer) {
+    clearTimeout(legendFilterHoverTimer)
+    legendFilterHoverTimer = null
+  }
+}
+
+function onLegendFilterKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') {
+    legendFilterPopoverRef.value?.hide()
+  }
+}
+
 // Color palette for stacked bars
 const colorPalette = [
   { bg: 'rgba(54, 162, 235, 0.6)', border: 'rgba(54, 162, 235, 1)' },
@@ -516,6 +742,16 @@ function getSafeTimeTickConfig(bucket: TimeBucket, range: { min?: number; max?: 
   unit = 'month'
   stepSize = Math.max(1, Math.ceil(rangeMs / (getUnitDuration(unit) * maxGeneratedTicks)))
   return { unit, stepSize }
+}
+
+function getHighlightedTooltipDatasetIndex(chart: any): number | null {
+  const value = chart?.$tdvHighlightedTooltipDatasetIndex
+  return typeof value === 'number' ? value : null
+}
+
+function isHighlightedTooltipItem(item: any): boolean {
+  const tooltipItemCount = item.chart?.tooltip?.dataPoints?.length || 0
+  return tooltipItemCount > 1 && item.datasetIndex === getHighlightedTooltipDatasetIndex(item.chart)
 }
 
 // Calculate time range with padding to include edge data points
@@ -613,6 +849,18 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => {
       mode: totalSeriesCount.value > TOOLTIP_SINGLE_SERIES_THRESHOLD ? 'nearest' : 'index',
       intersect: false
     },
+    onHover: (event: any, _elements: any[], chart: any) => {
+      const nativeEvent = event?.native
+      const nearest = nativeEvent
+        ? chart.getElementsAtEventForMode(nativeEvent, 'nearest', { intersect: false }, false)
+        : []
+      const nextDatasetIndex = nearest[0]?.datasetIndex ?? null
+
+      if (chart.$tdvHighlightedTooltipDatasetIndex !== nextDatasetIndex) {
+        chart.$tdvHighlightedTooltipDatasetIndex = nextDatasetIndex
+        chart.update('none')
+      }
+    },
     plugins: {
       legend: {
         display: showCount.value,
@@ -651,6 +899,24 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => {
             const x = items[0]?.parsed?.x
             if (typeof x !== 'number') return ''
             return formatDateLikeOriginal(new Date(x), timeColumnFormat.value)
+          },
+          label: (item: any) => {
+            const label = item.dataset?.label ? `${item.dataset.label}: ` : ''
+            const marker = isHighlightedTooltipItem(item) ? '▶ ' : ''
+            return `${marker}${label}${item.formattedValue}`
+          },
+          labelTextColor: (item: any) => {
+            return isHighlightedTooltipItem(item) ? '#ffffff' : 'rgba(255, 255, 255, 0.72)'
+          },
+          labelColor: (item: any) => {
+            const dataset = item.dataset || {}
+            const highlighted = isHighlightedTooltipItem(item)
+            return {
+              borderColor: highlighted ? '#ffffff' : dataset.borderColor,
+              backgroundColor: dataset.backgroundColor || dataset.borderColor,
+              borderWidth: highlighted ? 3 : 1,
+              borderRadius: 2
+            }
           }
         }
       }
@@ -728,8 +994,8 @@ const bucketOptions = [
 ]
 
 const valueAggOptions: { label: string; value: ValueAggregation }[] = [
-  { label: 'Avg', value: 'avg' },
   { label: 'Sum', value: 'sum' },
+  { label: 'Avg', value: 'avg' },
   { label: 'Max', value: 'max' }
 ]
 
@@ -774,9 +1040,9 @@ function toggleAllValueSeries() {
   const nextExplicitlyShown = new Set<string>()
 
   if (allValueSeriesHidden.value) {
-    valueSeriesSummaries.value.forEach((series, index) => {
-      if (index < MAX_RENDERED_SERIES) next.delete(series.key)
-      else next.add(series.key)
+    filteredLegendRows.value.forEach(({ series, originalIndex }) => {
+      next.delete(series.key)
+      if (originalIndex >= MAX_RENDERED_SERIES) nextExplicitlyShown.add(series.key)
     })
   } else {
     for (const series of valueSeriesSummaries.value) next.add(series.key)
@@ -803,13 +1069,13 @@ function updateLegendResize(event: MouseEvent) {
   resizeTimer = setTimeout(() => {
     resizeTimer = null
     if (pendingResizeClientX == null) return
-    legendWidth.value = Math.max(220, Math.min(520, legendResizeRight.value - pendingResizeClientX))
+    legendWidth.value = Math.max(220, legendResizeRight.value - pendingResizeClientX)
   }, 32)
 }
 
 function stopLegendResize() {
   if (pendingResizeClientX != null) {
-    legendWidth.value = Math.max(220, Math.min(520, legendResizeRight.value - pendingResizeClientX))
+    legendWidth.value = Math.max(220, legendResizeRight.value - pendingResizeClientX)
     pendingResizeClientX = null
   }
   if (resizeTimer) {
@@ -909,6 +1175,7 @@ function endTimeSelectionDrag() {
 onBeforeUnmount(() => {
   if (debounceTimer) clearTimeout(debounceTimer)
   if (resizeTimer) clearTimeout(resizeTimer)
+  if (legendFilterHoverTimer) clearTimeout(legendFilterHoverTimer)
   window.removeEventListener('mousemove', updateTimeSelectionDrag)
   window.removeEventListener('mouseup', endTimeSelectionDrag)
   window.removeEventListener('mousemove', updateLegendResize)
@@ -1028,6 +1295,7 @@ onBeforeUnmount(() => {
     <div
       class="chart-layout"
       :class="{ maximized: isMaximized }"
+      :style="chartLayoutStyle"
       v-if="timeColumn && chartHasData"
     >
       <div class="chart-container" @mousedown.capture="startTimeSelectionDrag">
@@ -1061,56 +1329,161 @@ onBeforeUnmount(() => {
                   size="small"
                   severity="secondary"
                   @click="toggleAllValueSeries"
-                  v-tooltip.top="allValueSeriesHidden ? 'Show all value series' : 'Hide all value series'"
+                  v-tooltip.top="allValueSeriesHidden ? 'Show matching value series' : 'Hide all value series'"
                 />
               </th>
               <th class="color-col"></th>
-              <th>Name</th>
               <th
-                v-for="groupColumnName in effectiveGroupColumns"
-                :key="groupColumnName"
+                class="legend-filterable-header"
+                @mouseenter="onLegendHeaderMouseEnter($event, 'name', 'Name')"
+                @mouseleave="cancelLegendFilterHover"
               >
-                {{ groupColumnName }}
+                <div class="legend-header-content">
+                  <button
+                    type="button"
+                    class="legend-sort-button"
+                    :class="{ 'has-filter': isLegendFilterActive('name'), 'has-disabled-filter': isLegendFilterDisabled('name') }"
+                    @click="setLegendSort('name')"
+                  >
+                    <span>Name</span>
+                    <i :class="getLegendSortIcon('name')"></i>
+                  </button>
+                  <i
+                    class="pi pi-filter legend-filter-indicator"
+                    :class="{ active: isLegendFilterActive('name'), 'filter-disabled': isLegendFilterDisabled('name') }"
+                    @click.stop="showLegendFilterPopover($event, 'name', 'Name')"
+                  ></i>
+                </div>
               </th>
-              <th class="numeric-col">Max</th>
-              <th class="numeric-col">Mean</th>
+              <th
+                v-for="(groupColumnName, groupIndex) in effectiveGroupColumns"
+                :key="groupColumnName"
+                class="legend-filterable-header"
+                @mouseenter="onLegendHeaderMouseEnter($event, `group:${groupIndex}`, groupColumnName)"
+                @mouseleave="cancelLegendFilterHover"
+              >
+                <div class="legend-header-content">
+                  <button
+                    type="button"
+                    class="legend-sort-button"
+                    :class="{ 'has-filter': isLegendFilterActive(`group:${groupIndex}`), 'has-disabled-filter': isLegendFilterDisabled(`group:${groupIndex}`) }"
+                    @click="setLegendSort(`group:${groupIndex}`)"
+                  >
+                    <span>{{ groupColumnName }}</span>
+                    <i :class="getLegendSortIcon(`group:${groupIndex}`)"></i>
+                  </button>
+                  <i
+                    class="pi pi-filter legend-filter-indicator"
+                    :class="{ active: isLegendFilterActive(`group:${groupIndex}`), 'filter-disabled': isLegendFilterDisabled(`group:${groupIndex}`) }"
+                    @click.stop="showLegendFilterPopover($event, `group:${groupIndex}`, groupColumnName)"
+                  ></i>
+                </div>
+              </th>
+              <th
+                class="numeric-col legend-filterable-header"
+                @mouseenter="onLegendHeaderMouseEnter($event, 'max', 'Max')"
+                @mouseleave="cancelLegendFilterHover"
+              >
+                <div class="legend-header-content">
+                  <button
+                    type="button"
+                    class="legend-sort-button numeric-sort"
+                    :class="{ 'has-filter': isLegendFilterActive('max'), 'has-disabled-filter': isLegendFilterDisabled('max') }"
+                    @click="setLegendSort('max')"
+                  >
+                    <span>Max</span>
+                    <i :class="getLegendSortIcon('max')"></i>
+                  </button>
+                  <i
+                    class="pi pi-filter legend-filter-indicator"
+                    :class="{ active: isLegendFilterActive('max'), 'filter-disabled': isLegendFilterDisabled('max') }"
+                    @click.stop="showLegendFilterPopover($event, 'max', 'Max')"
+                  ></i>
+                </div>
+              </th>
+              <th
+                class="numeric-col legend-filterable-header"
+                @mouseenter="onLegendHeaderMouseEnter($event, 'mean', 'Mean')"
+                @mouseleave="cancelLegendFilterHover"
+              >
+                <div class="legend-header-content">
+                  <button
+                    type="button"
+                    class="legend-sort-button numeric-sort"
+                    :class="{ 'has-filter': isLegendFilterActive('mean'), 'has-disabled-filter': isLegendFilterDisabled('mean') }"
+                    @click="setLegendSort('mean')"
+                  >
+                    <span>Mean</span>
+                    <i :class="getLegendSortIcon('mean')"></i>
+                  </button>
+                  <i
+                    class="pi pi-filter legend-filter-indicator"
+                    :class="{ active: isLegendFilterActive('mean'), 'filter-disabled': isLegendFilterDisabled('mean') }"
+                    @click.stop="showLegendFilterPopover($event, 'mean', 'Mean')"
+                  ></i>
+                </div>
+              </th>
             </tr>
           </thead>
           <tbody>
-            <tr
-              v-for="(series, index) in valueSeriesSummaries"
-              :key="series.key"
-              :class="{ hidden: !isValueSeriesVisible(series, index) }"
-            >
-              <td class="visibility-col">
-                <Button
-                  :icon="isValueSeriesVisible(series, index) ? 'pi pi-eye' : 'pi pi-eye-slash'"
-                  text
-                  size="small"
-                  severity="secondary"
-                  @click="toggleSeriesVisibility(series, index)"
-                  v-tooltip.top="isValueSeriesVisible(series, index) ? 'Hide series' : 'Show series'"
-                />
+            <tr v-if="filteredLegendRows.length === 0">
+              <td class="legend-empty" :colspan="effectiveGroupColumns.length + 5">
+                No series match the legend filters
               </td>
-              <td class="color-col">
-                <span
-                  class="series-color"
-                  :style="{ backgroundColor: getSeriesColor(series).border }"
-                />
-              </td>
-              <td class="series-name" :title="series.name">{{ series.valueColumn }}</td>
-              <td
-                v-for="(_, index) in effectiveGroupColumns"
-                :key="`${series.key}:${index}`"
-                :title="series.groupParts[index] || ''"
-              >
-                {{ series.groupParts[index] || '' }}
-              </td>
-              <td class="numeric-col">{{ formatMetric(series.max) }}</td>
-              <td class="numeric-col">{{ formatMetric(series.mean) }}</td>
             </tr>
+            <template v-else>
+              <tr
+                v-for="{ series, originalIndex } in filteredLegendRows"
+                :key="series.key"
+                :class="{ hidden: !isValueSeriesVisible(series, originalIndex) }"
+              >
+                <td class="visibility-col">
+                  <Button
+                    :icon="isValueSeriesVisible(series, originalIndex) ? 'pi pi-eye' : 'pi pi-eye-slash'"
+                    text
+                    size="small"
+                    severity="secondary"
+                    @click="toggleSeriesVisibility(series, originalIndex)"
+                    v-tooltip.top="isValueSeriesVisible(series, originalIndex) ? 'Hide series' : 'Show series'"
+                  />
+                </td>
+                <td class="color-col">
+                  <span
+                    class="series-color"
+                    :style="{ backgroundColor: getSeriesColor(series).border }"
+                  />
+                </td>
+                <td class="series-name" :title="series.name">{{ series.valueColumn }}</td>
+                <td
+                  v-for="(_, index) in effectiveGroupColumns"
+                  :key="`${series.key}:${index}`"
+                  :title="series.groupParts[index] || ''"
+                >
+                  {{ series.groupParts[index] || '' }}
+                </td>
+                <td class="numeric-col">{{ formatMetric(series.max) }}</td>
+                <td class="numeric-col">{{ formatMetric(series.mean) }}</td>
+              </tr>
+            </template>
           </tbody>
         </table>
+        <Popover ref="legendFilterPopoverRef" appendTo="body" class="legend-filter-popover">
+          <div class="legend-filter-popover-content">
+            <ColumnFilterBasicControls
+              v-model:query="activeLegendFilterText"
+              v-model:is-regex="activeLegendFilterQuery.isRegex"
+              v-model:is-negate="activeLegendFilterQuery.isNegate"
+              v-model:is-array="activeLegendFilterQuery.isArray"
+              v-model:is-disabled="activeLegendFilterQuery.isDisabled"
+              v-model:is-js="activeLegendFilterIsJs"
+              :field="activeLegendFilterTitle"
+              :show-js="true"
+              :show-hide-column="false"
+              @clear="clearActiveLegendFilter"
+              @keydown="onLegendFilterKeydown"
+            />
+          </div>
+        </Popover>
       </aside>
     </div>
     
@@ -1231,7 +1604,6 @@ onBeforeUnmount(() => {
 .value-legend {
   flex: 0 0 auto;
   min-width: 220px;
-  max-width: 520px;
   overflow: auto;
   border-left: 1px solid var(--tdv-surface-border);
 }
@@ -1257,9 +1629,98 @@ onBeforeUnmount(() => {
   position: sticky;
   top: 0;
   z-index: 1;
+  overflow: visible;
   background: var(--tdv-surface);
   color: var(--tdv-text-muted);
   font-weight: 600;
+}
+
+.legend-header-content {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 4px;
+}
+
+.legend-sort-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.legend-sort-button span {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.legend-sort-button i {
+  flex: 0 0 auto;
+  font-size: 0.7rem;
+  opacity: 0.75;
+}
+
+.legend-sort-button.has-filter {
+  color: var(--tdv-success);
+}
+
+.legend-sort-button.has-disabled-filter {
+  color: var(--tdv-warning, #f59e0b);
+  font-style: italic;
+}
+
+.numeric-sort {
+  justify-content: flex-end;
+}
+
+.legend-filter-indicator {
+  flex: 0 0 auto;
+  font-size: 0.65rem;
+  opacity: 0;
+}
+
+.legend-filterable-header:hover .legend-filter-indicator,
+.legend-filterable-header:focus-within .legend-filter-indicator,
+.legend-filter-indicator.active {
+  opacity: 0.8;
+}
+
+.legend-filter-indicator.active {
+  color: var(--tdv-primary);
+}
+
+.legend-filter-indicator.filter-disabled {
+  color: var(--tdv-warning, #f59e0b);
+}
+
+:global(.legend-filter-popover.p-popover) {
+  max-width: 360px;
+}
+
+:global(.legend-filter-popover .p-popover-content) {
+  padding: 8px;
+}
+
+.legend-filter-popover-content {
+  width: 320px;
+}
+
+.legend-empty {
+  padding: 18px 8px !important;
+  color: var(--tdv-text-muted);
+  text-align: center !important;
 }
 
 .value-legend tr.hidden {

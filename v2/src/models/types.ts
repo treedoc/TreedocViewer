@@ -106,6 +106,7 @@ export interface ChartState {
   timeSelectionStart?: number | null
   timeSelectionEnd?: number | null
   timeSelectionColumn?: string
+  chartHeight?: number
 }
 
 export interface TableNodeState {

@@ -133,10 +133,16 @@ const chartGroupColumns = ref<string[]>([])
 const chartBucketSize = ref<import('@/utils/TableUtil').TimeBucket>('minute')
 const chartHiddenGroups = ref<Set<string>>(new Set())
 const chartShowCount = ref(true)
-const chartValueAgg = ref<'avg' | 'sum' | 'max'>('avg')
+const chartValueAgg = ref<'avg' | 'sum' | 'max'>('sum')
 const chartTimeSelectionStart = ref<number | null>(null)
 const chartTimeSelectionEnd = ref<number | null>(null)
 const chartTimeSelectionColumn = ref('')
+const chartHeight = ref(250)
+const isResizingChartHeight = ref(false)
+let chartResizeStartY = 0
+let chartResizeStartHeight = 250
+const CHART_HEIGHT_MIN = 160
+const TABLE_HEIGHT_MIN = 180
 
 const activeFilterColumn = ref<TableColumn | null>(null)
 const columnFilterRef = ref<InstanceType<typeof ColumnFilterDialog> | null>(null)
@@ -996,6 +1002,38 @@ function onTableMouseDown(event: MouseEvent) {
   onCellMouseDown(event, cell.rowIndex, cell.field)
 }
 
+function getChartHeightMax(): number {
+  const rootHeight = tableViewRootRef.value?.getBoundingClientRect().height || 0
+  if (!rootHeight) return Number.POSITIVE_INFINITY
+  return Math.max(CHART_HEIGHT_MIN, rootHeight - TABLE_HEIGHT_MIN)
+}
+
+function clampChartHeight(value: number): number {
+  return Math.max(CHART_HEIGHT_MIN, Math.min(getChartHeightMax(), value))
+}
+
+function startChartHeightResize(event: MouseEvent) {
+  if (event.button !== 0) return
+  chartResizeStartY = event.clientY
+  chartResizeStartHeight = chartHeight.value
+  isResizingChartHeight.value = true
+  window.addEventListener('mousemove', updateChartHeightResize)
+  window.addEventListener('mouseup', stopChartHeightResize)
+  event.preventDefault()
+}
+
+function updateChartHeightResize(event: MouseEvent) {
+  if (!isResizingChartHeight.value) return
+  chartHeight.value = clampChartHeight(chartResizeStartHeight + event.clientY - chartResizeStartY)
+}
+
+function stopChartHeightResize() {
+  if (!isResizingChartHeight.value) return
+  isResizingChartHeight.value = false
+  window.removeEventListener('mousemove', updateChartHeightResize)
+  window.removeEventListener('mouseup', stopChartHeightResize)
+}
+
 function onCellMouseEnter(rowIndex: number, field: string) {
   if (!isDraggingSelection.value || !tableSelection.value) return
 
@@ -1352,10 +1390,11 @@ function buildTableInternal(node: TDNode | null, restoreState = true) {
       chartBucketSize.value = (cachedState.chartState.bucketSize as import('@/utils/TableUtil').TimeBucket) ?? 'minute'
       chartHiddenGroups.value = new Set(cachedState.chartState.hiddenGroups ?? [])
       chartShowCount.value = cachedState.chartState.showCount ?? true
-      chartValueAgg.value = cachedState.chartState.valueAgg ?? 'avg'
+      chartValueAgg.value = cachedState.chartState.valueAgg ?? 'sum'
       chartTimeSelectionStart.value = cachedState.chartState.timeSelectionStart ?? null
       chartTimeSelectionEnd.value = cachedState.chartState.timeSelectionEnd ?? null
       chartTimeSelectionColumn.value = cachedState.chartState.timeSelectionColumn ?? ''
+      chartHeight.value = cachedState.chartState.chartHeight ?? 250
     }
   } else if (!cachedState) {
     // First time visiting this node - auto-detect
@@ -1811,7 +1850,8 @@ function saveCurrentTableState() {
         valueAgg: chartValueAgg.value,
         timeSelectionStart: chartTimeSelectionStart.value,
         timeSelectionEnd: chartTimeSelectionEnd.value,
-        timeSelectionColumn: chartTimeSelectionColumn.value
+        timeSelectionColumn: chartTimeSelectionColumn.value,
+        chartHeight: chartHeight.value
       }
     }
     store.saveTableState(toRaw(node), stateToSave)
@@ -1821,6 +1861,8 @@ function saveCurrentTableState() {
 // Save state before component unmounts (e.g., when toggling fullscreen)
 onBeforeUnmount(() => {
   window.removeEventListener('mouseup', finishSelectionDrag)
+  window.removeEventListener('mousemove', updateChartHeightResize)
+  window.removeEventListener('mouseup', stopChartHeightResize)
   clearJsQueryDebounceTimer()
   saveCurrentTableState()
 })
@@ -1869,6 +1911,7 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
   <div
     ref="tableViewRootRef"
     class="table-view"
+    :class="{ 'chart-height-resizing': isResizingChartHeight }"
     tabindex="0"
     @keydown="onTableKeyDown"
   >
@@ -2128,6 +2171,7 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
       v-if="showChart && hasTimeColumns"
       :data="filteredData as any"
       :columns="columns as any"
+      :chart-height="chartHeight"
       :time-column-model="chartTimeColumn"
       :value-column-model="chartValueColumn"
       :value-columns-model="chartValueColumns"
@@ -2151,6 +2195,13 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
       @update:show-count="chartShowCount = $event"
       @update:value-agg="chartValueAgg = $event"
       @update:time-range="onChartTimeRange"
+    />
+
+    <div
+      v-if="showChart && hasTimeColumns"
+      class="chart-table-divider"
+      :class="{ resizing: isResizingChartHeight }"
+      @mousedown="startChartHeightResize"
     />
     
     <div
@@ -2463,6 +2514,39 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
   border-radius: 3px;
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.7rem;
+}
+
+.chart-table-divider {
+  flex: 0 0 7px;
+  margin-top: -8px;
+  cursor: row-resize;
+  border-top: 1px solid var(--tdv-surface-border);
+  border-bottom: 1px solid var(--tdv-surface-border);
+  background: var(--tdv-surface-light);
+  position: relative;
+  z-index: 2;
+}
+
+.chart-table-divider:hover,
+.chart-table-divider.resizing {
+  background: var(--tdv-hover-bg);
+}
+
+.chart-table-divider::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 42px;
+  height: 2px;
+  border-top: 1px solid var(--tdv-text-muted);
+  border-bottom: 1px solid var(--tdv-text-muted);
+  opacity: 0.45;
+  transform: translate(-50%, -50%);
+}
+
+.table-view.chart-height-resizing {
+  user-select: none;
 }
 
 .table-content {

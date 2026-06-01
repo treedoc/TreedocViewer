@@ -13,6 +13,8 @@ const props = defineProps<{
   isDisabled?: boolean
   isJs?: boolean
   showAdvanced?: boolean
+  showJs?: boolean
+  showHideColumn?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -119,6 +121,7 @@ const localIsJs = computed({
       :disabled="localIsDisabled || localIsJs"
     />
     <ToggleButton
+      v-if="showJs !== false"
       v-model="localIsJs"
       onLabel="JS"
       offLabel="JS"
@@ -153,6 +156,7 @@ const localIsJs = computed({
       v-tooltip.top="'Open advanced filter'"
     />
     <Button
+      v-if="showHideColumn !== false"
       icon="pi pi-eye-slash"
       size="small"
       text
