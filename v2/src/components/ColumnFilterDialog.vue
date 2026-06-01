@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
 import { debounce } from 'lodash-es'
-import Popover from 'primevue/popover'
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
 import ProgressBar from 'primevue/progressbar'
 import MultiSelect from 'primevue/multiselect'
 import HoverButtonBar, { type HoverButton } from './HoverButtonBar.vue'
 import ColumnFilterBasicControls from './ColumnFilterBasicControls.vue'
+import BasicColumnFilterPopover from './BasicColumnFilterPopover.vue'
 import type { TDNode } from 'treedoc'
 import { TDNodeType, TDJSONWriter, TDJSONWriterOption } from 'treedoc'
 import type { FieldQuery } from '@/models/types'
@@ -83,6 +83,7 @@ function valueToSearchString(value: any): string {
 
 // Popover ref for programmatic control
 const popoverRef = ref()
+const compactFilterPopoverRef = ref<InstanceType<typeof BasicColumnFilterPopover> | null>(null)
 let autoCloseTimer: ReturnType<typeof setTimeout> | null = null
 let autoCloseOnShow = false
 const isPopoverVisible = ref(false)
@@ -136,7 +137,7 @@ function handleDocumentPointerDown(event: PointerEvent) {
 // Expose methods for parent to control popover
 function show(event: Event, options: { autoClose?: boolean } = {}) {
   autoCloseOnShow = !!options.autoClose
-  popoverRef.value?.show(event)
+  compactFilterPopoverRef.value?.show(event, options)
 }
 
 function hide() {
@@ -145,11 +146,11 @@ function hide() {
   isPopoverVisible.value = false
   document.removeEventListener('mousemove', handleDocumentMouseMove)
   document.removeEventListener('pointerdown', handleDocumentPointerDown, true)
-  popoverRef.value?.hide()
+  compactFilterPopoverRef.value?.hide()
 }
 
 function toggle(event: Event) {
-  popoverRef.value?.toggle(event)
+  compactFilterPopoverRef.value?.toggle(event)
 }
 
 function resetSize() {
@@ -1010,33 +1011,24 @@ function toggleColorPicker(value: string) {
 </script>
 
 <template>
-  <Popover
-    ref="popoverRef"
-    appendTo="body"
-    :baseZIndex="1100"
-    @show="onPopoverShow"
-    @hide="onPopoverHide"
-    :style="{ width: compactPopoverWidth + 'px' }"
-    class="column-filter-popover"
-  >
-    <div class="compact-filter-content">
-      <ColumnFilterBasicControls
-        v-model:query="localQuery"
-        v-model:is-regex="localIsRegex"
-        v-model:is-negate="localIsNegate"
-        v-model:is-array="localIsArray"
-        v-model:is-disabled="localIsDisabled"
-        v-model:is-js="localIsJs"
-        :field="field"
-        :show-advanced="true"
-        @apply="debouncedApplyFilter"
-        @clear="clearFilter"
-        @keydown="handleKeydown"
-        @advanced="openAdvancedOverlay"
-        @hide-column="emit('hide-column'); hide()"
-      />
-    </div>
-  </Popover>
+  <BasicColumnFilterPopover
+    ref="compactFilterPopoverRef"
+    v-model:query="localQuery"
+    v-model:is-regex="localIsRegex"
+    v-model:is-negate="localIsNegate"
+    v-model:is-array="localIsArray"
+    v-model:is-disabled="localIsDisabled"
+    v-model:is-js="localIsJs"
+    :field="field"
+    :show-advanced="true"
+    popover-class="column-filter-popover"
+    :width="compactPopoverWidth"
+    @apply="debouncedApplyFilter"
+    @clear="clearFilter"
+    @keydown="handleKeydown"
+    @advanced="openAdvancedOverlay"
+    @hide-column="emit('hide-column'); hide()"
+  />
 
   <Dialog
     v-model:visible="showAdvancedOverlay"

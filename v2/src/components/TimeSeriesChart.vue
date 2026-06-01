@@ -25,8 +25,7 @@ import Select from 'primevue/select'
 import MultiSelect from 'primevue/multiselect'
 import Button from 'primevue/button'
 import Checkbox from 'primevue/checkbox'
-import Popover from 'primevue/popover'
-import ColumnFilterBasicControls from './ColumnFilterBasicControls.vue'
+import BasicColumnFilterPopover from './BasicColumnFilterPopover.vue'
 import type { FieldQuery } from '@/models/types'
 import { matchFieldQuery } from '@/utils/QueryUtil'
 
@@ -139,7 +138,7 @@ const legendSortOrder = ref<LegendSortOrder>(-1)
 const legendFilterQueries = ref<Record<string, FieldQuery>>({})
 const activeLegendFilterField = ref<LegendSortField>('name')
 const activeLegendFilterTitle = ref('Name')
-const legendFilterPopoverRef = ref<InstanceType<typeof Popover> | null>(null)
+const legendFilterPopoverRef = ref<InstanceType<typeof BasicColumnFilterPopover> | null>(null)
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
 let resizeTimer: ReturnType<typeof setTimeout> | null = null
 let legendFilterHoverTimer: ReturnType<typeof setTimeout> | null = null
@@ -616,10 +615,6 @@ function showLegendFilterPopover(event: Event, field: LegendSortField, title: st
   activeLegendFilterTitle.value = title
   nextTick(() => {
     legendFilterPopoverRef.value?.show(event)
-    setTimeout(() => {
-      const inputEl = document.querySelector('.legend-filter-popover input') as HTMLInputElement | null
-      inputEl?.focus()
-    }, 0)
   })
 }
 
@@ -1467,23 +1462,22 @@ onBeforeUnmount(() => {
             </template>
           </tbody>
         </table>
-        <Popover ref="legendFilterPopoverRef" appendTo="body" class="legend-filter-popover">
-          <div class="legend-filter-popover-content">
-            <ColumnFilterBasicControls
-              v-model:query="activeLegendFilterText"
-              v-model:is-regex="activeLegendFilterQuery.isRegex"
-              v-model:is-negate="activeLegendFilterQuery.isNegate"
-              v-model:is-array="activeLegendFilterQuery.isArray"
-              v-model:is-disabled="activeLegendFilterQuery.isDisabled"
-              v-model:is-js="activeLegendFilterIsJs"
-              :field="activeLegendFilterTitle"
-              :show-js="true"
-              :show-hide-column="false"
-              @clear="clearActiveLegendFilter"
-              @keydown="onLegendFilterKeydown"
-            />
-          </div>
-        </Popover>
+        <BasicColumnFilterPopover
+          ref="legendFilterPopoverRef"
+          v-model:query="activeLegendFilterText"
+          v-model:is-regex="activeLegendFilterQuery.isRegex"
+          v-model:is-negate="activeLegendFilterQuery.isNegate"
+          v-model:is-array="activeLegendFilterQuery.isArray"
+          v-model:is-disabled="activeLegendFilterQuery.isDisabled"
+          v-model:is-js="activeLegendFilterIsJs"
+          :field="activeLegendFilterTitle"
+          :show-js="true"
+          :show-hide-column="false"
+          popover-class="legend-filter-popover"
+          :width="320"
+          @clear="clearActiveLegendFilter"
+          @keydown="onLegendFilterKeydown"
+        />
       </aside>
     </div>
     
@@ -1612,12 +1606,13 @@ onBeforeUnmount(() => {
   width: 100%;
   border-collapse: collapse;
   table-layout: fixed;
-  font-size: 0.78rem;
+  font-size: 0.72rem;
+  line-height: 1.15;
 }
 
 .value-legend th,
 .value-legend td {
-  padding: 5px 6px;
+  padding: 2px 4px;
   border-bottom: 1px solid var(--tdv-surface-border);
   white-space: nowrap;
   overflow: hidden;
@@ -1639,14 +1634,14 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   min-width: 0;
-  gap: 4px;
+  gap: 2px;
 }
 
 .legend-sort-button {
   display: inline-flex;
   align-items: center;
   justify-content: flex-start;
-  gap: 4px;
+  gap: 2px;
   width: 100%;
   min-width: 0;
   padding: 0;
@@ -1668,7 +1663,7 @@ onBeforeUnmount(() => {
 
 .legend-sort-button i {
   flex: 0 0 auto;
-  font-size: 0.7rem;
+  font-size: 0.62rem;
   opacity: 0.75;
 }
 
@@ -1687,7 +1682,7 @@ onBeforeUnmount(() => {
 
 .legend-filter-indicator {
   flex: 0 0 auto;
-  font-size: 0.65rem;
+  font-size: 0.6rem;
   opacity: 0;
 }
 
@@ -1718,7 +1713,7 @@ onBeforeUnmount(() => {
 }
 
 .legend-empty {
-  padding: 18px 8px !important;
+  padding: 10px 6px !important;
   color: var(--tdv-text-muted);
   text-align: center !important;
 }
@@ -1728,19 +1723,29 @@ onBeforeUnmount(() => {
 }
 
 .visibility-col {
-  width: 34px;
+  width: 26px;
   text-align: center;
 }
 
 .color-col {
-  width: 22px;
+  width: 16px;
   text-align: center;
+}
+
+.value-legend .visibility-col :deep(.p-button) {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+}
+
+.value-legend .visibility-col :deep(.p-button-icon) {
+  font-size: 0.72rem;
 }
 
 .series-color {
   display: inline-block;
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   vertical-align: middle;
 }
@@ -1750,7 +1755,7 @@ onBeforeUnmount(() => {
 }
 
 .numeric-col {
-  width: 68px;
+  width: 58px;
   text-align: right !important;
 }
 
