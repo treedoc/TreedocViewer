@@ -2199,6 +2199,7 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
       @update:show-count="chartShowCount = $event"
       @update:show-value-sum="chartShowValueSum = $event"
       @update:value-agg="chartValueAgg = $event"
+      @update:chart-height="chartHeight = clampChartHeight($event)"
       @update:time-range="onChartTimeRange"
     />
 

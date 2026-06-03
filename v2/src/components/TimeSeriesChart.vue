@@ -76,6 +76,7 @@ const emit = defineEmits<{
   'update:showCount': [value: boolean]
   'update:showValueSum': [value: boolean]
   'update:valueAgg': [value: ValueAggregation]
+  'update:chartHeight': [value: number]
   'update:time-range': [payload: { timeColumn: string; startMs: number | null; endMs: number | null }]
 }>()
 
@@ -142,6 +143,7 @@ const legendFilterQueries = ref<Record<string, FieldQuery>>({})
 const activeLegendFilterField = ref<LegendSortField>('name')
 const activeLegendFilterTitle = ref('Name')
 const legendFilterPopoverRef = ref<InstanceType<typeof BasicColumnFilterPopover> | null>(null)
+const previousChartHeight = ref<number | null>(null)
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
 let resizeTimer: ReturnType<typeof setTimeout> | null = null
 let legendFilterHoverTimer: ReturnType<typeof setTimeout> | null = null
@@ -230,7 +232,6 @@ const groupMultiSelectOptions = computed(() => groupColumnOptions.value.filter(o
 const chartHasData = computed(() => chartBuckets.value.length > 0 && (showCount.value || valueSeriesSummaries.value.length > 0))
 const canSyncGroupFilter = computed(() => effectiveGroupColumns.value.length === 1 && groupedCountEnabled.value)
 const chartLayoutStyle = computed(() => {
-  if (isMaximized.value) return {}
   const height = props.chartHeight ?? 250
   return {
     height: `${height}px`,
@@ -655,6 +656,19 @@ function onLegendFilterKeydown(event: KeyboardEvent) {
   }
 }
 
+function toggleMaximizedChart() {
+  if (isMaximized.value) {
+    isMaximized.value = false
+    emit('update:chartHeight', previousChartHeight.value ?? 250)
+    previousChartHeight.value = null
+    return
+  }
+
+  previousChartHeight.value = props.chartHeight ?? 250
+  isMaximized.value = true
+  emit('update:chartHeight', Math.max(400, window.innerHeight - 300))
+}
+
 // Color palette for stacked bars
 const colorPalette = [
   { bg: 'rgba(54, 162, 235, 0.6)', border: 'rgba(54, 162, 235, 1)' },
@@ -926,6 +940,9 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => {
         display: false
       },
       tooltip: {
+        backgroundColor: 'rgba(17, 24, 39, 0.6)',
+        borderColor: 'rgba(255, 255, 255, 0.18)',
+        borderWidth: 1,
         callbacks: {
           title: (items: any[]) => {
             const x = items[0]?.parsed?.x
@@ -1316,7 +1333,7 @@ onBeforeUnmount(() => {
           :icon="isMaximized ? 'pi pi-window-minimize' : 'pi pi-window-maximize'"
           text
           severity="secondary"
-          @click="isMaximized = !isMaximized"
+          @click="toggleMaximizedChart"
           v-tooltip.top="isMaximized ? 'Minimize chart' : 'Maximize chart'"
         />
         <Button
@@ -1600,11 +1617,6 @@ onBeforeUnmount(() => {
   min-height: 250px;
   height: 250px;
   transition: height 0.2s ease;
-}
-
-.chart-layout.maximized {
-  height: calc(100vh - 300px);
-  min-height: 400px;
 }
 
 .chart-container {
