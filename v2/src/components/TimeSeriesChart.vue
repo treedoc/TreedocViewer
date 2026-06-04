@@ -53,6 +53,7 @@ const props = defineProps<{
   valueColumnsModel?: string[]
   groupColumnModel?: string
   groupColumnsModel?: string[]
+  groupFilterValues?: string[] | null
   bucketSizeModel?: TimeBucket
   hiddenGroupsModel?: Set<string>
   showCountModel?: boolean
@@ -108,11 +109,25 @@ interface LegendRow {
 
 type LegendSortField = 'name' | 'max' | 'mean' | `group:${number}`
 type LegendSortOrder = 1 | -1
+type LegendColumnKey = LegendSortField
 
 const MAX_RENDERED_SERIES = 100
 const MAX_GROUPED_COUNT_SERIES = 100
 const TOOLTIP_SINGLE_SERIES_THRESHOLD = 30
 const DEBOUNCE_MS = 250
+const LEGEND_VISIBILITY_COL_WIDTH = 26
+const LEGEND_COLOR_COL_WIDTH = 16
+const LEGEND_COLUMN_DEFAULT_WIDTHS: Record<string, number> = {
+  name: 130,
+  max: 58,
+  mean: 58,
+}
+const LEGEND_COLUMN_MIN_WIDTHS: Record<string, number> = {
+  name: 80,
+  max: 48,
+  mean: 48,
+  group: 64,
+}
 
 // State - use props if provided, otherwise use local state
 const timeColumn = ref<string>(props.timeColumnModel || '')
@@ -144,10 +159,14 @@ const activeLegendFilterField = ref<LegendSortField>('name')
 const activeLegendFilterTitle = ref('Name')
 const legendFilterPopoverRef = ref<InstanceType<typeof BasicColumnFilterPopover> | null>(null)
 const previousChartHeight = ref<number | null>(null)
+const legendColumnWidths = ref<Record<string, number>>({})
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
 let resizeTimer: ReturnType<typeof setTimeout> | null = null
 let legendFilterHoverTimer: ReturnType<typeof setTimeout> | null = null
 let pendingResizeClientX: number | null = null
+let resizingLegendColumnKey: LegendColumnKey | null = null
+let legendColumnResizeStartX = 0
+let legendColumnResizeStartWidth = 0
 
 // Emit state changes to parent
 watch(timeColumn, (val) => emit('update:timeColumn', val))
@@ -229,8 +248,13 @@ const groupColumnOptions = computed(() => {
 })
 
 const groupMultiSelectOptions = computed(() => groupColumnOptions.value.filter(option => option.value))
-const chartHasData = computed(() => chartBuckets.value.length > 0 && (showCount.value || valueSeriesSummaries.value.length > 0))
-const canSyncGroupFilter = computed(() => effectiveGroupColumns.value.length === 1 && groupedCountEnabled.value)
+const countSeriesCount = computed(() => {
+  if (!showCount.value) return 0
+  if (effectiveGroupColumns.value.length === 0) return 1
+  if (groupedCountEnabled.value) return visibleCountGroupKeys.value.length
+  return visibleCountGroupKeys.value.length > MAX_GROUPED_COUNT_SERIES ? 1 : 0
+})
+const chartHasData = computed(() => chartBuckets.value.length > 0 && (countSeriesCount.value > 0 || valueSeriesSummaries.value.length > 0))
 const chartLayoutStyle = computed(() => {
   const height = props.chartHeight ?? 250
   return {
@@ -395,7 +419,34 @@ const countGroupKeys = computed(() => {
   return Array.from(keys).sort()
 })
 
-const groupedCountEnabled = computed(() => effectiveGroupColumns.value.length > 0 && countGroupKeys.value.length <= MAX_GROUPED_COUNT_SERIES)
+const visibleCountGroupKeys = computed(() => {
+  let keys = countGroupKeys.value
+
+  // Table group filters are the source of truth when they are simple selected-value filters.
+  if (
+    effectiveGroupColumns.value.length === 1
+    && props.groupFilterValues
+    && props.groupFilterValues.length > 0
+  ) {
+    const selected = new Set(props.groupFilterValues)
+    keys = keys.filter(key => selected.has(key))
+  }
+
+  // When the group selection table is visible, count follows the same visible group selection.
+  if (effectiveValueColumns.value.length > 0 && effectiveGroupColumns.value.length > 0) {
+    keys = keys.filter(key => valueSeriesSummaries.value.some((series, index) => {
+      return getGroupKey(series.groupParts) === key && isValueSeriesVisible(series, index)
+    }))
+  }
+
+  return keys
+})
+
+const groupedCountEnabled = computed(() => {
+  return effectiveGroupColumns.value.length > 0
+    && visibleCountGroupKeys.value.length > 0
+    && visibleCountGroupKeys.value.length <= MAX_GROUPED_COUNT_SERIES
+})
 
 function aggregateValues(values: number[]): { max: number; mean: number } {
   if (values.length === 0) return { max: 0, mean: 0 }
@@ -459,8 +510,28 @@ function isValueSeriesVisible(series: SeriesSummary, index: number): boolean {
 
 const visibleValueSeries = computed(() => valueSeriesSummaries.value.filter((series, index) => isValueSeriesVisible(series, index)))
 const hasVisibleValueSeries = computed(() => visibleValueSeries.value.length > 0)
-const totalSeriesCount = computed(() => (showCount.value ? (groupedCountEnabled.value ? countGroupKeys.value.length : 1) : 0) + visibleValueSeries.value.length + (showValueSum.value && hasVisibleValueSeries.value ? 1 : 0))
+const totalSeriesCount = computed(() => countSeriesCount.value + visibleValueSeries.value.length + (showValueSum.value && hasVisibleValueSeries.value ? 1 : 0))
 const allValueSeriesHidden = computed(() => valueSeriesSummaries.value.length > 0 && valueSeriesSummaries.value.every((series, index) => !isValueSeriesVisible(series, index)))
+
+const legendResizableColumnKeys = computed<LegendColumnKey[]>(() => [
+  'name',
+  ...effectiveGroupColumns.value.map((_, index) => `group:${index}` as const),
+  'max',
+  'mean',
+])
+
+function getLegendColumnWidth(key: LegendColumnKey): number {
+  return legendColumnWidths.value[key] ?? LEGEND_COLUMN_DEFAULT_WIDTHS[key] ?? 120
+}
+
+function getLegendColumnMinWidth(key: LegendColumnKey): number {
+  return key.startsWith('group:') ? LEGEND_COLUMN_MIN_WIDTHS.group : LEGEND_COLUMN_MIN_WIDTHS[key] ?? 48
+}
+
+const legendTableWidth = computed(() => {
+  const resizableWidth = legendResizableColumnKeys.value.reduce((sum, key) => sum + getLegendColumnWidth(key), 0)
+  return LEGEND_VISIBILITY_COL_WIDTH + LEGEND_COLOR_COL_WIDTH + resizableWidth
+})
 
 const filteredLegendRows = computed<LegendRow[]>(() => {
   const rows = valueSeriesSummaries.value
@@ -804,8 +875,8 @@ const effectiveTimeRange = computed(() => {
 const chartJsData = computed<ChartData<'bar'>>(() => {
   const datasets: any[] = []
   
-  if (showCount.value && groupedCountEnabled.value && countGroupKeys.value.length > 0) {
-    countGroupKeys.value.forEach((group, index) => {
+  if (showCount.value && groupedCountEnabled.value && visibleCountGroupKeys.value.length > 0) {
+    visibleCountGroupKeys.value.forEach((group, index) => {
       const color = colorPalette[index % colorPalette.length]
       const key = `count:${group}`
       datasets.push({
@@ -816,11 +887,16 @@ const chartJsData = computed<ChartData<'bar'>>(() => {
         borderWidth: 1,
         yAxisID: 'y',
         stack: 'stack0',
-        seriesKey: key,
-        hidden: hiddenGroups.value.has(key)
+        seriesKey: key
       })
     })
-  } else if (showCount.value) {
+  } else if (
+    showCount.value
+    && (
+      effectiveGroupColumns.value.length === 0
+      || visibleCountGroupKeys.value.length > MAX_GROUPED_COUNT_SERIES
+    )
+  ) {
     datasets.push({
       label: 'Row Count',
       data: chartBuckets.value.map(d => ({ x: d.time.getTime(), y: d.count })),
@@ -885,7 +961,7 @@ const chartJsData = computed<ChartData<'bar'>>(() => {
 
 // Chart.js options
 const chartOptions = computed<ChartOptions<'bar'>>(() => {
-  const isStacked = !!(showCount.value && groupedCountEnabled.value)
+  const isStacked = !!(showCount.value && groupedCountEnabled.value && visibleCountGroupKeys.value.length > 0)
   const tickConfig = getSafeTimeTickConfig(bucketSize.value, effectiveTimeRange.value)
   
   const options: ChartOptions<'bar'> = {
@@ -909,30 +985,12 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => {
     },
     plugins: {
       legend: {
-        display: showCount.value,
+        display: false,
         position: 'top',
         labels: {
           filter: (item: any, data: any) => {
             const dataset = data.datasets[item.datasetIndex] as any
             return dataset?.seriesKind !== 'value' && dataset?.seriesKind !== 'value-sum'
-          }
-        },
-        onClick: (evt: any, legendItem: any, legend: any) => {
-          const dataset = legend.chart.data.datasets[legendItem.datasetIndex] as any
-          if (dataset?.seriesKind === 'value') return
-          const seriesKey = dataset?.seriesKey
-          if (seriesKey) {
-            const newHiddenGroups = new Set(hiddenGroups.value)
-            if (newHiddenGroups.has(seriesKey)) newHiddenGroups.delete(seriesKey)
-            else newHiddenGroups.add(seriesKey)
-            hiddenGroups.value = newHiddenGroups
-          } else {
-            // No grouping - use default Chart.js behavior
-            const index = legendItem.datasetIndex
-            const ci = legend.chart
-            const meta = ci.getDatasetMeta(index)
-            meta.hidden = !meta.hidden
-            ci.update()
           }
         }
       },
@@ -1052,17 +1110,6 @@ function onBucketChange() {
   autoDetectBucket.value = false
 }
 
-function syncGroupsToTable() {
-  if (effectiveGroupColumns.value.length !== 1 || !groupedCountEnabled.value) return
-  const field = effectiveGroupColumns.value[0]
-  const visibleGroups = countGroupKeys.value.filter(g => !hiddenGroups.value.has(`count:${g}`))
-  if (visibleGroups.length === countGroupKeys.value.length) {
-    emit('update:groupFilter', field, [])
-    return
-  }
-  emit('update:groupFilter', field, visibleGroups)
-}
-
 function formatMetric(value: number): string {
   if (!Number.isFinite(value)) return ''
   return Math.abs(value) >= 1000 ? value.toLocaleString(undefined, { maximumFractionDigits: 1 }) : value.toLocaleString(undefined, { maximumFractionDigits: 3 })
@@ -1134,6 +1181,32 @@ function stopLegendResize() {
   isResizingLegend.value = false
   window.removeEventListener('mousemove', updateLegendResize)
   window.removeEventListener('mouseup', stopLegendResize)
+}
+
+function startLegendColumnResize(event: MouseEvent, key: LegendColumnKey) {
+  resizingLegendColumnKey = key
+  legendColumnResizeStartX = event.clientX
+  legendColumnResizeStartWidth = getLegendColumnWidth(key)
+  window.addEventListener('mousemove', updateLegendColumnResize)
+  window.addEventListener('mouseup', stopLegendColumnResize)
+  event.preventDefault()
+  event.stopPropagation()
+}
+
+function updateLegendColumnResize(event: MouseEvent) {
+  if (!resizingLegendColumnKey) return
+  const minWidth = getLegendColumnMinWidth(resizingLegendColumnKey)
+  const width = Math.max(minWidth, legendColumnResizeStartWidth + event.clientX - legendColumnResizeStartX)
+  legendColumnWidths.value = {
+    ...legendColumnWidths.value,
+    [resizingLegendColumnKey]: Math.round(width),
+  }
+}
+
+function stopLegendColumnResize() {
+  resizingLegendColumnKey = null
+  window.removeEventListener('mousemove', updateLegendColumnResize)
+  window.removeEventListener('mouseup', stopLegendColumnResize)
 }
 
 function getChartTimeFromClientX(clientX: number): number | null {
@@ -1229,6 +1302,8 @@ onBeforeUnmount(() => {
   window.removeEventListener('mouseup', endTimeSelectionDrag)
   window.removeEventListener('mousemove', updateLegendResize)
   window.removeEventListener('mouseup', stopLegendResize)
+  window.removeEventListener('mousemove', updateLegendColumnResize)
+  window.removeEventListener('mouseup', stopLegendColumnResize)
 })
 </script>
 
@@ -1316,18 +1391,6 @@ onBeforeUnmount(() => {
         />
       </div>
 
-      <div class="control-group">
-        <Button
-          icon="pi pi-sync"
-          size="small"
-          text
-          severity="secondary"
-          :disabled="!canSyncGroupFilter"
-          @click="syncGroupsToTable"
-          v-tooltip.top="canSyncGroupFilter ? 'Sync group selection to table' : 'Sync requires one grouped count column'"
-        />
-      </div>
-      
       <div class="chart-actions">
         <Button
           :icon="isMaximized ? 'pi pi-window-minimize' : 'pi pi-window-maximize'"
@@ -1373,7 +1436,19 @@ onBeforeUnmount(() => {
         class="value-legend"
         :style="{ width: `${legendWidth}px` }"
       >
-        <table>
+        <table :style="{ minWidth: `${legendTableWidth}px` }">
+          <colgroup>
+            <col :style="{ width: `${LEGEND_VISIBILITY_COL_WIDTH}px` }" />
+            <col :style="{ width: `${LEGEND_COLOR_COL_WIDTH}px` }" />
+            <col :style="{ width: `${getLegendColumnWidth('name')}px` }" />
+            <col
+              v-for="(_, groupIndex) in effectiveGroupColumns"
+              :key="`group-col:${groupIndex}`"
+              :style="{ width: `${getLegendColumnWidth(`group:${groupIndex}`)}px` }"
+            />
+            <col :style="{ width: `${getLegendColumnWidth('max')}px` }" />
+            <col :style="{ width: `${getLegendColumnWidth('mean')}px` }" />
+          </colgroup>
           <thead>
             <tr>
               <th class="visibility-col">
@@ -1388,7 +1463,7 @@ onBeforeUnmount(() => {
               </th>
               <th class="color-col"></th>
               <th
-                class="legend-filterable-header"
+                class="legend-filterable-header legend-resizable-header"
                 @mouseenter="onLegendHeaderMouseEnter($event, 'name', 'Name')"
                 @mouseleave="cancelLegendFilterHover"
               >
@@ -1408,11 +1483,15 @@ onBeforeUnmount(() => {
                     @click.stop="showLegendFilterPopover($event, 'name', 'Name')"
                   ></i>
                 </div>
+                <span
+                  class="legend-column-resize-handle"
+                  @mousedown="startLegendColumnResize($event, 'name')"
+                />
               </th>
               <th
                 v-for="(groupColumnName, groupIndex) in effectiveGroupColumns"
                 :key="groupColumnName"
-                class="legend-filterable-header"
+                class="legend-filterable-header legend-resizable-header"
                 @mouseenter="onLegendHeaderMouseEnter($event, `group:${groupIndex}`, groupColumnName)"
                 @mouseleave="cancelLegendFilterHover"
               >
@@ -1432,9 +1511,13 @@ onBeforeUnmount(() => {
                     @click.stop="showLegendFilterPopover($event, `group:${groupIndex}`, groupColumnName)"
                   ></i>
                 </div>
+                <span
+                  class="legend-column-resize-handle"
+                  @mousedown="startLegendColumnResize($event, `group:${groupIndex}`)"
+                />
               </th>
               <th
-                class="numeric-col legend-filterable-header"
+                class="numeric-col legend-filterable-header legend-resizable-header"
                 @mouseenter="onLegendHeaderMouseEnter($event, 'max', 'Max')"
                 @mouseleave="cancelLegendFilterHover"
               >
@@ -1454,9 +1537,13 @@ onBeforeUnmount(() => {
                     @click.stop="showLegendFilterPopover($event, 'max', 'Max')"
                   ></i>
                 </div>
+                <span
+                  class="legend-column-resize-handle"
+                  @mousedown="startLegendColumnResize($event, 'max')"
+                />
               </th>
               <th
-                class="numeric-col legend-filterable-header"
+                class="numeric-col legend-filterable-header legend-resizable-header"
                 @mouseenter="onLegendHeaderMouseEnter($event, 'mean', 'Mean')"
                 @mouseleave="cancelLegendFilterHover"
               >
@@ -1476,6 +1563,10 @@ onBeforeUnmount(() => {
                     @click.stop="showLegendFilterPopover($event, 'mean', 'Mean')"
                   ></i>
                 </div>
+                <span
+                  class="legend-column-resize-handle"
+                  @mousedown="startLegendColumnResize($event, 'mean')"
+                />
               </th>
             </tr>
           </thead>
@@ -1684,6 +1775,36 @@ onBeforeUnmount(() => {
   font-weight: 600;
 }
 
+.legend-resizable-header {
+  position: sticky;
+  padding-right: 8px;
+}
+
+.legend-column-resize-handle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 8px;
+  cursor: col-resize;
+  z-index: 2;
+}
+
+.legend-column-resize-handle::after {
+  content: '';
+  position: absolute;
+  top: 4px;
+  right: 0;
+  bottom: 4px;
+  width: 1px;
+  background: var(--tdv-surface-border);
+  opacity: 0;
+}
+
+.legend-resizable-header:hover .legend-column-resize-handle::after {
+  opacity: 1;
+}
+
 .legend-header-content {
   display: flex;
   align-items: center;
@@ -1809,7 +1930,6 @@ onBeforeUnmount(() => {
 }
 
 .numeric-col {
-  width: 58px;
   text-align: right !important;
 }
 

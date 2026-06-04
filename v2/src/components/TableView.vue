@@ -344,6 +344,18 @@ const activeFilterCount = computed(() => {
   return columnFilterCount + (hasJsQueryFilter ? 1 : 0)
 })
 
+const chartGroupFilterValues = computed<string[] | null>(() => {
+  if (chartGroupColumns.value.length !== 1) return null
+
+  const query = fieldQueries.value[chartGroupColumns.value[0]]
+  if (!query?.query || query.isDisabled || !query.isArray || query.isNegate || query.isRegex || query.isPattern || query.jsExpression) {
+    return null
+  }
+
+  const values = query.query.split(',').map(value => value.trim()).filter(Boolean)
+  return values.length > 0 ? values : null
+})
+
 const visibleColumns = computed(() => {
   return columns.value.filter(col => col.visible)
 })
@@ -934,6 +946,16 @@ function isSelectionInteractiveTarget(target: EventTarget | null, field: string)
   return !isRowSelectionColumn(field) && !!target.closest('a')
 }
 
+function isNativeTextSelectionTarget(target: EventTarget | null): boolean {
+  return target instanceof HTMLElement && !!target.closest('.selectable-cell-text')
+}
+
+function onCellTextMouseDown(event: MouseEvent) {
+  if (!event.shiftKey) {
+    event.stopPropagation()
+  }
+}
+
 function getSelectionCellFromEvent(event: MouseEvent): { rowIndex: number, field: string } | null {
   if (!(event.target instanceof HTMLElement)) return null
   const cell = event.target.closest('.cell-outer')
@@ -959,6 +981,7 @@ function finishSelectionDrag() {
 
 function onCellMouseDown(event: MouseEvent, rowIndex: number, field: string) {
   if (event.button !== 0) return
+  if (!event.shiftKey && isNativeTextSelectionTarget(event.target)) return
   if (!event.shiftKey && isSelectionInteractiveTarget(event.target, field)) return
 
   const colIndex = getVisibleColumnIndex(field)
@@ -997,9 +1020,10 @@ function onCellMouseDown(event: MouseEvent, rowIndex: number, field: string) {
 }
 
 function onTableMouseDown(event: MouseEvent) {
-  tableViewRootRef.value?.focus()
   const cell = getSelectionCellFromEvent(event)
   if (!cell) return
+  if (!event.shiftKey && isNativeTextSelectionTarget(event.target)) return
+  tableViewRootRef.value?.focus()
   onCellMouseDown(event, cell.rowIndex, cell.field)
 }
 
@@ -2180,6 +2204,7 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
       :value-columns-model="chartValueColumns"
       :group-column-model="chartGroupColumn"
       :group-columns-model="chartGroupColumns"
+      :group-filter-values="chartGroupFilterValues"
       :bucket-size-model="chartBucketSize"
       :hidden-groups-model="chartHiddenGroups"
       :show-count-model="chartShowCount"
@@ -2279,7 +2304,9 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
                   <template v-if="isKeyColumn(col.field)">
                     <a 
                       href="#" 
-                      class="key-link"
+                      class="key-link selectable-cell-text"
+                      :draggable="false"
+                      @mousedown="onCellTextMouseDown"
                       @click.prevent="nodeClicked(getRowNodePath(data))"
                     >
                       {{ getCellValue(data, col.field) }}
@@ -2288,7 +2315,9 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
                   <template v-else-if="isComplexValue(data, col.field)">
                     <a 
                       href="#" 
-                      class="complex-value-link"
+                      class="complex-value-link selectable-cell-text"
+                      :draggable="false"
+                      @mousedown="onCellTextMouseDown"
                       @click.prevent="nodeClicked(['', ...getCellNode(data, col.field)!.path])"
                     >
                       <span class="complex-value-summary" :style="{ whiteSpace: whiteSpaceStyle }">
@@ -2301,7 +2330,9 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
                       v-if="evaluateLinkExpression(data, col.field)"
                       :href="evaluateLinkExpression(data, col.field)!"
                       target="_blank"
-                      class="cell-link"
+                      class="cell-link selectable-cell-text"
+                      :draggable="false"
+                      @mousedown="onCellTextMouseDown"
                     >
                       <SimpleValue
                         :tnode="getCellNode(data, col.field)!"
@@ -2314,6 +2345,8 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
                       :tnode="getCellNode(data, col.field)!"
                       :is-in-table="true"
                       :text-wrap="textWrap"
+                      class="selectable-cell-text"
+                      @mousedown="onCellTextMouseDown"
                       @node-clicked="nodeClicked([$event])"
                     />
                   </template>
@@ -2322,11 +2355,18 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
                       v-if="evaluateLinkExpression(data, col.field)"
                       :href="evaluateLinkExpression(data, col.field)!"
                       target="_blank"
-                      class="cell-link"
+                      class="cell-link selectable-cell-text"
+                      :draggable="false"
+                      @mousedown="onCellTextMouseDown"
                     >
                       <span class="simple-cell-value" :style="{ whiteSpace: whiteSpaceStyle }">{{ getCellValue(data, col.field) }}</span>
                     </a>
-                    <span v-else class="simple-cell-value" :style="{ whiteSpace: whiteSpaceStyle }">{{ getCellValue(data, col.field) }}</span>
+                    <span
+                      v-else
+                      class="simple-cell-value selectable-cell-text"
+                      :style="{ whiteSpace: whiteSpaceStyle }"
+                      @mousedown="onCellTextMouseDown"
+                    >{{ getCellValue(data, col.field) }}</span>
                   </template>
                 </div>
               </div>
@@ -2633,6 +2673,8 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
   align-items: center;
   gap: 6px;
   width: 100%;
+  min-width: 0;
+  overflow: hidden;
   cursor: pointer;
 }
 
@@ -2642,7 +2684,11 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
 
 .column-title {
   font-weight: 600;
-  flex: 1;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .column-title.has-filter {
@@ -2655,6 +2701,7 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
 }
 
 .column-filter-indicator {
+  flex: 0 0 auto;
   font-size: 0.75rem;
   color: var(--tdv-success);
 }
@@ -2712,6 +2759,12 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
   max-width: 100%;
   overflow-wrap: anywhere;
   /* white-space is controlled by inline style via whiteSpaceStyle computed property */
+}
+
+:global(.selectable-cell-text),
+:global(.selectable-cell-text *) {
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .empty-table {
@@ -2854,6 +2907,7 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
   font-size: 0.85rem;
   padding: 4px 4px;
   border-right: 1px solid var(--tdv-surface-border);
+  overflow: hidden;
 }
 
 :deep(.p-datatable-thead > tr > th:last-child) {
@@ -2878,7 +2932,26 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
   border-right: none;
 }
 
-:deep(.p-column-header-content) {
+:deep(.p-column-header-content),
+:deep(.p-datatable-column-header-content) {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   width: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+
+:deep(.p-column-title) {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+
+:deep(.p-sortable-column-icon),
+:deep(.p-datatable-sort-icon),
+:deep([data-pc-section="sort"]),
+:deep(.p-sortable-column-badge) {
+  flex: 0 0 auto;
 }
 </style>

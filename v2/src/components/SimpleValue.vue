@@ -154,6 +154,7 @@ function handleRefClick() {
 }
 
 .value-pre {
+  display: inline-block;
   margin: 0;
   font-family: inherit;
   overflow-wrap: anywhere;
