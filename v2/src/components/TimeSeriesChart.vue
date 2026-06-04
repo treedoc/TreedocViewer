@@ -166,6 +166,11 @@ let resizingLegendColumnKey: LegendColumnKey | null = null
 let legendColumnResizeStartX = 0
 let legendColumnResizeStartWidth = 0
 
+function sameStringArray(a: string[], b?: string[]) {
+  if (!b || a.length !== b.length) return false
+  return a.every((item, index) => item === b[index])
+}
+
 // Emit state changes to parent
 watch(timeColumn, (val) => emit('update:timeColumn', val))
 watch(valueColumns, (val) => {
@@ -181,6 +186,41 @@ watch(showValueSum, (val) => emit('update:showValueSum', val))
 watch(valueAgg, (val) => emit('update:valueAgg', val))
 watch(() => props.showStatusModel, (val) => {
   isMaximized.value = val === 'maximized'
+})
+watch(() => props.timeColumnModel, (val) => {
+  const next = val || ''
+  if (timeColumn.value !== next) timeColumn.value = next
+})
+watch(() => props.valueColumnsModel, (val) => {
+  if (!sameStringArray(valueColumns.value, val)) {
+    valueColumns.value = val ? [...val] : []
+  }
+}, { deep: true })
+watch(() => props.groupColumnsModel, (val) => {
+  if (!sameStringArray(groupColumns.value, val)) {
+    groupColumns.value = val ? [...val] : []
+  }
+}, { deep: true })
+watch(() => props.bucketSizeModel, (val) => {
+  if (val && bucketSize.value !== val) bucketSize.value = val
+})
+watch(() => props.hiddenGroupsModel, (val) => {
+  const next = val ? new Set<string>(val) : new Set<string>()
+  if (hiddenGroups.value.size !== next.size || [...hiddenGroups.value].some(item => !next.has(item))) {
+    hiddenGroups.value = next
+  }
+})
+watch(() => props.showCountModel, (val) => {
+  const next = val ?? true
+  if (showCount.value !== next) showCount.value = next
+})
+watch(() => props.showValueSumModel, (val) => {
+  const next = val ?? false
+  if (showValueSum.value !== next) showValueSum.value = next
+})
+watch(() => props.valueAggModel, (val) => {
+  const next = val ?? 'sum'
+  if (valueAgg.value !== next) valueAgg.value = next
 })
 
 watch([valueColumns, groupColumns], () => {

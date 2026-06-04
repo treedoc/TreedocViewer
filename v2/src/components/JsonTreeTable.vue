@@ -396,8 +396,9 @@ function applyInitialPreset() {
     const pathRules = [...(presetData.pathRules ?? [])]
     if (props.options?.globalRule) {
       pathRules.push({
-        ...props.options.globalRule,
         pathPattern: '**',
+        columns: [],
+        ...props.options.globalRule,
       })
     }
     

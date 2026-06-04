@@ -128,7 +128,7 @@ export interface TDVOptions {
   showSource?: boolean
   showTree?: boolean
   parsers?: ParserPlugin[]
-  globalRule?: Omit<PathRule, 'pathPattern'>
+  globalRule?: Partial<Omit<PathRule, 'pathPattern'>>
 }
 
 /**

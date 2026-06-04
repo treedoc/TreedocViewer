@@ -87,13 +87,22 @@ The application supports URL parameters for embedding and configuration:
 | `data` | JSON string to display |
 | `dataUrl` | URL to fetch data from |
 | `initialPath` | Initial node path to navigate to |
-| `title` | Custom title for the app |
+| `title` | Custom title for the app. Prefer `option.title` for new links. |
+| `option` | JSONEx encoded viewer options, such as `{title:My Data,maxPane:table}` |
+| `preset` | JSONEx encoded table preset |
 | `embeddedId` | Enable embedded mode for iframe communication |
 
 Example:
 ```
 http://localhost:5173/?data={"name":"test"}&initialPath=/name&title=My Data
 ```
+
+Time-series table and maximized chart example:
+```
+https://www.treedoc.org/?data=[{ts:"2026-06-01T00:00:00Z",service:api,count:8},{ts:"2026-06-01T00:00:00Z",service:web,count:5},{ts:"2026-06-01T01:00:00Z",service:api,count:12},{ts:"2026-06-01T01:00:00Z",service:web,count:7}]&initialPath=/&option={title:"Time Series Demo",maxPane:table,globalRule:{chartState:{showStatus:maximized,timeColumn:ts,valueColumns:[count],groupColumns:[service],showCount:true,bucketSize:hour}}}#/
+```
+
+In that URL, `maxPane:table` opens the table pane maximized, and `globalRule.chartState.showStatus:maximized` opens the chart inside the table in its maximized state. `globalRule` is a shortcut for a preset path rule with `pathPattern:"**"`; only provide the attributes you want to override. The example is intentionally unencoded for readability; encode `data` and `option` values when generating production links.
 
 ### Embedded Mode (iframe)
 

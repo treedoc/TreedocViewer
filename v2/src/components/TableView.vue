@@ -395,7 +395,6 @@ const isApplyingPreset = ref(false)
 // Apply a ChartState (from per-node cache or from a preset/share-link) to the
 // chart-related refs. Centralized so the restore path and preset path stay in sync.
 function applyChartState(cs: ChartState) {
-  chartShowStatus.value = cs.showStatus ?? 'hidden'
   chartTimeColumn.value = cs.timeColumn ?? ''
   chartValueColumns.value = cs.valueColumns ?? []
   chartGroupColumns.value = cs.groupColumns ?? []
@@ -407,7 +406,8 @@ function applyChartState(cs: ChartState) {
   chartTimeSelectionStart.value = cs.timeSelectionStart ?? null
   chartTimeSelectionEnd.value = cs.timeSelectionEnd ?? null
   chartTimeSelectionColumn.value = cs.timeSelectionColumn ?? ''
-  chartHeight.value = cs.chartHeight ?? 250
+  chartHeight.value = clampChartHeight(cs.chartHeight ?? (cs.showStatus === 'maximized' ? Math.max(400, window.innerHeight - 300) : 250))
+  chartShowStatus.value = cs.showStatus ?? 'hidden'
 }
 
 function applyPreset(preset: QueryPreset) {
