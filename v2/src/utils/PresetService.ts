@@ -16,6 +16,7 @@ function cleanPathRuleForSave(rule: PathRule): PathRule {
     ...(rule.jsQuery ? { jsQuery: rule.jsQuery } : {}),
     ...(rule.jsQueryDisabled ? { jsQueryDisabled: rule.jsQueryDisabled } : {}),
     ...(rule.expandLevel !== undefined ? { expandLevel: rule.expandLevel } : {}),
+    ...(rule.chartState ? { chartState: rule.chartState } : {}),
   }
 }
 import { TD } from 'treedoc'

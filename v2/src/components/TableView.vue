@@ -22,7 +22,7 @@ import AutoCompleteInput from './AutoCompleteInput.vue'
 import PresetSelector from './PresetSelector.vue'
 import TimeSeriesChart from './TimeSeriesChart.vue'
 import HoverButtonBar, { type HoverButton } from './HoverButtonBar.vue'
-import type { QueryPreset, FieldQuery, Column, TableNodeState } from '@/models/types'
+import type { QueryPreset, FieldQuery, Column, TableNodeState, ChartState } from '@/models/types'
 import { columnsToFieldQueries, getPresetConfigForPath } from '@/models/types'
 import type { ExpandState } from './ExpandControl.vue'
 import type { ColumnVisibility } from './ColumnSelector.vue'
@@ -388,6 +388,26 @@ const presetColumnVisibility = ref<Map<string, boolean> | null>(null)
 const isApplyingPreset = ref(false)
 
 // Apply a loaded preset
+// Apply a ChartState (from per-node cache or from a preset/share-link) to the
+// chart-related refs. Centralized so the restore path and preset path stay in sync.
+function applyChartState(cs: ChartState) {
+  showChart.value = cs.showChart ?? false
+  chartTimeColumn.value = cs.timeColumn ?? ''
+  chartValueColumn.value = cs.valueColumn ?? ''
+  chartValueColumns.value = cs.valueColumns ?? (cs.valueColumn ? [cs.valueColumn] : [])
+  chartGroupColumn.value = cs.groupColumn ?? ''
+  chartGroupColumns.value = cs.groupColumns ?? (cs.groupColumn ? [cs.groupColumn] : [])
+  chartBucketSize.value = (cs.bucketSize as import('@/utils/TableUtil').TimeBucket) ?? 'minute'
+  chartHiddenGroups.value = new Set(cs.hiddenGroups ?? [])
+  chartShowCount.value = cs.showCount ?? true
+  chartShowValueSum.value = cs.showValueSum ?? false
+  chartValueAgg.value = cs.valueAgg ?? 'sum'
+  chartTimeSelectionStart.value = cs.timeSelectionStart ?? null
+  chartTimeSelectionEnd.value = cs.timeSelectionEnd ?? null
+  chartTimeSelectionColumn.value = cs.timeSelectionColumn ?? ''
+  chartHeight.value = cs.chartHeight ?? 250
+}
+
 function applyPreset(preset: QueryPreset) {
   // The selectedPresetName should already be set by PresetSelector via v-model
   // but let's ensure it's set in case it wasn't
@@ -434,6 +454,14 @@ function applyPreset(preset: QueryPreset) {
 
   // Rebuild table to apply changes (derived columns will be positioned using presetColumnOrder)
   rebuildTable()
+
+  // Apply chart configuration from the preset, if any. This lets a share link /
+  // embed open directly into a configured time-series chart. Deferred to next tick
+  // so the rebuilt columns exist before the chart reads them.
+  if (config.chartState) {
+    const cs = config.chartState
+    nextTick(() => applyChartState(cs))
+  }
 }
 
 const rawSelectedNode = computed(() => {
@@ -1406,21 +1434,7 @@ function buildTableInternal(node: TDNode | null, restoreState = true) {
     }
     // Restore chart state
     if (cachedState.chartState) {
-      showChart.value = cachedState.chartState.showChart ?? false
-      chartTimeColumn.value = cachedState.chartState.timeColumn ?? ''
-      chartValueColumn.value = cachedState.chartState.valueColumn ?? ''
-      chartValueColumns.value = cachedState.chartState.valueColumns ?? (cachedState.chartState.valueColumn ? [cachedState.chartState.valueColumn] : [])
-      chartGroupColumn.value = cachedState.chartState.groupColumn ?? ''
-      chartGroupColumns.value = cachedState.chartState.groupColumns ?? (cachedState.chartState.groupColumn ? [cachedState.chartState.groupColumn] : [])
-      chartBucketSize.value = (cachedState.chartState.bucketSize as import('@/utils/TableUtil').TimeBucket) ?? 'minute'
-      chartHiddenGroups.value = new Set(cachedState.chartState.hiddenGroups ?? [])
-      chartShowCount.value = cachedState.chartState.showCount ?? true
-      chartShowValueSum.value = cachedState.chartState.showValueSum ?? false
-      chartValueAgg.value = cachedState.chartState.valueAgg ?? 'sum'
-      chartTimeSelectionStart.value = cachedState.chartState.timeSelectionStart ?? null
-      chartTimeSelectionEnd.value = cachedState.chartState.timeSelectionEnd ?? null
-      chartTimeSelectionColumn.value = cachedState.chartState.timeSelectionColumn ?? ''
-      chartHeight.value = cachedState.chartState.chartHeight ?? 250
+      applyChartState(cachedState.chartState)
     }
   } else if (!cachedState) {
     // First time visiting this node - auto-detect

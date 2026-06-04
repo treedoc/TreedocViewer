@@ -139,6 +139,9 @@ export interface PathRule {
   jsQuery?: string
   jsQueryDisabled?: boolean
   expandLevel?: number
+  // Optional chart configuration applied when this rule matches. Lets a preset
+  // (or a share link / embed) open directly into a configured time-series chart.
+  chartState?: ChartState
 }
 
 /**
@@ -206,18 +209,20 @@ export function getPresetConfigForPath(preset: QueryPreset, path: string): {
   jsQuery?: string
   jsQueryDisabled?: boolean
   expandLevel?: number
+  chartState?: ChartState
 } | null {
   const matchingRule = findMatchingPathRule(preset, path)
-  
+
   if (matchingRule) {
     return {
       columns: matchingRule.columns,
       jsQuery: matchingRule.jsQuery,
       jsQueryDisabled: matchingRule.jsQueryDisabled,
       expandLevel: matchingRule.expandLevel,
+      chartState: matchingRule.chartState,
     }
   }
-  
+
   return null
 }
 
