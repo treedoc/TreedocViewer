@@ -26,7 +26,7 @@ import MultiSelect from 'primevue/multiselect'
 import Button from 'primevue/button'
 import Checkbox from 'primevue/checkbox'
 import BasicColumnFilterPopover from './BasicColumnFilterPopover.vue'
-import type { FieldQuery } from '@/models/types'
+import type { ChartShowStatus, FieldQuery } from '@/models/types'
 import { matchFieldQuery } from '@/utils/QueryUtil'
 
 // Register Chart.js components
@@ -48,10 +48,9 @@ const props = defineProps<{
   data: TableRow[]
   columns: TableColumn[]
   // Chart state props (for persistence across remounts)
+  showStatusModel?: ChartShowStatus
   timeColumnModel?: string
-  valueColumnModel?: string
   valueColumnsModel?: string[]
-  groupColumnModel?: string
   groupColumnsModel?: string[]
   groupFilterValues?: string[] | null
   bucketSizeModel?: TimeBucket
@@ -66,11 +65,10 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   close: []
+  'update:showStatus': [value: ChartShowStatus]
   'update:groupFilter': [field: string, values: string[]]
   'update:timeColumn': [value: string]
-  'update:valueColumn': [value: string]
   'update:valueColumns': [value: string[]]
-  'update:groupColumn': [value: string]
   'update:groupColumns': [value: string[]]
   'update:bucketSize': [value: TimeBucket]
   'update:hiddenGroups': [value: Set<string>]
@@ -131,8 +129,8 @@ const LEGEND_COLUMN_MIN_WIDTHS: Record<string, number> = {
 
 // State - use props if provided, otherwise use local state
 const timeColumn = ref<string>(props.timeColumnModel || '')
-const valueColumns = ref<string[]>(props.valueColumnsModel?.length ? [...props.valueColumnsModel] : (props.valueColumnModel ? [props.valueColumnModel] : []))
-const groupColumns = ref<string[]>(props.groupColumnsModel?.length ? [...props.groupColumnsModel] : (props.groupColumnModel ? [props.groupColumnModel] : []))
+const valueColumns = ref<string[]>(props.valueColumnsModel ? [...props.valueColumnsModel] : [])
+const groupColumns = ref<string[]>(props.groupColumnsModel ? [...props.groupColumnsModel] : [])
 const effectiveValueColumns = ref<string[]>([...valueColumns.value])
 const effectiveGroupColumns = ref<string[]>([...groupColumns.value])
 const showCount = ref(props.showCountModel ?? true)
@@ -140,7 +138,7 @@ const showValueSum = ref(props.showValueSumModel ?? false)
 const valueAgg = ref<ValueAggregation>(props.valueAggModel ?? 'sum')
 const bucketSize = ref<TimeBucket>(props.bucketSizeModel || 'minute')
 const autoDetectBucket = ref(!props.bucketSizeModel) // Auto-detect only if no saved bucket
-const isMaximized = ref(false)
+const isMaximized = ref(props.showStatusModel === 'maximized')
 const hiddenGroups = ref<Set<string>>(props.hiddenGroupsModel ? new Set(props.hiddenGroupsModel) : new Set())
 const explicitlyShownValueSeries = ref<Set<string>>(new Set())
 const legendWidth = ref(320)
@@ -172,17 +170,18 @@ let legendColumnResizeStartWidth = 0
 watch(timeColumn, (val) => emit('update:timeColumn', val))
 watch(valueColumns, (val) => {
   emit('update:valueColumns', [...val])
-  emit('update:valueColumn', val[0] || '')
 }, { deep: true })
 watch(groupColumns, (val) => {
   emit('update:groupColumns', [...val])
-  emit('update:groupColumn', val[0] || '')
 }, { deep: true })
 watch(bucketSize, (val) => emit('update:bucketSize', val))
 watch(hiddenGroups, (val) => emit('update:hiddenGroups', val))
 watch(showCount, (val) => emit('update:showCount', val))
 watch(showValueSum, (val) => emit('update:showValueSum', val))
 watch(valueAgg, (val) => emit('update:valueAgg', val))
+watch(() => props.showStatusModel, (val) => {
+  isMaximized.value = val === 'maximized'
+})
 
 watch([valueColumns, groupColumns], () => {
   if (debounceTimer) clearTimeout(debounceTimer)
@@ -730,6 +729,7 @@ function onLegendFilterKeydown(event: KeyboardEvent) {
 function toggleMaximizedChart() {
   if (isMaximized.value) {
     isMaximized.value = false
+    emit('update:showStatus', 'normal')
     emit('update:chartHeight', previousChartHeight.value ?? 250)
     previousChartHeight.value = null
     return
@@ -737,6 +737,7 @@ function toggleMaximizedChart() {
 
   previousChartHeight.value = props.chartHeight ?? 250
   isMaximized.value = true
+  emit('update:showStatus', 'maximized')
   emit('update:chartHeight', Math.max(400, window.innerHeight - 300))
 }
 

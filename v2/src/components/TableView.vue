@@ -22,7 +22,7 @@ import AutoCompleteInput from './AutoCompleteInput.vue'
 import PresetSelector from './PresetSelector.vue'
 import TimeSeriesChart from './TimeSeriesChart.vue'
 import HoverButtonBar, { type HoverButton } from './HoverButtonBar.vue'
-import type { QueryPreset, FieldQuery, Column, TableNodeState, ChartState } from '@/models/types'
+import type { QueryPreset, FieldQuery, Column, TableNodeState, ChartState, ChartShowStatus } from '@/models/types'
 import { columnsToFieldQueries, getPresetConfigForPath } from '@/models/types'
 import type { ExpandState } from './ExpandControl.vue'
 import type { ColumnVisibility } from './ColumnSelector.vue'
@@ -120,15 +120,19 @@ const jsQueryDisabled = ref(false)
 const extendedFields = ref('')
 const showExtendedFields = ref(false)
 const selectedPresetName = ref<string | null>(null)
-const showChart = ref(false)
+const chartShowStatus = ref<ChartShowStatus>('hidden')
+const showChart = computed({
+  get: () => chartShowStatus.value !== 'hidden',
+  set: (visible: boolean) => {
+    chartShowStatus.value = visible ? 'normal' : 'hidden'
+  },
+})
 const first = ref(0)
 const rows = ref(100)
 
 // Chart state (lifted up to survive fullscreen toggle)
 const chartTimeColumn = ref('')
-const chartValueColumn = ref('')
 const chartValueColumns = ref<string[]>([])
-const chartGroupColumn = ref('')
 const chartGroupColumns = ref<string[]>([])
 const chartBucketSize = ref<import('@/utils/TableUtil').TimeBucket>('minute')
 const chartHiddenGroups = ref<Set<string>>(new Set())
@@ -391,12 +395,10 @@ const isApplyingPreset = ref(false)
 // Apply a ChartState (from per-node cache or from a preset/share-link) to the
 // chart-related refs. Centralized so the restore path and preset path stay in sync.
 function applyChartState(cs: ChartState) {
-  showChart.value = cs.showChart ?? false
+  chartShowStatus.value = cs.showStatus ?? 'hidden'
   chartTimeColumn.value = cs.timeColumn ?? ''
-  chartValueColumn.value = cs.valueColumn ?? ''
-  chartValueColumns.value = cs.valueColumns ?? (cs.valueColumn ? [cs.valueColumn] : [])
-  chartGroupColumn.value = cs.groupColumn ?? ''
-  chartGroupColumns.value = cs.groupColumns ?? (cs.groupColumn ? [cs.groupColumn] : [])
+  chartValueColumns.value = cs.valueColumns ?? []
+  chartGroupColumns.value = cs.groupColumns ?? []
   chartBucketSize.value = (cs.bucketSize as import('@/utils/TableUtil').TimeBucket) ?? 'minute'
   chartHiddenGroups.value = new Set(cs.hiddenGroups ?? [])
   chartShowCount.value = cs.showCount ?? true
@@ -1878,11 +1880,9 @@ function saveCurrentTableState() {
       showAdvancedQuery: showAdvancedQuery.value,
       selectedPresetName: selectedPresetName.value,
       chartState: {
-        showChart: showChart.value,
+        showStatus: chartShowStatus.value,
         timeColumn: chartTimeColumn.value,
-        valueColumn: chartValueColumn.value,
         valueColumns: chartValueColumns.value,
-        groupColumn: chartGroupColumn.value,
         groupColumns: chartGroupColumns.value,
         bucketSize: chartBucketSize.value,
         hiddenGroups: Array.from(chartHiddenGroups.value),
@@ -2212,11 +2212,10 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
       v-if="showChart && hasTimeColumns"
       :data="filteredData as any"
       :columns="columns as any"
+      :show-status-model="chartShowStatus"
       :chart-height="chartHeight"
       :time-column-model="chartTimeColumn"
-      :value-column-model="chartValueColumn"
       :value-columns-model="chartValueColumns"
-      :group-column-model="chartGroupColumn"
       :group-columns-model="chartGroupColumns"
       :group-filter-values="chartGroupFilterValues"
       :bucket-size-model="chartBucketSize"
@@ -2227,11 +2226,10 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
       :time-selection-start-model="chartTimeSelectionStart"
       :time-selection-end-model="chartTimeSelectionEnd"
       @close="showChart = false"
+      @update:show-status="chartShowStatus = $event"
       @update:group-filter="onChartGroupFilter"
       @update:time-column="chartTimeColumn = $event"
-      @update:value-column="chartValueColumn = $event"
       @update:value-columns="chartValueColumns = $event"
-      @update:group-column="chartGroupColumn = $event"
       @update:group-columns="chartGroupColumns = $event"
       @update:bucket-size="chartBucketSize = $event"
       @update:hidden-groups="chartHiddenGroups = $event"

@@ -17,7 +17,7 @@ const embeddedId = urlParams.get('embeddedId') || hashParams.get('embeddedId')
 const dataParam = urlParams.get('data') || hashParams.get('data')
 const dataUrlParam = urlParams.get('dataUrl') || hashParams.get('dataUrl')
 const initialPath = urlParams.get('initialPath') || hashParams.get('initialPath') || '/'
-const title = urlParams.get('title') || hashParams.get('title') || 'TreeDoc Viewer'
+const titleParam = urlParams.get('title') || hashParams.get('title')
 // Preset parameter - JSONEx encoded preset to apply after data loads
 const presetParam = urlParams.get('preset') || hashParams.get('preset') || undefined
 
@@ -33,6 +33,7 @@ const options = computed<TDVOptions | undefined>(() => {
     return undefined
   }
 })
+const title = computed(() => options.value?.title || titleParam || 'TreeDoc Viewer')
 
 // Sample data selection
 const selectedSample = ref<typeof sampleData[0] | null>(null)

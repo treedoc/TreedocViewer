@@ -376,7 +376,7 @@ watch(parseResult, (result) => {
     toast.add({ ...props_, detail: result })
     
     // Apply initial preset after successful parse (only once)
-    if (!hasError.value && props.initialPreset && !initialPresetApplied.value) {
+    if (!hasError.value && (props.initialPreset || props.options?.globalRule) && !initialPresetApplied.value) {
       initialPresetApplied.value = true
       applyInitialPreset()
     }
@@ -385,30 +385,20 @@ watch(parseResult, (result) => {
 
 // Apply initial preset from URL parameter
 function applyInitialPreset() {
-  if (!props.initialPreset) return
+  if (!props.initialPreset && !props.options?.globalRule) return
   
   try {
-    // Parse the JSONEx encoded preset
-    const node = TDJSONParser.get().parse(props.initialPreset)
-    const presetData = node.toObject(false)
-    
-    if (!presetData || !presetData.pathRules) {
-      // Handle old format with columns at root
-      if (presetData && presetData.columns) {
-        // Convert to new format
-        presetData.pathRules = [{
-          pathPattern: '**',
-          columns: presetData.columns,
-          jsQuery: presetData.jsQuery,
-          expandLevel: presetData.expandLevel,
-        }]
-        delete presetData.columns
-        delete presetData.jsQuery
-        delete presetData.expandLevel
-      } else {
-        console.error('[JsonTreeTable] Invalid preset format')
-        return
-      }
+    // Parse the JSONEx encoded preset.
+    const presetData = props.initialPreset
+      ? TDJSONParser.get().parse(props.initialPreset).toObject(false)
+      : {}
+
+    const pathRules = [...(presetData.pathRules ?? [])]
+    if (props.options?.globalRule) {
+      pathRules.push({
+        ...props.options.globalRule,
+        pathPattern: '**',
+      })
     }
     
     // Create a temporary preset object
@@ -417,7 +407,7 @@ function applyInitialPreset() {
       description: presetData.description,
       createdAt: Date.now(),
       updatedAt: Date.now(),
-      pathRules: presetData.pathRules,
+      pathRules,
     }
     
     // Apply the preset to TableView after a short delay to ensure it's mounted

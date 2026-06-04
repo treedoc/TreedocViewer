@@ -92,12 +92,12 @@ export interface Query {
   columns: Column[]
 }
 
+export type ChartShowStatus = 'hidden' | 'normal' | 'maximized'
+
 export interface ChartState {
-  showChart?: boolean
+  showStatus?: ChartShowStatus
   timeColumn?: string
-  valueColumn?: string
   valueColumns?: string[]
-  groupColumn?: string
   groupColumns?: string[]
   bucketSize?: string
   hiddenGroups?: string[]
@@ -121,12 +121,14 @@ export interface TableNodeState {
 }
 
 export interface TDVOptions {
+  title?: string
   maxPane?: string
   textWrap?: boolean
   showTable?: boolean
   showSource?: boolean
   showTree?: boolean
   parsers?: ParserPlugin[]
+  globalRule?: Omit<PathRule, 'pathPattern'>
 }
 
 /**
