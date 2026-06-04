@@ -4,6 +4,8 @@ import Select from 'primevue/select'
 import JsonTreeTable from '../components/JsonTreeTable.vue'
 import sampleData from '../data/sampleData'
 import { useTreeStore } from '../stores/treeStore'
+import { TDJSONParser } from 'treedoc'
+import type { TDVOptions } from '../models/types'
 
 const store = useTreeStore()
 const jsonTreeTableRef = ref<InstanceType<typeof JsonTreeTable>>()
@@ -18,6 +20,19 @@ const initialPath = urlParams.get('initialPath') || hashParams.get('initialPath'
 const title = urlParams.get('title') || hashParams.get('title') || 'TreeDoc Viewer'
 // Preset parameter - JSONEx encoded preset to apply after data loads
 const presetParam = urlParams.get('preset') || hashParams.get('preset') || undefined
+
+// Option parameter - JSONEx encoded view options (e.g. {maxPane:table}) applied
+// on mount. Lets an embedder open straight into a maximized table/chart view.
+const optionParam = urlParams.get('option') || hashParams.get('option') || undefined
+const options = computed<TDVOptions | undefined>(() => {
+  if (!optionParam) return undefined
+  try {
+    return TDJSONParser.get().parse(optionParam).toObject(false) as TDVOptions
+  } catch (e) {
+    console.error('[Home] Failed to parse option param:', e)
+    return undefined
+  }
+})
 
 // Sample data selection
 const selectedSample = ref<typeof sampleData[0] | null>(null)
@@ -101,6 +116,7 @@ watch(() => store.rawText, (text) => {
       ref="jsonTreeTableRef"
       :initial-path="initialPath"
       :initial-preset="presetParam"
+      :options="options"
       root-object-key="root"
     >
       <template #title>
