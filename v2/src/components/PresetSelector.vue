@@ -90,7 +90,11 @@ const updatePresetPattern = ref('')
 
 // Computed - bind to parent via v-model (now uses preset name as key)
 const selectedPresetName = computed({
-  get: () => props.modelValue ?? null,
+  get: () => {
+    const value = props.modelValue?.trim() || null
+    if (!value) return null
+    return presets.value.some(p => p.name && p.name.toLowerCase() === value.toLowerCase()) ? value : null
+  },
   set: (value: string | null) => emit('update:modelValue', value)
 })
 
@@ -101,10 +105,12 @@ const selectedPreset = computed(() => {
 })
 
 const presetOptions = computed(() => {
-  return presets.value.map(p => ({
-    label: p.name,
-    value: p.name,  // Use name as value
-  }))
+  return presets.value
+    .filter(p => p.name)
+    .map(p => ({
+      label: p.name,
+      value: p.name,  // Use name as value
+    }))
 })
 
 // Methods
