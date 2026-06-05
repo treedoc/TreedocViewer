@@ -551,9 +551,10 @@ const visibleValueSeries = computed(() => valueSeriesSummaries.value.filter((ser
 const hasVisibleValueSeries = computed(() => visibleValueSeries.value.length > 0)
 const totalSeriesCount = computed(() => countSeriesCount.value + visibleValueSeries.value.length + (showValueSum.value && hasVisibleValueSeries.value ? 1 : 0))
 const allValueSeriesHidden = computed(() => valueSeriesSummaries.value.length > 0 && valueSeriesSummaries.value.every((series, index) => !isValueSeriesVisible(series, index)))
+const showLegendNameColumn = computed(() => effectiveValueColumns.value.length > 1)
 
 const legendResizableColumnKeys = computed<LegendColumnKey[]>(() => [
-  'name',
+  ...(showLegendNameColumn.value ? ['name' as const] : []),
   ...effectiveGroupColumns.value.map((_, index) => `group:${index}` as const),
   'max',
   'mean',
@@ -576,7 +577,7 @@ const filteredLegendRows = computed<LegendRow[]>(() => {
   const rows = valueSeriesSummaries.value
     .map((series, originalIndex) => ({ series, originalIndex }))
     .filter(({ series }) => {
-      if (!matchesLegendFilter('name', `${series.name} ${series.valueColumn || ''}`)) return false
+      if (showLegendNameColumn.value && !matchesLegendFilter('name', `${series.name} ${series.valueColumn || ''}`)) return false
 
       for (let index = 0; index < effectiveGroupColumns.value.length; index++) {
         if (!matchesLegendFilter(`group:${index}`, series.groupParts[index] || '')) return false
@@ -587,7 +588,7 @@ const filteredLegendRows = computed<LegendRow[]>(() => {
       return true
     })
 
-  const field = legendSortField.value
+  const field = !showLegendNameColumn.value && legendSortField.value === 'name' ? 'max' : legendSortField.value
   const order = legendSortOrder.value
   return rows.sort((a, b) => compareLegendRows(a, b, field) * order)
 })
@@ -1481,7 +1482,7 @@ onBeforeUnmount(() => {
           <colgroup>
             <col :style="{ width: `${LEGEND_VISIBILITY_COL_WIDTH}px` }" />
             <col :style="{ width: `${LEGEND_COLOR_COL_WIDTH}px` }" />
-            <col :style="{ width: `${getLegendColumnWidth('name')}px` }" />
+            <col v-if="showLegendNameColumn" :style="{ width: `${getLegendColumnWidth('name')}px` }" />
             <col
               v-for="(_, groupIndex) in effectiveGroupColumns"
               :key="`group-col:${groupIndex}`"
@@ -1504,6 +1505,7 @@ onBeforeUnmount(() => {
               </th>
               <th class="color-col"></th>
               <th
+                v-if="showLegendNameColumn"
                 class="legend-filterable-header legend-resizable-header"
                 @mouseenter="onLegendHeaderMouseEnter($event, 'name', 'Name')"
                 @mouseleave="cancelLegendFilterHover"
@@ -1613,7 +1615,7 @@ onBeforeUnmount(() => {
           </thead>
           <tbody>
             <tr v-if="filteredLegendRows.length === 0">
-              <td class="legend-empty" :colspan="effectiveGroupColumns.length + 5">
+              <td class="legend-empty" :colspan="effectiveGroupColumns.length + (showLegendNameColumn ? 5 : 4)">
                 No series match the legend filters
               </td>
             </tr>
@@ -1639,7 +1641,7 @@ onBeforeUnmount(() => {
                     :style="{ backgroundColor: getSeriesColor(series).border }"
                   />
                 </td>
-                <td class="series-name" :title="series.name">{{ series.valueColumn }}</td>
+                <td v-if="showLegendNameColumn" class="series-name" :title="series.name">{{ series.valueColumn }}</td>
                 <td
                   v-for="(_, index) in effectiveGroupColumns"
                   :key="`${series.key}:${index}`"
