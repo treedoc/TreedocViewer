@@ -404,7 +404,7 @@ function applyInitialPreset() {
     
     // Create a temporary preset object
     const preset: QueryPreset = {
-      name: presetData.name || '_url_preset',
+      name: presetData.name || '',
       description: presetData.description,
       createdAt: Date.now(),
       updatedAt: Date.now(),

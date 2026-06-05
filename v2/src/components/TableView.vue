@@ -411,9 +411,10 @@ function applyChartState(cs: ChartState) {
 }
 
 function applyPreset(preset: QueryPreset) {
-  // The selectedPresetName should already be set by PresetSelector via v-model
-  // but let's ensure it's set in case it wasn't
-  if (selectedPresetName.value !== preset.name) {
+  // URL/globalRule presets without a name are transient and should not appear as selected saved presets.
+  if (!preset.name) {
+    selectedPresetName.value = null
+  } else if (selectedPresetName.value !== preset.name) {
     selectedPresetName.value = preset.name
   }
 
