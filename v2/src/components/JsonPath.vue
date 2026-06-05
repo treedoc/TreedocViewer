@@ -4,6 +4,7 @@ import type { TDNode } from 'treedoc'
 
 const props = defineProps<{
   treeNode: TDNode | null
+  prefix?: string
 }>()
 
 const emit = defineEmits<{
@@ -58,6 +59,10 @@ function handleHomeClick() {
 <template>
   <div class="json-path" v-if="treeNode">
     <nav class="breadcrumb-nav">
+      <template v-if="prefix">
+        <span class="path-prefix">{{ prefix }}</span>
+        <span class="separator">/</span>
+      </template>
       <a href="#" class="home-link" @click.prevent="handleHomeClick" v-if="items.length > 0">
         <i class="pi pi-home"></i>
       </a>
@@ -85,6 +90,13 @@ function handleHomeClick() {
   display: flex;
   align-items: center;
   gap: 6px;
+  min-width: 0;
+}
+
+.path-prefix {
+  color: var(--tdv-text-bright);
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .home-link {

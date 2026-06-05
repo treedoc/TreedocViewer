@@ -171,6 +171,7 @@ watch(() => store.rawText, (text) => {
       :initial-path="eventInitialPath"
       :initial-preset="initialPreset"
       :options="options"
+      :title="title"
       root-object-key="root"
     >
       <template #title>

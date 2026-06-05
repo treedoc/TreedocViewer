@@ -22,6 +22,7 @@ const props = defineProps<{
   data?: string | object
   initialPath?: string
   options?: TDVOptions
+  title?: string
   rootObjectKey?: string
   initialPreset?: string  // JSONEx encoded preset to apply after data loads
 }>()
@@ -122,6 +123,7 @@ const parserOptions = computed(() =>
 const sourceVisible = computed(() => showSource.value && (maxPane.value === '' || maxPane.value === 'source'))
 const treeVisible = computed(() => showTree.value && (maxPane.value === '' || maxPane.value === 'tree'))
 const tableVisible = computed(() => showTable.value && (maxPane.value === '' || maxPane.value === 'table'))
+const tableTitle = computed(() => props.title || props.options?.title || '')
 
 // Pane size management - only set initial sizes, let splitpanes handle the rest
 const splitpanesKey = ref(0)
@@ -615,7 +617,7 @@ defineExpose({ openUrl, applyPresetConfig })
           :root-object-key="rootObjectKey"
           :expand-level="1"
         />
-        <TableView v-else-if="maxPane === 'table'" ref="tableViewRef" />
+        <TableView v-else-if="maxPane === 'table'" ref="tableViewRef" :title="tableTitle" />
       </div>
 
       <Splitpanes
@@ -662,7 +664,7 @@ defineExpose({ openUrl, applyPresetConfig })
             @keydown="onKeyDown($event, 'table')"
             tabindex="0"
           >
-            <TableView ref="tableViewRef" />
+            <TableView ref="tableViewRef" :title="tableTitle" />
           </div>
         </Pane>
       </Splitpanes>

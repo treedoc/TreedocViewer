@@ -60,6 +60,10 @@ const COLUMN_WIDTH_MIN_PX = 40
 const COLUMN_WIDTH_MAX_WEIGHT_PX = 360
 const COLUMN_WIDTH_CELL_PADDING_PX = 32
 
+const props = defineProps<{
+  title?: string
+}>()
+
 // Recursively remove $$-prefixed keys from an object (TDNode internal metadata)
 function cleanInternalKeys(obj: any): any {
   if (obj === null || typeof obj !== 'object') {
@@ -367,6 +371,8 @@ const visibleColumns = computed(() => {
 const hiddenColumnCount = computed(() => {
   return columns.value.filter(col => !col.visible).length
 })
+
+const pathTitlePrefix = computed(() => (maxPane.value === 'table' ? props.title?.trim() || '' : ''))
 
 // Check if there are any timestamp columns for chart feature
 const hasTimeColumns = computed(() => {
@@ -1999,7 +2005,7 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
     
     <!-- Full header in normal mode -->
     <div class="table-header">
-      <JsonPath :tree-node="rawSelectedNode" @node-clicked="nodeClicked" />
+      <JsonPath :tree-node="rawSelectedNode" :prefix="pathTitlePrefix" @node-clicked="nodeClicked" />
       
       <div class="table-toolbar">
         <!-- Open file button (only in fullscreen mode) -->
