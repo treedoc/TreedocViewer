@@ -600,7 +600,26 @@ defineExpose({ openUrl, applyPresetConfig })
     
     <!-- Split Panes -->
     <div class="split-container">
-      <Splitpanes 
+      <div
+        v-if="maxPane"
+        class="pane-wrapper"
+        :class="{ 'pane-focused': currentPane === maxPane, 'resizing': isResizing }"
+        @click="currentPane = maxPane"
+        @keydown="onKeyDown($event, maxPane)"
+        tabindex="0"
+      >
+        <SourceView v-if="maxPane === 'source'" ref="sourceViewRef" />
+        <TreeView
+          v-else-if="maxPane === 'tree'"
+          ref="treeViewRef"
+          :root-object-key="rootObjectKey"
+          :expand-level="1"
+        />
+        <TableView v-else-if="maxPane === 'table'" ref="tableViewRef" />
+      </div>
+
+      <Splitpanes
+        v-else
         :key="splitpanesKey" 
         class="default-theme" 
         :horizontal="false"
