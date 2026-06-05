@@ -157,10 +157,13 @@ body {
 }
 
 .p-button.p-button-text {
+  background: transparent;
+  border-color: transparent;
   color: var(--tdv-text);
 }
 
 .p-button.p-button-text:hover:not(:disabled) {
+  border-color: transparent;
   color: var(--tdv-primary);
   background: var(--tdv-hover-bg);
 }
