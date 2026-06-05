@@ -2242,14 +2242,13 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
     />
 
     <div
-      v-if="showChart && hasTimeColumns && chartShowStatus !== 'maximized'"
+      v-if="showChart && hasTimeColumns"
       class="chart-table-divider"
       :class="{ resizing: isResizingChartHeight }"
       @mousedown="startChartHeightResize"
     />
     
     <div
-      v-if="chartShowStatus !== 'maximized'"
       class="table-content"
       :class="{ 'selection-dragging': isDraggingSelection }"
       @mousedown="onTableMouseDown"
