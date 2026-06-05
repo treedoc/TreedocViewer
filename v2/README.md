@@ -117,15 +117,47 @@ In that URL, `maxPane:table` opens the table pane maximized, and `globalRule.cha
 <script>
   window.addEventListener('message', (event) => {
     if (event.data.type === 'tdv-ready') {
-      // Viewer is ready, send data
+      // Viewer is ready, send data and optional view configuration.
       document.getElementById('tdvFrame').contentWindow.postMessage({
         type: 'tdv-setData',
-        data: { message: "Hello from parent!" }
+        data: [
+          { ts: "2026-06-01T00:00:00Z", service: "api", count: 8 },
+          { ts: "2026-06-01T00:00:00Z", service: "web", count: 5 },
+          { ts: "2026-06-01T01:00:00Z", service: "api", count: 12 },
+          { ts: "2026-06-01T01:00:00Z", service: "web", count: 7 }
+        ],
+        initialPath: '/',
+        options: {
+          title: 'Time Series Demo',
+          maxPane: 'table',
+          globalRule: {
+            chartState: {
+              showStatus: 'maximized',
+              timeColumn: 'ts',
+              valueColumns: ['count'],
+              groupColumns: ['service'],
+              showCount: true,
+              bucketSize: 'hour'
+            }
+          }
+        }
       }, '*');
     }
   });
 </script>
 ```
+
+Embedded messages support:
+
+| Message field | Description |
+|---------------|-------------|
+| `type` | Use `tdv-setData` to send data and optional config, or `tdv-setOptions` to update config without replacing data. |
+| `data` | Data payload for `tdv-setData`. |
+| `initialPath` | Node path to select after loading or updating config. |
+| `options` / `option` | Viewer options as an object or JSONEx string. Supports `title`, `maxPane`, and `globalRule`. |
+| `preset` / `initialPreset` | Table preset as an object or JSONEx string. |
+
+`globalRule` in event options works the same as the URL `option.globalRule`: it is applied as a catch-all preset rule with `pathPattern:"**"` and only needs the attributes you want to override.
 
 ### As a Vue Component
 

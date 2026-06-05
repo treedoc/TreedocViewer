@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, nextTick, onMounted, watch } from 'vue'
 import Select from 'primevue/select'
 import JsonTreeTable from '../components/JsonTreeTable.vue'
 import sampleData from '../data/sampleData'
@@ -16,7 +16,7 @@ const hashParams = new URLSearchParams(window.location.hash.split('?')[1] || '')
 const embeddedId = urlParams.get('embeddedId') || hashParams.get('embeddedId')
 const dataParam = urlParams.get('data') || hashParams.get('data')
 const dataUrlParam = urlParams.get('dataUrl') || hashParams.get('dataUrl')
-const initialPath = urlParams.get('initialPath') || hashParams.get('initialPath') || '/'
+const initialPathParam = urlParams.get('initialPath') || hashParams.get('initialPath') || '/'
 const titleParam = urlParams.get('title') || hashParams.get('title')
 // Preset parameter - JSONEx encoded preset to apply after data loads
 const presetParam = urlParams.get('preset') || hashParams.get('preset') || undefined
@@ -24,7 +24,11 @@ const presetParam = urlParams.get('preset') || hashParams.get('preset') || undef
 // Option parameter - JSONEx encoded view options (e.g. {maxPane:table}) applied
 // on mount. Lets an embedder open straight into a maximized table/chart view.
 const optionParam = urlParams.get('option') || hashParams.get('option') || undefined
-const options = computed<TDVOptions | undefined>(() => {
+const eventOptions = ref<TDVOptions | undefined>()
+const eventPresetParam = ref<string | undefined>()
+const eventInitialPath = ref(initialPathParam)
+
+const urlOptions = computed<TDVOptions | undefined>(() => {
   if (!optionParam) return undefined
   try {
     return TDJSONParser.get().parse(optionParam).toObject(false) as TDVOptions
@@ -33,6 +37,12 @@ const options = computed<TDVOptions | undefined>(() => {
     return undefined
   }
 })
+const options = computed<TDVOptions | undefined>(() => {
+  if (!urlOptions.value) return eventOptions.value
+  if (!eventOptions.value) return urlOptions.value
+  return { ...urlOptions.value, ...eventOptions.value }
+})
+const initialPreset = computed(() => eventPresetParam.value ?? presetParam)
 const title = computed(() => options.value?.title || titleParam || 'TreeDoc Viewer')
 
 // Sample data selection
@@ -48,6 +58,33 @@ function handleSampleChange(event: any) {
   }
 }
 
+function parseOptionsParam(value: unknown): TDVOptions | undefined {
+  if (!value) return undefined
+  if (typeof value === 'string') {
+    try {
+      return TDJSONParser.get().parse(value).toObject(false) as TDVOptions
+    } catch (e) {
+      console.error('[Home] Failed to parse event option:', e)
+      return undefined
+    }
+  }
+  if (typeof value === 'object') return value as TDVOptions
+  return undefined
+}
+
+function parsePresetParam(value: unknown): string | undefined {
+  if (!value) return undefined
+  if (typeof value === 'string') return value
+  if (typeof value === 'object') return JSON.stringify(value)
+  return undefined
+}
+
+function applyEventConfig() {
+  nextTick(() => {
+    jsonTreeTableRef.value?.applyPresetConfig(initialPreset.value, options.value)
+  })
+}
+
 // Handle embedded mode
 function setupEmbeddedMode() {
   if (embeddedId) {
@@ -57,11 +94,27 @@ function setupEmbeddedMode() {
       window.opener.postMessage({ type: 'tdv-ready', id: embeddedId }, '*')
     }
     
-    // Listen for data from parent
+    // Listen for data/config from parent
     window.addEventListener('message', (evt) => {
+      if (evt.data?.type !== 'tdv-setData' && evt.data?.type !== 'tdv-setOptions') {
+        return
+      }
+
+      const nextOptions = parseOptionsParam(evt.data.options ?? evt.data.option)
+      if (nextOptions) eventOptions.value = nextOptions
+
+      const nextPreset = parsePresetParam(evt.data.preset ?? evt.data.initialPreset)
+      if (nextPreset !== undefined) eventPresetParam.value = nextPreset
+
+      if (typeof evt.data.initialPath === 'string') {
+        eventInitialPath.value = evt.data.initialPath
+      }
+
       if (evt.data.type === 'tdv-setData') {
         store.loadData(evt.data.data)
       }
+
+      applyEventConfig()
     })
   }
 }
@@ -115,8 +168,8 @@ watch(() => store.rawText, (text) => {
   <div class="home-container">
     <JsonTreeTable
       ref="jsonTreeTableRef"
-      :initial-path="initialPath"
-      :initial-preset="presetParam"
+      :initial-path="eventInitialPath"
+      :initial-preset="initialPreset"
       :options="options"
       root-object-key="root"
     >

@@ -383,22 +383,34 @@ watch(parseResult, (result) => {
   }
 })
 
+watch(
+  [() => props.initialPreset, () => props.options?.globalRule],
+  () => {
+    initialPresetApplied.value = false
+    if (parseResult.value && parseResult.value !== 'No data' && !hasError.value && (props.initialPreset || props.options?.globalRule)) {
+      initialPresetApplied.value = true
+      applyInitialPreset()
+    }
+  },
+  { deep: true }
+)
+
 // Apply initial preset from URL parameter
-function applyInitialPreset() {
-  if (!props.initialPreset && !props.options?.globalRule) return
+function applyInitialPreset(initialPreset = props.initialPreset, options = props.options) {
+  if (!initialPreset && !options?.globalRule) return
   
   try {
     // Parse the JSONEx encoded preset.
-    const presetData = props.initialPreset
-      ? TDJSONParser.get().parse(props.initialPreset).toObject(false)
+    const presetData = initialPreset
+      ? TDJSONParser.get().parse(initialPreset).toObject(false)
       : {}
 
     const pathRules = [...(presetData.pathRules ?? [])]
-    if (props.options?.globalRule) {
+    if (options?.globalRule) {
       pathRules.push({
         pathPattern: '**',
         columns: [],
-        ...props.options.globalRule,
+        ...options.globalRule,
       })
     }
     
@@ -423,6 +435,13 @@ function applyInitialPreset() {
   } catch (e) {
     console.error('[JsonTreeTable] Failed to parse initial preset:', e)
   }
+}
+
+function applyPresetConfig(initialPreset?: string, options?: TDVOptions) {
+  if (options) {
+    store.setInitialOptions(options)
+  }
+  applyInitialPreset(initialPreset, options)
 }
 
 // Global keyboard handler for fullscreen toggle
@@ -465,7 +484,7 @@ onUnmounted(() => {
 })
 
 // Expose for parent access
-defineExpose({ openUrl })
+defineExpose({ openUrl, applyPresetConfig })
 </script>
 
 <template>
