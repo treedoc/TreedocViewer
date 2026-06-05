@@ -113,6 +113,7 @@ const MAX_RENDERED_SERIES = 100
 const MAX_GROUPED_COUNT_SERIES = 100
 const TOOLTIP_SINGLE_SERIES_THRESHOLD = 50
 const DEBOUNCE_MS = 250
+const CHART_UPDATE_MODE = 'none'
 const LEGEND_VISIBILITY_COL_WIDTH = 26
 const LEGEND_COLOR_COL_WIDTH = 16
 const LEGEND_COLUMN_DEFAULT_WIDTHS: Record<string, number> = {
@@ -1009,9 +1010,36 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => {
   const options: ChartOptions<'bar'> = {
     responsive: true,
     maintainAspectRatio: false,
+    animation: false,
+    parsing: false,
+    normalized: true,
     interaction: {
       mode: totalSeriesCount.value > TOOLTIP_SINGLE_SERIES_THRESHOLD ? 'nearest' : 'index',
       intersect: false
+    },
+    transitions: {
+      active: {
+        animation: {
+          duration: 0
+        }
+      },
+      resize: {
+        animation: {
+          duration: 0
+        }
+      },
+      show: {
+        animations: {
+          x: { duration: 0 },
+          y: { duration: 0 }
+        }
+      },
+      hide: {
+        animations: {
+          x: { duration: 0 },
+          y: { duration: 0 }
+        }
+      }
     },
     onHover: (event: any, _elements: any[], chart: any) => {
       const nativeEvent = event?.native
@@ -1462,6 +1490,8 @@ onBeforeUnmount(() => {
           ref="chartRef"
           :data="chartJsData"
           :options="chartOptions"
+          dataset-id-key="seriesKey"
+          :update-mode="CHART_UPDATE_MODE"
         />
         <div v-if="isDraggingSelection" class="selection-overlay" :style="dragOverlayStyle" />
       </div>
