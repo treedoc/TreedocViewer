@@ -219,6 +219,11 @@ export function matchFieldQuery(value: string, fq: FieldQuery): boolean {
           break
         }
       }
+    } else if (fq.isExact) {
+      if (value.toLowerCase() === q.toLowerCase()) {
+        matched = true
+        break
+      }
     } else {
       if (value.toLowerCase().includes(q.toLowerCase())) {
         matched = true

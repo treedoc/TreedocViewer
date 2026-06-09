@@ -53,6 +53,7 @@ export function clearFilterFields(col: Column): Column {
     ...col,
     query: '',
     isRegex: false,
+    isExact: false,
     isNegate: false,
     isArray: false,
     isPattern: false,
@@ -80,6 +81,7 @@ export function addValueToArrayFilter(
     field: current?.field ?? '',
     query: value,
     isRegex: false,
+    isExact: true,
     isNegate: isNegate,
     isArray: true,
     isPattern: false,
@@ -104,6 +106,10 @@ export function addValueToArrayFilter(
       return {
         ...current,
         query: existingValues.join(','),
+        isRegex: false,
+        isExact: true,
+        isPattern: false,
+        jsExpression: undefined,
       }
     }
     return current

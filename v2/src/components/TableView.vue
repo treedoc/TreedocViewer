@@ -161,6 +161,7 @@ let hoverTargetEvent: MouseEvent | null = null
 const columnSelectorRef = ref<InstanceType<typeof ColumnSelector> | null>(null)
 const columnVisibility = ref<ColumnVisibility[]>([])
 const copyMenuRef = ref<InstanceType<typeof Menu> | null>(null)
+const columnWidthOverrides = ref<Record<string, number>>({})
 
 // File input for open file in fullscreen mode
 const fileInputRef = ref<HTMLInputElement | null>(null)
@@ -241,6 +242,12 @@ watch(columns, (cols) => {
     header: c.header,
     visible: c.visible,
   }))
+  const fields = new Set(cols.map(c => c.field))
+  const nextOverrides: Record<string, number> = {}
+  for (const [field, width] of Object.entries(columnWidthOverrides.value)) {
+    if (fields.has(field)) nextOverrides[field] = width
+  }
+  columnWidthOverrides.value = nextOverrides
 }, { deep: true })
 
 // Computed to get current column's extendedFields for ExtendFieldDialog
@@ -356,7 +363,7 @@ const chartGroupFilterValues = computed<string[] | null>(() => {
   if (chartGroupColumns.value.length !== 1) return null
 
   const query = fieldQueries.value[chartGroupColumns.value[0]]
-  if (!query?.query || query.isDisabled || !query.isArray || query.isNegate || query.isRegex || query.isPattern || query.jsExpression) {
+  if (!query?.query || query.isDisabled || !query.isArray || query.isNegate || query.isRegex || query.isExact || query.isPattern || query.jsExpression) {
     return null
   }
 
@@ -479,6 +486,13 @@ const rawSelectedNode = computed(() => {
 })
 
 function hideColumn(field: string) {
+  captureColumnWidthsBeforeVisibilityChange(
+    columns.value.map(c => ({
+      field: c.field,
+      visible: c.field === field ? false : c.visible,
+    }))
+  )
+
   const col = columns.value.find(c => c.field === field)
   if (col) {
     col.visible = false
@@ -490,7 +504,69 @@ function hideColumn(field: string) {
   }
 }
 
+function getRenderedTableWidth(): number {
+  const root = tableViewRootRef.value
+  if (!root) return 0
+  const table = root.querySelector('.table-content .p-datatable-table, .table-content table') as HTMLElement | null
+  return table?.getBoundingClientRect().width ?? 0
+}
+
+function getTableContentWidth(): number {
+  const root = tableViewRootRef.value
+  if (!root) return 0
+  const content = root.querySelector('.table-content') as HTMLElement | null
+  return content?.getBoundingClientRect().width ?? 0
+}
+
+function isRenderedTableWiderThanContent(): boolean {
+  const tableWidth = getRenderedTableWidth()
+  const contentWidth = getTableContentWidth()
+  return tableWidth > 0 && contentWidth > 0 && tableWidth > contentWidth + 1
+}
+
+function getRenderedColumnWidths(): Record<string, number> {
+  const root = tableViewRootRef.value
+  if (!root) return {}
+
+  const headerCells = Array.from(root.querySelectorAll('.table-content .p-datatable-thead > tr > th')) as HTMLElement[]
+  const result: Record<string, number> = {}
+
+  visibleColumns.value.forEach((col, index) => {
+    const width = headerCells[index]?.getBoundingClientRect().width
+    if (width && Number.isFinite(width)) {
+      result[col.field] = Math.max(COLUMN_WIDTH_MIN_PX, Math.round(width))
+    }
+  })
+
+  return result
+}
+
+function captureColumnWidthsBeforeVisibilityChange(nextColumns: Pick<ColumnVisibility, 'field' | 'visible'>[]) {
+  const nextVisible = new Map(nextColumns.map(col => [col.field, col.visible]))
+  const removedVisibleColumn = visibleColumns.value.some(col => nextVisible.get(col.field) === false)
+  if (!removedVisibleColumn || !isRenderedTableWiderThanContent()) return
+
+  const renderedWidths = getRenderedColumnWidths()
+  const nextOverrides: Record<string, number> = { ...columnWidthOverrides.value }
+
+  for (const col of columns.value) {
+    if (!nextVisible.get(col.field)) {
+      delete nextOverrides[col.field]
+      continue
+    }
+
+    const renderedWidth = renderedWidths[col.field]
+    if (renderedWidth) {
+      nextOverrides[col.field] = renderedWidth
+    }
+  }
+
+  columnWidthOverrides.value = nextOverrides
+}
+
 function updateColumnVisibility(cols: ColumnVisibility[]) {
+  captureColumnWidthsBeforeVisibilityChange(cols)
+
   for (const col of cols) {
     const found = columns.value.find(c => c.field === col.field)
     if (found) {
@@ -567,6 +643,39 @@ function updateFieldQuery(query: FieldQuery) {
   }
 }
 
+function updateColumnValueFilter(field: string, value: string, isNegate: boolean) {
+  if (value === '') {
+    fieldQueries.value[field] = {
+      ...(fieldQueries.value[field] || createFieldQuery(field)),
+      field,
+      query: '',
+      isRegex: false,
+      isExact: false,
+      isNegate: false,
+      isArray: false,
+      isPattern: false,
+      isDisabled: false,
+      patternFields: [],
+      jsExpression: isNegate ? '$' : '!$',
+    }
+    return
+  }
+
+  fieldQueries.value[field] = {
+    ...(fieldQueries.value[field] || createFieldQuery(field)),
+    field,
+    query: value,
+    isRegex: false,
+    isExact: true,
+    isNegate,
+    isArray: true,
+    isPattern: false,
+    isDisabled: false,
+    patternFields: [],
+    jsExpression: undefined,
+  }
+}
+
 // Handle chart group filter sync
 function onChartGroupFilter(field: string, values: string[]) {
   if (values.length === 0) {
@@ -585,6 +694,7 @@ function onChartGroupFilter(field: string, values: string[]) {
       field,
       query: values.join(','),
       isRegex: false,
+      isExact: false,
       isNegate: false,
       isArray: true,
       isPattern: false,
@@ -855,21 +965,26 @@ interface ColumnWidthLayout {
 const columnWidthLayout = computed<ColumnWidthLayout>(() => {
   const cols = visibleColumns.value
   if (cols.length === 0) {
-    return { tableStyle: 'min-width: 100%', columnStyles: {} }
+    return { tableStyle: 'width: 100%; min-width: 100%; table-layout: fixed', columnStyles: {} }
   }
 
   const sampleRows = filteredData.value.slice(0, COLUMN_WIDTH_SAMPLE_ROWS)
   const weights = new Map<string, number>()
 
   for (const col of cols) {
-    let width = estimateTextWidth(col.header)
-    for (const row of sampleRows) {
-      width = Math.max(
-        width,
-        estimateTextWidth(getColumnSampleText(row, col.field))
-      )
+    const overrideWidth = columnWidthOverrides.value[col.field]
+    if (overrideWidth && Number.isFinite(overrideWidth)) {
+      weights.set(col.field, Math.max(overrideWidth, COLUMN_WIDTH_MIN_PX))
+    } else {
+      let width = estimateTextWidth(col.header)
+      for (const row of sampleRows) {
+        width = Math.max(
+          width,
+          estimateTextWidth(getColumnSampleText(row, col.field))
+        )
+      }
+      weights.set(col.field, Math.min(Math.max(width, COLUMN_WIDTH_MIN_PX), COLUMN_WIDTH_MAX_WEIGHT_PX))
     }
-    weights.set(col.field, Math.min(Math.max(width, COLUMN_WIDTH_MIN_PX), COLUMN_WIDTH_MAX_WEIGHT_PX))
   }
 
   const total = Array.from(weights.values()).reduce((sum, width) => sum + width, 0) || 1
@@ -883,7 +998,7 @@ const columnWidthLayout = computed<ColumnWidthLayout>(() => {
   }
 
   return {
-    tableStyle: `min-width: max(100%, ${Math.round(total)}px)`,
+    tableStyle: `width: max(100%, ${Math.round(total)}px); min-width: max(100%, ${Math.round(total)}px); table-layout: fixed`,
     columnStyles,
   }
 })
@@ -1637,6 +1752,7 @@ function filterCellValue(field: string, value: any, isNegate: boolean) {
       field,
       query: strValue,
       isRegex: false,
+      isExact: true,
       isNegate: isNegate,
       isArray: true,
       isPattern: false,
@@ -1653,7 +1769,11 @@ function filterCellValue(field: string, value: any, isNegate: boolean) {
       existingValues.push(strValue)
       fieldQueries.value[field] = {
         ...currentFq,
-        query: existingValues.join(',')
+        query: existingValues.join(','),
+        isRegex: false,
+        isExact: true,
+        isPattern: false,
+        jsExpression: undefined,
       }
     }
   } else {
@@ -1661,6 +1781,7 @@ function filterCellValue(field: string, value: any, isNegate: boolean) {
       field,
       query: strValue,
       isRegex: false,
+      isExact: true,
       isNegate: isNegate,
       isArray: true,
       isPattern: false,
@@ -1769,6 +1890,7 @@ function handleExtendFieldResult(result: ExtendFieldResult) {
   const existingQuery = fieldQueries.value[field] || {
     query: '',
     isRegex: false,
+    isExact: false,
     isNegate: false,
     isArray: false,
     isPattern: false,
@@ -1809,6 +1931,7 @@ function handleUpdateExtendedFields(fields: string) {
   const existingQuery = fieldQueries.value[field] || {
     query: '',
     isRegex: false,
+    isExact: false,
     isNegate: false,
     isArray: false,
     isPattern: false,
@@ -1973,6 +2096,7 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
       :filtered-data="filteredData"
       :columns="visibleColumns"
       @update:field-query="updateFieldQuery"
+      @update-column-filter="updateColumnValueFilter"
       @hide-column="hideColumn(activeFilterColumn.field)"
     />
     

@@ -99,6 +99,7 @@ describe('FieldQueryUtils', () => {
         field: 'f',
         query: 'test',
         isRegex: true,
+        isExact: true,
         isNegate: true,
         isArray: true,
         isPattern: true,
@@ -113,6 +114,7 @@ describe('FieldQueryUtils', () => {
 
       expect(cleared.query).toBe('')
       expect(cleared.isRegex).toBe(false)
+      expect(cleared.isExact).toBe(false)
       expect(cleared.isNegate).toBe(false)
       expect(cleared.isArray).toBe(false)
       expect(cleared.isPattern).toBe(false)
@@ -145,6 +147,8 @@ describe('FieldQueryUtils', () => {
       const result = addValueToArrayFilter(undefined, 'value', false)
       expect(result.query).toBe('value')
       expect(result.isArray).toBe(true)
+      expect(result.isExact).toBe(true)
+      expect(result.isRegex).toBe(false)
       expect(result.isNegate).toBe(false)
     })
 
@@ -162,6 +166,7 @@ describe('FieldQueryUtils', () => {
       }
       const result = addValueToArrayFilter(existing, 'c', false)
       expect(result.query).toBe('a,b,c')
+      expect(result.isExact).toBe(true)
     })
 
     it('should not add duplicate value', () => {
@@ -184,6 +189,7 @@ describe('FieldQueryUtils', () => {
       const result = addValueToArrayFilter(existing, 'c', true)
       expect(result.query).toBe('c')
       expect(result.isNegate).toBe(true)
+      expect(result.isExact).toBe(true)
     })
   })
 })

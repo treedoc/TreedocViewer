@@ -55,6 +55,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update:fieldQuery': [query: FieldQuery]
+  'update-column-filter': [field: string, value: string, isNegate: boolean]
   'hide-column': []
 }>()
 
@@ -164,6 +165,7 @@ defineExpose({ show, hide, toggle, resetSize })
 const showStats = ref(false)
 const localQuery = ref(props.fieldQuery.query || '')
 const localIsRegex = ref(!!props.fieldQuery.isRegex)
+const localIsExact = ref(!!props.fieldQuery.isExact)
 const localIsNegate = ref(!!props.fieldQuery.isNegate)
 const localIsArray = ref(!!props.fieldQuery.isArray)
 const localIsPattern = ref(props.fieldQuery.isPattern || false)
@@ -418,6 +420,7 @@ watch(() => props.fieldQuery, (fq) => {
     localQuery.value = fq.query || ''
   }
   localIsRegex.value = !!fq.isRegex
+  localIsExact.value = !!fq.isExact
   localIsNegate.value = !!fq.isNegate
   localIsArray.value = !!fq.isArray
   localIsPattern.value = fq.isPattern || false
@@ -538,11 +541,14 @@ function applyFilter() {
   if (localIsJs.value) {
     jsExpression = localQuery.value || 'true'  // 'true' means no filtering
   }
+  const isRegex = !localIsJs.value && localIsRegex.value
+  const isExact = !localIsJs.value && !isRegex && localIsExact.value
   
   emit('update:fieldQuery', {
     ...props.fieldQuery,  // Preserve valueColors and other properties
     query: localIsJs.value ? '' : localQuery.value,
-    isRegex: localIsJs.value ? false : localIsRegex.value,
+    isRegex,
+    isExact,
     isNegate: localIsJs.value ? false : localIsNegate.value,
     isArray: localIsJs.value ? false : localIsArray.value,
     isPattern: false,  // No longer used in filter options
@@ -590,6 +596,7 @@ function handleTextareaKeydown(e: KeyboardEvent) {
 function clearFilter() {
   localQuery.value = ''
   localIsRegex.value = false
+  localIsExact.value = false
   localIsNegate.value = false
   localIsArray.value = false
   localIsPattern.value = false
@@ -630,6 +637,7 @@ function applySelectedValuesFilter(isNegate: boolean) {
   localIsArray.value = true
   localIsNegate.value = isNegate
   localIsRegex.value = false
+  localIsExact.value = true
   localIsPattern.value = false
   localIsJs.value = false
   debouncedApplyFilter.cancel()
@@ -652,6 +660,7 @@ function addValueToFilter(value: string, isNegate: boolean) {
     localIsArray.value = false
     localIsNegate.value = false
     localIsRegex.value = false
+    localIsExact.value = false
     localIsPattern.value = false
     debouncedApplyFilter()
     return
@@ -663,6 +672,7 @@ function addValueToFilter(value: string, isNegate: boolean) {
     localIsNegate.value = isNegate
     localIsArray.value = true
     localIsRegex.value = false
+    localIsExact.value = true
     localIsPattern.value = false
     localIsJs.value = false
     debouncedApplyFilter()
@@ -676,11 +686,16 @@ function addValueToFilter(value: string, isNegate: boolean) {
       existingValues.push(value)
       localQuery.value = existingValues.join(', ')
     }
+    localIsRegex.value = false
+    localIsExact.value = true
+    localIsPattern.value = false
+    localIsJs.value = false
   } else {
     localQuery.value = value
     localIsArray.value = true
     localIsNegate.value = isNegate
     localIsRegex.value = false
+    localIsExact.value = true
     localIsPattern.value = false
     localIsJs.value = false
   }
@@ -718,6 +733,28 @@ function handleTopValueButtonClick(buttonId: string, value: string) {
       break
     case 'filter-out':
       addValueToFilter(value, true)
+      break
+  }
+}
+
+function getBreakdownValueButtons(): HoverButton[] {
+  return [
+    { id: 'filter-in', icon: 'pi-filter', title: 'Filter in this value', variant: 'filter-in' },
+    { id: 'filter-out', icon: 'pi-filter-slash', title: 'Filter out this value', variant: 'filter-out' }
+  ]
+}
+
+function handleBreakdownValueButtonClick(buttonId: string, value: string) {
+  if (breakdownFields.value.length !== 1) return
+  const breakdownField = breakdownFields.value[0]
+  if (!breakdownField) return
+
+  switch (buttonId) {
+    case 'filter-in':
+      emit('update-column-filter', breakdownField, value, false)
+      break
+    case 'filter-out':
+      emit('update-column-filter', breakdownField, value, true)
       break
   }
 }
@@ -1015,6 +1052,7 @@ function toggleColorPicker(value: string) {
     ref="compactFilterPopoverRef"
     v-model:query="localQuery"
     v-model:is-regex="localIsRegex"
+    v-model:is-exact="localIsExact"
     v-model:is-negate="localIsNegate"
     v-model:is-array="localIsArray"
     v-model:is-disabled="localIsDisabled"
@@ -1056,11 +1094,13 @@ function toggleColorPicker(value: string) {
       <ColumnFilterBasicControls
         v-model:query="localQuery"
         v-model:is-regex="localIsRegex"
+        v-model:is-exact="localIsExact"
         v-model:is-negate="localIsNegate"
         v-model:is-array="localIsArray"
         v-model:is-disabled="localIsDisabled"
         v-model:is-js="localIsJs"
         :field="field"
+        :show-hide-column="true"
         @apply="debouncedApplyFilter"
         @clear="clearFilter"
         @keydown="handleKeydown"
@@ -1267,10 +1307,18 @@ user=${userId}, action=$action"
                   <td
                     v-for="(value, index) in row.values"
                     :key="`${row.key}-${index}`"
-                    class="breakdown-value"
+                    class="breakdown-value breakdown-value-cell"
                     :title="value"
                   >
-                    {{ value || '(empty)' }}
+                    <span class="breakdown-value-text">{{ value || '(empty)' }}</span>
+                    <HoverButtonBar
+                      v-if="breakdownFields.length === 1 && index === 0"
+                      :buttons="getBreakdownValueButtons()"
+                      layout="absolute"
+                      :position-below="true"
+                      class="breakdown-value-actions"
+                      @click="handleBreakdownValueButtonClick($event, value)"
+                    />
                   </td>
                   <td>{{ row.count }}</td>
                   <td>{{ row.uniqueCount }}</td>
@@ -1893,6 +1941,24 @@ user=${userId}, action=$action"
 
 .breakdown-value {
   white-space: nowrap;
+}
+
+.breakdown-value-cell {
+  position: relative;
+  overflow: visible;
+}
+
+.breakdown-value-text {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+:global(.breakdown-value-cell:hover .breakdown-value-actions),
+:global(.breakdown-value-cell:hover .hover-button-bar) {
+  opacity: 1 !important;
+  transition-delay: 300ms;
+  pointer-events: auto;
 }
 
 .breakdown-total-value {

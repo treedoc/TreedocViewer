@@ -47,6 +47,7 @@ export interface Column {
   // --- filter / query state (formerly FieldQuery) ---
   query?: string
   isRegex?: boolean
+  isExact?: boolean
   isNegate?: boolean
   isArray?: boolean
   isPattern?: boolean
@@ -240,6 +241,7 @@ export function cleanColumnForSave(col: Column): Partial<Column> {
   if (col.width) result.width = col.width
   if (col.query) result.query = col.query
   if (col.isRegex) result.isRegex = col.isRegex
+  if (col.isExact) result.isExact = col.isExact
   if (col.isNegate) result.isNegate = col.isNegate
   if (col.isArray) result.isArray = col.isArray
   if (col.isPattern) result.isPattern = col.isPattern
@@ -279,6 +281,7 @@ export function createDefaultFieldQuery(): FieldQuery {
     field: '',
     query: '',
     isRegex: false,
+    isExact: false,
     isNegate: false,
     isArray: false,
     isPattern: false,

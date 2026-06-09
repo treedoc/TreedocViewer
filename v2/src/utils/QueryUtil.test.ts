@@ -195,6 +195,7 @@ describe('matchFieldQuery', () => {
   const createFieldQuery = (overrides: Partial<{
     query: string
     isRegex: boolean
+    isExact: boolean
     isNegate: boolean
     isArray: boolean
     isPattern: boolean
@@ -204,6 +205,7 @@ describe('matchFieldQuery', () => {
     field: 'test-field',
     query: '',
     isRegex: false,
+    isExact: false,
     isNegate: false,
     isArray: false,
     isPattern: false,
@@ -241,6 +243,25 @@ describe('matchFieldQuery', () => {
 
   it('should match regex when isRegex is true', () => {
     const fq = createFieldQuery({ query: '^\\d+$', isRegex: true })
+    expect(matchFieldQuery('12345', fq)).toBe(true)
+    expect(matchFieldQuery('abc123', fq)).toBe(false)
+  })
+
+  it('should match the whole value when isExact is true', () => {
+    const fq = createFieldQuery({ query: 'hello', isExact: true })
+    expect(matchFieldQuery('hello', fq)).toBe(true)
+    expect(matchFieldQuery('Hello', fq)).toBe(true)
+    expect(matchFieldQuery('hello world', fq)).toBe(false)
+  })
+
+  it('should match whole values in array exact mode', () => {
+    const fq = createFieldQuery({ query: 'red, green, blue', isArray: true, isExact: true })
+    expect(matchFieldQuery('green', fq)).toBe(true)
+    expect(matchFieldQuery('greenish', fq)).toBe(false)
+  })
+
+  it('should prefer regex when both regex and exact flags are set', () => {
+    const fq = createFieldQuery({ query: '^\\d+$', isRegex: true, isExact: true })
     expect(matchFieldQuery('12345', fq)).toBe(true)
     expect(matchFieldQuery('abc123', fq)).toBe(false)
   })

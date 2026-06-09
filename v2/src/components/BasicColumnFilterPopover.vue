@@ -7,6 +7,7 @@ const props = withDefaults(defineProps<{
   field: string
   query: string
   isRegex?: boolean
+  isExact?: boolean
   isNegate?: boolean
   isArray?: boolean
   isDisabled?: boolean
@@ -29,6 +30,7 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{
   'update:query': [value: string]
   'update:isRegex': [value: boolean]
+  'update:isExact': [value: boolean]
   'update:isNegate': [value: boolean]
   'update:isArray': [value: boolean]
   'update:isDisabled': [value: boolean]
@@ -53,6 +55,11 @@ const localQuery = computed({
 const localIsRegex = computed({
   get: () => !!props.isRegex,
   set: (value: boolean) => emit('update:isRegex', value),
+})
+
+const localIsExact = computed({
+  get: () => !!props.isExact,
+  set: (value: boolean) => emit('update:isExact', value),
 })
 
 const localIsNegate = computed({
@@ -185,6 +192,7 @@ defineExpose({ show, hide, toggle })
       <ColumnFilterBasicControls
         v-model:query="localQuery"
         v-model:is-regex="localIsRegex"
+        v-model:is-exact="localIsExact"
         v-model:is-negate="localIsNegate"
         v-model:is-array="localIsArray"
         v-model:is-disabled="localIsDisabled"

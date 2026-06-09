@@ -599,6 +599,7 @@ function createLegendFilterQuery(field: LegendSortField): FieldQuery {
     field,
     query: '',
     isRegex: false,
+    isExact: false,
     isNegate: false,
     isArray: false,
     isPattern: false,
@@ -639,6 +640,7 @@ const activeLegendFilterIsJs = computed({
       query.jsExpression = query.query || 'true'
       query.query = ''
       query.isRegex = false
+      query.isExact = false
       query.isNegate = false
       query.isArray = false
     } else {
@@ -1689,6 +1691,7 @@ onBeforeUnmount(() => {
           ref="legendFilterPopoverRef"
           v-model:query="activeLegendFilterText"
           v-model:is-regex="activeLegendFilterQuery.isRegex"
+          v-model:is-exact="activeLegendFilterQuery.isExact"
           v-model:is-negate="activeLegendFilterQuery.isNegate"
           v-model:is-array="activeLegendFilterQuery.isArray"
           v-model:is-disabled="activeLegendFilterQuery.isDisabled"

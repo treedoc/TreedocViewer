@@ -8,6 +8,7 @@ const props = defineProps<{
   field: string
   query: string
   isRegex?: boolean
+  isExact?: boolean
   isNegate?: boolean
   isArray?: boolean
   isDisabled?: boolean
@@ -20,6 +21,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   'update:query': [value: string]
   'update:isRegex': [value: boolean]
+  'update:isExact': [value: boolean]
   'update:isNegate': [value: boolean]
   'update:isArray': [value: boolean]
   'update:isDisabled': [value: boolean]
@@ -38,7 +40,18 @@ const localQuery = computed({
 
 const localIsRegex = computed({
   get: () => !!props.isRegex,
-  set: (value: boolean) => emit('update:isRegex', value),
+  set: (value: boolean) => {
+    emit('update:isRegex', value)
+    if (value) emit('update:isExact', false)
+  },
+})
+
+const localIsExact = computed({
+  get: () => !!props.isExact,
+  set: (value: boolean) => {
+    emit('update:isExact', value)
+    if (value) emit('update:isRegex', false)
+  },
 })
 
 const localIsNegate = computed({
@@ -107,6 +120,17 @@ const localIsJs = computed({
       class="filter-option-btn"
       :class="{ 'is-active': localIsRegex && !localIsJs }"
       :style="localIsRegex && !localIsJs ? { background: '#3b82f6', borderColor: '#3b82f6', color: 'white' } : {}"
+      :disabled="localIsDisabled || localIsJs"
+    />
+    <ToggleButton
+      v-model="localIsExact"
+      onLabel="="
+      offLabel="="
+      @change="emit('apply')"
+      v-tooltip.top="'Exact match'"
+      class="filter-option-btn"
+      :class="{ 'is-active': localIsExact && !localIsJs }"
+      :style="localIsExact && !localIsJs ? { background: '#3b82f6', borderColor: '#3b82f6', color: 'white' } : {}"
       :disabled="localIsDisabled || localIsJs"
     />
     <ToggleButton
