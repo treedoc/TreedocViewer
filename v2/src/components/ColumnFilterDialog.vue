@@ -11,6 +11,7 @@ import BasicColumnFilterPopover from './BasicColumnFilterPopover.vue'
 import type { TDNode } from 'treedoc'
 import { TDNodeType, TDJSONWriter, TDJSONWriterOption } from 'treedoc'
 import type { FieldQuery } from '@/models/types'
+import { useColumnResize } from '@/composables/useColumnResize'
 
 export type { FieldQuery }
 
@@ -43,6 +44,25 @@ interface StatisticTableRow {
   p99: number
   p90: number
   p50: number
+}
+
+type StatisticColumnKey =
+  | `breakdown:${number}`
+  | 'count'
+  | 'unique'
+  | 'total'
+  | 'percent'
+  | 'max'
+  | 'avg'
+  | 'p99'
+  | 'p90'
+  | 'p50'
+
+type StatisticSortOrder = 1 | -1
+
+interface StatisticTableColumn {
+  key: StatisticColumnKey
+  label: string
 }
 
 const props = defineProps<{
@@ -285,6 +305,24 @@ const isResizingStatsTable = ref(false)
 const statsResizeStartY = ref(0)
 const statsResizeStartHeight = ref(0)
 
+const STATS_COLUMN_DEFAULT_WIDTHS: Partial<Record<StatisticColumnKey, number>> = {
+  count: 72,
+  unique: 72,
+  total: 96,
+  percent: 84,
+  max: 84,
+  avg: 84,
+  p99: 84,
+  p90: 84,
+  p50: 84,
+}
+const STATS_BREAKDOWN_COLUMN_DEFAULT_WIDTH = 160
+const STATS_COLUMN_MIN_WIDTH = 56
+const STATS_BREAKDOWN_COLUMN_MIN_WIDTH = 88
+const STATS_COLUMN_RESIZE_DEBOUNCE_MS = 32
+const statisticSortField = ref<StatisticColumnKey | null>(null)
+const statisticSortOrder = ref<StatisticSortOrder>(-1)
+
 function clampOverlayPosition(left: number, top: number): { left: number; top: number } {
   return {
     left: Math.max(16, Math.min(window.innerWidth - overlayWidth.value - 16, left)),
@@ -381,6 +419,10 @@ function stopStatsTableResize() {
   document.removeEventListener('mousemove', onStatsTableResize)
   document.removeEventListener('mouseup', stopStatsTableResize)
   saveStatsTableHeight(statsTableHeight.value)
+}
+
+function getStatsColumnMinWidth(key: StatisticColumnKey): number {
+  return key.startsWith('breakdown:') ? STATS_BREAKDOWN_COLUMN_MIN_WIDTH : STATS_COLUMN_MIN_WIDTH
 }
 
 onBeforeUnmount(() => {
@@ -901,6 +943,42 @@ const statisticValueHeaders = computed(() => {
   return selectedBreakdownLabels.value
 })
 
+const statisticTableColumns = computed<StatisticTableColumn[]>(() => {
+  return [
+    ...statisticValueHeaders.value.map((label, index) => ({
+      key: `breakdown:${index}` as const,
+      label,
+    })),
+    { key: 'count', label: 'Count' },
+    { key: 'unique', label: 'Unique' },
+    ...(hasNumericStatisticRows.value ? [{ key: 'total' as const, label: 'Total' }] : []),
+    ...(hasBreakdownFields.value ? [{ key: 'percent' as const, label: '%' }] : []),
+    ...(hasNumericStatisticRows.value
+      ? [
+          { key: 'max' as const, label: 'Max' },
+          { key: 'avg' as const, label: 'Avg' },
+          { key: 'p99' as const, label: 'P99' },
+          { key: 'p90' as const, label: 'P90' },
+          { key: 'p50' as const, label: 'P50' },
+        ]
+      : []),
+  ]
+})
+
+const {
+  columnWidths: statsColumnWidths,
+  resizingColumnKey: resizingStatsColumnKey,
+  tableWidth: statisticTableWidth,
+  getColumnWidth: getStatsColumnWidth,
+  startColumnResize: startStatsColumnResize,
+} = useColumnResize<StatisticColumnKey>({
+  columns: statisticTableColumns,
+  defaultWidths: STATS_COLUMN_DEFAULT_WIDTHS,
+  defaultWidth: STATS_BREAKDOWN_COLUMN_DEFAULT_WIDTH,
+  getMinWidth: getStatsColumnMinWidth,
+  debounceMs: STATS_COLUMN_RESIZE_DEBOUNCE_MS,
+})
+
 function createStatisticTableRow(values: string[], rows: any[], totalBase: number): StatisticTableRow {
   const stats = calculateColumnStats(rows, props.field)
   const isNumeric = stats.numericCount > 0
@@ -953,9 +1031,73 @@ const statisticRows = computed<StatisticTableRow[]>(() => {
     })
 })
 
-const displayedStatisticRows = computed(() => {
-  return statisticRows.value.slice(0, MAX_DISPLAYED_BREAKDOWN_ROWS)
+const activeStatisticSortField = computed<StatisticColumnKey>(() => {
+  const field = statisticSortField.value
+  if (field && statisticTableColumns.value.some(col => col.key === field)) return field
+  return hasNumericStatisticRows.value ? 'total' : 'count'
 })
+
+function getStatisticSortValue(row: StatisticTableRow, field: StatisticColumnKey): string | number | null {
+  if (field.startsWith('breakdown:')) {
+    return row.values[Number(field.split(':')[1])] || ''
+  }
+
+  switch (field) {
+    case 'count': return row.count
+    case 'unique': return row.uniqueCount
+    case 'total': return row.isNumeric ? row.total : null
+    case 'percent': return row.percent
+    case 'max': return row.isNumeric && typeof row.max === 'number' ? row.max : null
+    case 'avg': return row.isNumeric ? row.avg : null
+    case 'p99': return row.isNumeric ? row.p99 : null
+    case 'p90': return row.isNumeric ? row.p90 : null
+    case 'p50': return row.isNumeric ? row.p50 : null
+  }
+
+  return null
+}
+
+function compareStatisticValues(a: string | number | null, b: string | number | null): number {
+  if (a == null && b == null) return 0
+  if (a == null) return 1
+  if (b == null) return -1
+  if (typeof a === 'number' && typeof b === 'number') return a - b
+  return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' })
+}
+
+const sortedStatisticRows = computed(() => {
+  const field = activeStatisticSortField.value
+  const order = statisticSortOrder.value
+  return statisticRows.value
+    .map((row, index) => ({ row, index }))
+    .sort((a, b) => {
+      const diff = compareStatisticValues(
+        getStatisticSortValue(a.row, field),
+        getStatisticSortValue(b.row, field)
+      )
+      return diff === 0 ? a.index - b.index : diff * order
+    })
+    .map(item => item.row)
+})
+
+const displayedStatisticRows = computed(() => {
+  return sortedStatisticRows.value.slice(0, MAX_DISPLAYED_BREAKDOWN_ROWS)
+})
+
+function setStatisticSort(field: StatisticColumnKey) {
+  if (activeStatisticSortField.value === field) {
+    statisticSortOrder.value = statisticSortOrder.value === 1 ? -1 : 1
+  } else {
+    statisticSortField.value = field
+    statisticSortOrder.value = 1
+  }
+  statisticSortField.value = field
+}
+
+function getStatisticSortIcon(field: StatisticColumnKey): string {
+  if (activeStatisticSortField.value !== field) return 'pi pi-sort-alt'
+  return statisticSortOrder.value === 1 ? 'pi pi-sort-amount-up-alt' : 'pi pi-sort-amount-down'
+}
 
 watch(() => displayedTopValues.value.map(item => item.val).join('\u0000'), (topValuesKey) => {
   const allowed = new Set(topValuesKey ? topValuesKey.split('\u0000') : [])
@@ -971,7 +1113,7 @@ function copyBreakdownStats() {
   const headers = hasNumericStatisticRows.value
     ? [...breakdownLabels, 'Count', 'Unique', 'Total', 'Percent', 'Max', 'Avg', 'P99', 'P90', 'P50']
     : [...breakdownLabels, 'Count', 'Unique', 'Percent']
-  const rows = statisticRows.value.map(row => {
+  const rows = sortedStatisticRows.value.map(row => {
     const common = [
       ...row.values,
       row.count,
@@ -1277,24 +1419,41 @@ user=${userId}, action=$action"
           </div>
           <div
             v-if="statisticRows.length > 0"
-            v-memo="[breakdownFieldsKey, selectedBreakdownValue, filteredData, field, statsTableHeight, hasBreakdownFields, displayedStatisticRows]"
+            v-memo="[breakdownFieldsKey, selectedBreakdownValue, filteredData, field, statsTableHeight, hasBreakdownFields, displayedStatisticRows, statisticTableWidth, statsColumnWidths, resizingStatsColumnKey, activeStatisticSortField, statisticSortOrder]"
             class="stats-breakdown-table-wrap"
             :class="{ 'is-compact': !hasBreakdownFields }"
             :style="hasBreakdownFields ? { height: statsTableHeight + 'px' } : undefined"
           >
-            <table class="stats-breakdown-table">
+            <table class="stats-breakdown-table" :style="{ width: statisticTableWidth + 'px' }">
+              <colgroup>
+                <col
+                  v-for="col in statisticTableColumns"
+                  :key="col.key"
+                  :style="{ width: getStatsColumnWidth(col.key) + 'px' }"
+                />
+              </colgroup>
               <thead>
                 <tr>
-                  <th v-for="header in statisticValueHeaders" :key="header">{{ header }}</th>
-                  <th>Count</th>
-                  <th>Unique</th>
-                  <th v-if="hasNumericStatisticRows">Total</th>
-                  <th v-if="hasBreakdownFields">%</th>
-                  <th v-if="hasNumericStatisticRows">Max</th>
-                  <th v-if="hasNumericStatisticRows">Avg</th>
-                  <th v-if="hasNumericStatisticRows">P99</th>
-                  <th v-if="hasNumericStatisticRows">P90</th>
-                  <th v-if="hasNumericStatisticRows">P50</th>
+                  <th
+                    v-for="col in statisticTableColumns"
+                    :key="col.key"
+                    class="stats-resizable-header"
+                    :class="{ resizing: resizingStatsColumnKey === col.key }"
+                  >
+                    <button
+                      type="button"
+                      class="stats-sort-button"
+                      :class="{ sorted: activeStatisticSortField === col.key }"
+                      @click="setStatisticSort(col.key)"
+                    >
+                      <span class="stats-header-label">{{ col.label }}</span>
+                      <i :class="getStatisticSortIcon(col.key)"></i>
+                    </button>
+                    <span
+                      class="p-column-resizer stats-column-resize-handle"
+                      @mousedown="startStatsColumnResize($event, col.key)"
+                    />
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -1887,8 +2046,8 @@ user=${userId}, action=$action"
 }
 
 .stats-breakdown-table {
-  width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
   font-size: 0.78rem;
 }
 
@@ -1896,8 +2055,16 @@ user=${userId}, action=$action"
 .stats-breakdown-table td {
   padding: 5px 6px;
   border-bottom: 1px solid var(--tdv-surface-border);
+  border-right: 1px solid var(--tdv-surface-border);
   text-align: left;
   vertical-align: top;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stats-breakdown-table th:last-child,
+.stats-breakdown-table td:last-child {
+  border-right: none;
 }
 
 .stats-breakdown-table th {
@@ -1907,6 +2074,81 @@ user=${userId}, action=$action"
   background: var(--tdv-surface-light);
   color: var(--tdv-text-muted);
   font-weight: 600;
+}
+
+.stats-resizable-header {
+  padding-right: 10px !important;
+}
+
+.stats-sort-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.stats-sort-button.sorted {
+  color: var(--tdv-text);
+}
+
+.stats-sort-button:hover {
+  color: var(--tdv-primary);
+}
+
+.stats-header-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stats-sort-button i {
+  flex: 0 0 auto;
+  font-size: 0.68rem;
+  opacity: 0.75;
+}
+
+.stats-column-resize-handle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 8px;
+  cursor: col-resize;
+  z-index: 2;
+}
+
+.stats-column-resize-handle::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 1px;
+  background: transparent;
+  opacity: 0;
+}
+
+.stats-resizable-header:hover .stats-column-resize-handle::after,
+.stats-resizable-header.resizing .stats-column-resize-handle::after {
+  background: var(--tdv-primary);
+  opacity: 0.8;
+}
+
+.stats-resizable-header.resizing .stats-column-resize-handle::after {
+  width: 2px;
+  opacity: 1;
 }
 
 .stats-breakdown-table tbody tr {
