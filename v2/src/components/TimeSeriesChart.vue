@@ -172,6 +172,15 @@ function sameStringArray(a: string[], b?: string[]) {
   return a.every((item, index) => item === b[index])
 }
 
+function applyEffectiveColumnsImmediately() {
+  if (debounceTimer) {
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+  }
+  effectiveValueColumns.value = [...valueColumns.value]
+  effectiveGroupColumns.value = [...groupColumns.value]
+}
+
 // Emit state changes to parent
 watch(timeColumn, (val) => emit('update:timeColumn', val))
 watch(valueColumns, (val) => {
@@ -195,11 +204,13 @@ watch(() => props.timeColumnModel, (val) => {
 watch(() => props.valueColumnsModel, (val) => {
   if (!sameStringArray(valueColumns.value, val)) {
     valueColumns.value = val ? [...val] : []
+    applyEffectiveColumnsImmediately()
   }
 }, { deep: true })
 watch(() => props.groupColumnsModel, (val) => {
   if (!sameStringArray(groupColumns.value, val)) {
     groupColumns.value = val ? [...val] : []
+    applyEffectiveColumnsImmediately()
   }
 }, { deep: true })
 watch(() => props.bucketSizeModel, (val) => {
