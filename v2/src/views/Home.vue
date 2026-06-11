@@ -81,7 +81,7 @@ function parsePresetParam(value: unknown): string | undefined {
 
 function applyEventConfig() {
   nextTick(() => {
-    jsonTreeTableRef.value?.applyPresetConfig(initialPreset.value, options.value)
+    jsonTreeTableRef.value?.applyPresetConfig(initialPreset.value, options.value, { immediate: true })
   })
 }
 

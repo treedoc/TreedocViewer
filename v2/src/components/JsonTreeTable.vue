@@ -47,6 +47,7 @@ const {
   availableParsers
 } = storeToRefs(store)
 const { isDarkMode } = storeToRefs(themeStore)
+let initialPresetTimer: ReturnType<typeof setTimeout> | null = null
 
 const toast = useToast()
 const fileInputRef = ref<HTMLInputElement>()
@@ -360,6 +361,13 @@ watch(() => props.initialPath, (path) => {
 // Track if initial preset has been applied
 const initialPresetApplied = ref(false)
 
+function clearInitialPresetTimer() {
+  if (initialPresetTimer) {
+    clearTimeout(initialPresetTimer)
+    initialPresetTimer = null
+  }
+}
+
 function getToastProps(status: ParseStatus) {
   switch (status) {
     case ParseStatus.ERROR:
@@ -398,7 +406,11 @@ watch(
 )
 
 // Apply initial preset from URL parameter
-function applyInitialPreset(initialPreset = props.initialPreset, options = props.options) {
+function applyInitialPreset(
+  initialPreset = props.initialPreset,
+  options = props.options,
+  applyOptions: { immediate?: boolean } = {}
+) {
   if (!initialPreset && !options?.globalRule) return
   
   try {
@@ -425,25 +437,35 @@ function applyInitialPreset(initialPreset = props.initialPreset, options = props
       pathRules,
     }
     
-    // Apply the preset to TableView after a short delay to ensure it's mounted
-    nextTick(() => {
-      setTimeout(() => {
-        if (tableViewRef.value) {
-          tableViewRef.value.applyPreset(preset)
-          console.log('[JsonTreeTable] Applied initial preset:', preset.name)
-        }
-      }, 100)
-    })
+    const applyToTable = () => {
+      initialPresetTimer = null
+      if (tableViewRef.value) {
+        tableViewRef.value.applyPreset(preset)
+        console.log('[JsonTreeTable] Applied initial preset:', preset.name)
+      }
+    }
+
+    // Initial URL/data-load presets may run before the table is mounted. Embed
+    // events arrive after ready, so they can apply without the extra delay.
+    if (applyOptions.immediate) {
+      clearInitialPresetTimer()
+      nextTick(applyToTable)
+    } else {
+      nextTick(() => {
+        clearInitialPresetTimer()
+        initialPresetTimer = setTimeout(applyToTable, 100)
+      })
+    }
   } catch (e) {
     console.error('[JsonTreeTable] Failed to parse initial preset:', e)
   }
 }
 
-function applyPresetConfig(initialPreset?: string, options?: TDVOptions) {
+function applyPresetConfig(initialPreset?: string, options?: TDVOptions, applyOptions?: { immediate?: boolean }) {
   if (options) {
     store.setInitialOptions(options)
   }
-  applyInitialPreset(initialPreset, options)
+  applyInitialPreset(initialPreset, options, applyOptions)
 }
 
 // Global keyboard handler for fullscreen toggle
@@ -482,6 +504,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  clearInitialPresetTimer()
   document.removeEventListener('keydown', handleGlobalKeydown)
 })
 
