@@ -126,6 +126,13 @@ interface PieChartConfig {
   total: number
 }
 
+interface PieLegendRow {
+  label: string
+  groupParts: string[]
+  count: number
+  total: number
+}
+
 type LegendSortField = 'name' | 'max' | 'mean' | `group:${number}`
 type LegendSortOrder = 1 | -1
 type LegendColumnKey = LegendSortField
@@ -367,7 +374,7 @@ const pieChartsControl = computed({
   }
 })
 const chartHasData = computed(() => {
-  return (renderTimeSeriesChart.value || (renderPieCharts.value && pieChartConfigs.value.length > 0))
+  return renderTimeSeriesChart.value || (renderPieCharts.value && pieLegendRows.value.length > 0)
 })
 const chartLayoutStyle = computed(() => {
   const height = props.chartHeight ?? 250
@@ -571,6 +578,14 @@ const pieGroupLabels = computed(() => {
   return Array.from(labels).sort()
 })
 
+function getPieHiddenKey(label: string): string {
+  return `pie:${label}`
+}
+
+function isPieSliceVisible(label: string): boolean {
+  return !hiddenGroups.value.has(getPieHiddenKey(label))
+}
+
 const pieSlices = computed<PieSliceStats[]>(() => {
   const sliceMap = new Map<string, PieSliceStats>()
 
@@ -599,6 +614,25 @@ const pieSlices = computed<PieSliceStats[]>(() => {
     return labels.indexOf(a.label) - labels.indexOf(b.label)
   })
 })
+
+const pieLegendRows = computed<PieLegendRow[]>(() => {
+  return pieSlices.value.map(slice => {
+    let total = 0
+    for (const column of effectiveValueColumns.value) {
+      const value = getValueForStats(slice.valueStats[column])
+      if (value !== null && Number.isFinite(value)) total += value
+    }
+
+    return {
+      label: slice.label,
+      groupParts: slice.label === 'All' ? [] : slice.label.split(' | '),
+      count: slice.count,
+      total,
+    }
+  }).sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, undefined, { numeric: true, sensitivity: 'base' }))
+})
+
+const allPieSlicesHidden = computed(() => pieLegendRows.value.length > 0 && pieLegendRows.value.every(row => !isPieSliceVisible(row.label)))
 
 function aggregateValues(values: number[]): { max: number; mean: number } {
   if (values.length === 0) return { max: 0, mean: 0 }
@@ -971,14 +1005,15 @@ function getSeriesColor(series: SeriesSummary) {
   return colorPalette[(series.colorIndex + 2) % colorPalette.length]
 }
 
-function getPieValueColor(index: number) {
+function getPieGroupColor(label: string) {
+  const index = Math.max(0, pieGroupLabels.value.indexOf(label))
   return colorPalette[index % colorPalette.length]
 }
 
 function getPieData(title: string, valuesByLabel: Map<string, number>): ChartData<'pie'> {
   const rows = pieGroupLabels.value
     .map(label => ({ label, value: valuesByLabel.get(label) || 0 }))
-    .filter(row => Number.isFinite(row.value) && row.value > 0)
+    .filter(row => isPieSliceVisible(row.label) && Number.isFinite(row.value) && row.value > 0)
     .sort((a, b) => b.value - a.value || a.label.localeCompare(b.label, undefined, { numeric: true, sensitivity: 'base' }))
 
   return {
@@ -987,8 +1022,8 @@ function getPieData(title: string, valuesByLabel: Map<string, number>): ChartDat
       {
         label: title,
         data: rows.map(row => row.value),
-        backgroundColor: rows.map((_, index) => getPieValueColor(index).bg),
-        borderColor: rows.map((_, index) => getPieValueColor(index).border),
+        backgroundColor: rows.map(row => getPieGroupColor(row.label).bg),
+        borderColor: rows.map(row => getPieGroupColor(row.label).border),
         borderWidth: 1
       }
     ]
@@ -1063,12 +1098,7 @@ const pieOptions = computed<ChartOptions<'pie'>>(() => ({
   animation: false,
   plugins: {
     legend: {
-      display: true,
-      position: 'right',
-      labels: {
-        boxWidth: 10,
-        boxHeight: 10
-      }
+      display: false
     },
     title: {
       display: false
@@ -1453,6 +1483,31 @@ function toggleAllValueSeries() {
 
   hiddenGroups.value = next
   explicitlyShownValueSeries.value = nextExplicitlyShown
+}
+
+function togglePieSliceVisibility(label: string) {
+  const next = new Set(hiddenGroups.value)
+  const key = getPieHiddenKey(label)
+
+  if (next.has(key)) {
+    next.delete(key)
+  } else {
+    next.add(key)
+  }
+
+  hiddenGroups.value = next
+}
+
+function toggleAllPieSlices() {
+  const next = new Set(hiddenGroups.value)
+
+  if (allPieSlicesHidden.value) {
+    for (const row of pieLegendRows.value) next.delete(getPieHiddenKey(row.label))
+  } else {
+    for (const row of pieLegendRows.value) next.add(getPieHiddenKey(row.label))
+  }
+
+  hiddenGroups.value = next
 }
 
 function startLegendResize(event: MouseEvent) {
@@ -1960,25 +2015,111 @@ onBeforeUnmount(() => {
         </aside>
       </div>
 
-      <div v-if="renderPieCharts && pieChartConfigs.length > 0" class="pie-chart-grid" :style="pieGridStyle">
-        <section
-          v-for="pieChart in pieChartConfigs"
-          :key="pieChart.key"
-          class="pie-chart-panel"
+      <div v-if="renderPieCharts" class="pie-chart-row">
+        <div v-if="pieChartConfigs.length > 0" class="pie-chart-grid" :style="pieGridStyle">
+          <section
+            v-for="pieChart in pieChartConfigs"
+            :key="pieChart.key"
+            class="pie-chart-panel"
+          >
+            <header class="pie-chart-header">
+              <span class="pie-chart-title">{{ pieChart.title }}</span>
+              <span class="pie-chart-total">{{ formatMetric(pieChart.total) }}</span>
+            </header>
+            <div class="pie-chart-container">
+              <Pie
+                :data="pieChart.data"
+                :options="pieOptions"
+                dataset-id-key="label"
+                :update-mode="CHART_UPDATE_MODE"
+              />
+            </div>
+          </section>
+        </div>
+
+        <div v-else class="pie-chart-empty">
+          <i class="pi pi-eye-slash"></i>
+          <span>All pie slices are hidden</span>
+        </div>
+
+        <aside
+          v-if="pieLegendRows.length > 0"
+          class="value-legend pie-legend"
+          :style="{ width: `${legendWidth}px` }"
         >
-          <header class="pie-chart-header">
-            <span class="pie-chart-title">{{ pieChart.title }}</span>
-            <span class="pie-chart-total">{{ formatMetric(pieChart.total) }}</span>
-          </header>
-          <div class="pie-chart-container">
-            <Pie
-              :data="pieChart.data"
-              :options="pieOptions"
-              dataset-id-key="label"
-              :update-mode="CHART_UPDATE_MODE"
-            />
-          </div>
-        </section>
+          <table>
+            <colgroup>
+              <col :style="{ width: `${LEGEND_VISIBILITY_COL_WIDTH}px` }" />
+              <col :style="{ width: `${LEGEND_COLOR_COL_WIDTH}px` }" />
+              <col
+                v-for="(_, groupIndex) in effectiveGroupColumns"
+                :key="`pie-group-col:${groupIndex}`"
+                :style="{ width: `${getLegendColumnWidth(`group:${groupIndex}`)}px` }"
+              />
+              <col v-if="effectiveGroupColumns.length === 0" :style="{ width: `${getLegendColumnWidth('name')}px` }" />
+              <col :style="{ width: `${getLegendColumnWidth('max')}px` }" />
+              <col v-if="effectiveValueColumns.length > 0" :style="{ width: `${getLegendColumnWidth('mean')}px` }" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th class="visibility-col">
+                  <Button
+                    :icon="allPieSlicesHidden ? 'pi pi-eye' : 'pi pi-eye-slash'"
+                    text
+                    size="small"
+                    severity="secondary"
+                    @click="toggleAllPieSlices"
+                    v-tooltip.top="allPieSlicesHidden ? 'Show all pie slices' : 'Hide all pie slices'"
+                  />
+                </th>
+                <th class="color-col"></th>
+                <th
+                  v-for="groupColumnName in effectiveGroupColumns"
+                  :key="`pie-header:${groupColumnName}`"
+                >
+                  {{ groupColumnName }}
+                </th>
+                <th v-if="effectiveGroupColumns.length === 0">Name</th>
+                <th class="numeric-col">Count</th>
+                <th v-if="effectiveValueColumns.length > 0" class="numeric-col">Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="row in pieLegendRows"
+                :key="row.label"
+                :class="{ hidden: !isPieSliceVisible(row.label) }"
+              >
+                <td class="visibility-col">
+                  <Button
+                    :icon="isPieSliceVisible(row.label) ? 'pi pi-eye' : 'pi pi-eye-slash'"
+                    text
+                    size="small"
+                    severity="secondary"
+                    @click="togglePieSliceVisibility(row.label)"
+                    v-tooltip.top="isPieSliceVisible(row.label) ? 'Hide slice' : 'Show slice'"
+                  />
+                </td>
+                <td class="color-col">
+                  <span
+                    class="series-color"
+                    :style="{ backgroundColor: getPieGroupColor(row.label).border }"
+                  />
+                </td>
+                <td
+                  v-for="(_, index) in effectiveGroupColumns"
+                  :key="`${row.label}:${index}`"
+                  :title="row.groupParts[index] || ''"
+                >
+                  {{ row.groupParts[index] || '' }}
+                </td>
+                <td v-if="effectiveGroupColumns.length === 0" :title="row.label">{{ row.label }}</td>
+                <td class="numeric-col">{{ formatMetric(row.count) }}</td>
+                <td v-if="effectiveValueColumns.length > 0" class="numeric-col">{{ formatMetric(row.total) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </aside>
       </div>
     </div>
     
@@ -2078,6 +2219,12 @@ onBeforeUnmount(() => {
   border-bottom: 1px solid var(--tdv-surface-border);
 }
 
+.pie-chart-row {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
 .chart-container {
   position: relative;
   flex: 1 1 auto;
@@ -2091,10 +2238,23 @@ onBeforeUnmount(() => {
   gap: 10px;
   min-width: 0;
   padding: 10px;
+  overflow: auto;
 }
 
 .chart-layout.with-time-series.with-pie .pie-chart-grid {
   min-height: 220px;
+}
+
+.pie-chart-empty {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 24px;
+  color: var(--tdv-text-muted);
+  font-size: 0.9rem;
 }
 
 .pie-chart-panel {
@@ -2316,6 +2476,10 @@ onBeforeUnmount(() => {
 
 .value-legend tr.hidden {
   opacity: 0.5;
+}
+
+.pie-legend {
+  border-left: 1px solid var(--tdv-surface-border);
 }
 
 .visibility-col {
