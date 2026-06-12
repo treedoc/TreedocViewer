@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch, onBeforeUnmount, nextTick } from 'vue'
-import { Bar } from 'vue-chartjs'
+import { Bar, Pie } from 'vue-chartjs'
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -8,6 +8,8 @@ import {
   TimeScale,
   BarElement,
   BarController,
+  ArcElement,
+  PieController,
   LineElement,
   LineController,
   PointElement,
@@ -36,6 +38,8 @@ ChartJS.register(
   TimeScale,
   BarElement,
   BarController,
+  ArcElement,
+  PieController,
   LineElement,
   LineController,
   PointElement,
@@ -103,6 +107,19 @@ interface SeriesSummary {
 interface LegendRow {
   series: SeriesSummary
   originalIndex: number
+}
+
+interface PieSliceStats {
+  label: string
+  count: number
+  valueStats: Record<string, { sum: number; count: number; max: number }>
+}
+
+interface PieChartConfig {
+  key: string
+  title: string
+  data: ChartData<'pie'>
+  total: number
 }
 
 type LegendSortField = 'name' | 'max' | 'mean' | `group:${number}`
@@ -323,7 +340,11 @@ const countSeriesCount = computed(() => {
   if (groupedCountEnabled.value) return visibleCountGroupKeys.value.length
   return visibleCountGroupKeys.value.length > MAX_RENDERED_SERIES ? 1 : 0
 })
-const chartHasData = computed(() => chartBuckets.value.length > 0 && (countSeriesCount.value > 0 || valueSeriesSummaries.value.length > 0))
+const usePieMode = computed(() => !timeColumn.value || chartBuckets.value.length <= 1)
+const chartHasData = computed(() => {
+  if (usePieMode.value) return pieChartConfigs.value.length > 0
+  return chartBuckets.value.length > 0 && (countSeriesCount.value > 0 || valueSeriesSummaries.value.length > 0)
+})
 const chartLayoutStyle = computed(() => {
   const height = props.chartHeight ?? 250
   return {
@@ -515,6 +536,41 @@ const groupedCountEnabled = computed(() => {
   return effectiveGroupColumns.value.length > 0
     && visibleCountGroupKeys.value.length > 0
     && visibleCountGroupKeys.value.length <= MAX_RENDERED_SERIES
+})
+
+const pieGroupLabels = computed(() => {
+  const labels = new Set<string>()
+  for (const row of props.data) labels.add(getGroupKey(getGroupParts(row)))
+  return Array.from(labels).sort()
+})
+
+const pieSlices = computed<PieSliceStats[]>(() => {
+  const sliceMap = new Map<string, PieSliceStats>()
+
+  for (const row of props.data) {
+    const label = getGroupKey(getGroupParts(row))
+    let slice = sliceMap.get(label)
+    if (!slice) {
+      slice = { label, count: 0, valueStats: {} }
+      sliceMap.set(label, slice)
+    }
+
+    slice.count++
+
+    for (const column of effectiveValueColumns.value) {
+      const numericValue = getNumericValue(row, column)
+      if (numericValue === null) continue
+      const stats = slice.valueStats[column] ||= { sum: 0, count: 0, max: -Infinity }
+      stats.sum += numericValue
+      stats.count++
+      stats.max = Math.max(stats.max, numericValue)
+    }
+  }
+
+  const labels = pieGroupLabels.value
+  return Array.from(sliceMap.values()).sort((a, b) => {
+    return labels.indexOf(a.label) - labels.indexOf(b.label)
+  })
 })
 
 function aggregateValues(values: number[]): { max: number; mean: number } {
@@ -887,6 +943,123 @@ function getUnitDuration(unit: TimeUnit): number {
 function getSeriesColor(series: SeriesSummary) {
   return colorPalette[(series.colorIndex + 2) % colorPalette.length]
 }
+
+function getPieValueColor(index: number) {
+  return colorPalette[index % colorPalette.length]
+}
+
+function getPieData(title: string, valuesByLabel: Map<string, number>): ChartData<'pie'> {
+  const rows = pieGroupLabels.value
+    .map(label => ({ label, value: valuesByLabel.get(label) || 0 }))
+    .filter(row => Number.isFinite(row.value) && row.value > 0)
+
+  return {
+    labels: rows.map(row => row.label),
+    datasets: [
+      {
+        label: title,
+        data: rows.map(row => row.value),
+        backgroundColor: rows.map((_, index) => getPieValueColor(index).bg),
+        borderColor: rows.map((_, index) => getPieValueColor(index).border),
+        borderWidth: 1
+      }
+    ]
+  }
+}
+
+const pieChartConfigs = computed<PieChartConfig[]>(() => {
+  const charts: PieChartConfig[] = []
+
+  if (showCount.value) {
+    const valuesByLabel = new Map<string, number>()
+    for (const slice of pieSlices.value) valuesByLabel.set(slice.label, slice.count)
+    const total = Array.from(valuesByLabel.values()).reduce((sum, value) => sum + value, 0)
+    if (total > 0) {
+      charts.push({
+        key: 'count',
+        title: 'Row Count',
+        data: getPieData('Row Count', valuesByLabel),
+        total,
+      })
+    }
+  }
+
+  for (const column of effectiveValueColumns.value) {
+    const valuesByLabel = new Map<string, number>()
+    for (const slice of pieSlices.value) {
+      const value = getValueForStats(slice.valueStats[column])
+      if (value !== null) valuesByLabel.set(slice.label, value)
+    }
+    const total = Array.from(valuesByLabel.values()).reduce((sum, value) => sum + value, 0)
+    if (total > 0) {
+      const aggLabel = valueAgg.value.toUpperCase()
+      charts.push({
+        key: `value:${column}`,
+        title: `${aggLabel} ${column}`,
+        data: getPieData(`${aggLabel} ${column}`, valuesByLabel),
+        total,
+      })
+    }
+  }
+
+  if (showValueSum.value && effectiveValueColumns.value.length > 0) {
+    const valuesByLabel = new Map<string, number>()
+    for (const slice of pieSlices.value) {
+      let total = 0
+      let hasValue = false
+      for (const column of effectiveValueColumns.value) {
+        const value = getValueForStats(slice.valueStats[column])
+        if (value === null || !Number.isFinite(value)) continue
+        total += value
+        hasValue = true
+      }
+      if (hasValue) valuesByLabel.set(slice.label, total)
+    }
+    const total = Array.from(valuesByLabel.values()).reduce((sum, value) => sum + value, 0)
+    if (total > 0) {
+      charts.push({
+        key: 'value-sum',
+        title: `SUM visible ${valueAgg.value.toUpperCase()}`,
+        data: getPieData(`SUM visible ${valueAgg.value.toUpperCase()}`, valuesByLabel),
+        total,
+      })
+    }
+  }
+
+  return charts
+})
+
+const pieOptions = computed<ChartOptions<'pie'>>(() => ({
+  responsive: true,
+  maintainAspectRatio: false,
+  animation: false,
+  plugins: {
+    legend: {
+      display: true,
+      position: 'right',
+      labels: {
+        boxWidth: 10,
+        boxHeight: 10
+      }
+    },
+    title: {
+      display: false
+    },
+    tooltip: {
+      backgroundColor: 'rgba(17, 24, 39, 0.82)',
+      borderColor: 'rgba(255, 255, 255, 0.18)',
+      borderWidth: 1,
+      callbacks: {
+        label: (item: any) => {
+          const value = Number(item.raw || 0)
+          const total = item.dataset.data.reduce((sum: number, next: number) => sum + Number(next || 0), 0)
+          const percent = total > 0 ? ` (${((value / total) * 100).toFixed(1)}%)` : ''
+          return `${item.label}: ${formatMetric(value)}${percent}`
+        }
+      }
+    }
+  }
+}))
 
 function getSafeTimeTickConfig(bucket: TimeBucket, range: { min?: number; max?: number }): { unit: TimeUnit; stepSize?: number } {
   const units: TimeUnit[] = ['second', 'minute', 'hour', 'day', 'week', 'month']
@@ -1414,6 +1587,7 @@ onBeforeUnmount(() => {
           :options="timeColumns"
           placeholder="Select time column"
           class="control-select"
+          showClear
         />
       </div>
       
@@ -1472,7 +1646,7 @@ onBeforeUnmount(() => {
       </label>
 
       <label class="control-group checkbox-control">
-        <Checkbox v-model="showValueSum" :binary="true" :disabled="valueSeriesSummaries.length === 0" />
+        <Checkbox v-model="showValueSum" :binary="true" :disabled="valueColumns.length === 0" />
         <span>Sum</span>
       </label>
 
@@ -1482,7 +1656,7 @@ onBeforeUnmount(() => {
           size="small"
           text
           severity="secondary"
-          :disabled="!hasTimeSelection"
+          :disabled="usePieMode || !hasTimeSelection"
           @click="resetTimeSelection"
           v-tooltip.top="'Reset time selection'"
         />
@@ -1508,11 +1682,32 @@ onBeforeUnmount(() => {
     
     <div
       class="chart-layout"
-      :class="{ maximized: isMaximized }"
+      :class="{ maximized: isMaximized, 'pie-mode': usePieMode }"
       :style="chartLayoutStyle"
-      v-if="timeColumn && chartHasData"
+      v-if="chartHasData"
     >
-      <div class="chart-container" @mousedown.capture="startTimeSelectionDrag">
+      <div v-if="usePieMode" class="pie-chart-grid">
+        <section
+          v-for="pieChart in pieChartConfigs"
+          :key="pieChart.key"
+          class="pie-chart-panel"
+        >
+          <header class="pie-chart-header">
+            <span class="pie-chart-title">{{ pieChart.title }}</span>
+            <span class="pie-chart-total">{{ formatMetric(pieChart.total) }}</span>
+          </header>
+          <div class="pie-chart-container">
+            <Pie
+              :data="pieChart.data"
+              :options="pieOptions"
+              dataset-id-key="label"
+              :update-mode="CHART_UPDATE_MODE"
+            />
+          </div>
+        </section>
+      </div>
+
+      <div v-else class="chart-container" @mousedown.capture="startTimeSelectionDrag">
         <Bar
           ref="chartRef"
           :data="chartJsData"
@@ -1524,14 +1719,14 @@ onBeforeUnmount(() => {
       </div>
 
       <div
-        v-if="valueColumns.length > 0"
+        v-if="!usePieMode && valueColumns.length > 0"
         class="legend-divider"
         :class="{ resizing: isResizingLegend }"
         @mousedown="startLegendResize"
       />
 
       <aside
-        v-if="valueColumns.length > 0"
+        v-if="!usePieMode && valueColumns.length > 0"
         class="value-legend"
         :style="{ width: `${legendWidth}px` }"
       >
@@ -1732,19 +1927,19 @@ onBeforeUnmount(() => {
       </aside>
     </div>
     
-    <div class="no-data" v-else-if="timeColumn">
+    <div class="no-data" v-else-if="props.data.length === 0">
+      <i class="pi pi-info-circle"></i>
+      <span>No rows to display</span>
+    </div>
+
+    <div class="no-data" v-else-if="showCount || valueColumns.length > 0 || showValueSum">
       <i class="pi pi-info-circle"></i>
       <span>Enable count or select value columns to display the chart</span>
     </div>
-
-    <div class="no-data" v-else-if="timeColumns.length === 0">
-      <i class="pi pi-info-circle"></i>
-      <span>No timestamp columns detected in the data</span>
-    </div>
     
-    <div class="no-data" v-else-if="!timeColumn">
+    <div class="no-data" v-else>
       <i class="pi pi-info-circle"></i>
-      <span>Select a time column to display the chart</span>
+      <span>Enable count or select value columns to display the chart</span>
     </div>
   </div>
 </template>
@@ -1811,11 +2006,65 @@ onBeforeUnmount(() => {
   transition: height 0.2s ease;
 }
 
+.chart-layout.pie-mode {
+  overflow: auto;
+}
+
 .chart-container {
   position: relative;
   flex: 1 1 auto;
   min-width: 0;
   padding: 12px;
+}
+
+.pie-chart-grid {
+  display: grid;
+  flex: 1 1 auto;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 10px;
+  min-width: 0;
+  padding: 10px;
+}
+
+.pie-chart-panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 210px;
+  border: 1px solid var(--tdv-surface-border);
+  border-radius: var(--tdv-radius);
+  background: var(--tdv-surface);
+}
+
+.pie-chart-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--tdv-surface-border);
+  font-size: 0.8rem;
+}
+
+.pie-chart-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.pie-chart-total {
+  flex: 0 0 auto;
+  color: var(--tdv-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.pie-chart-container {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 170px;
+  padding: 8px;
 }
 
 .selection-overlay {

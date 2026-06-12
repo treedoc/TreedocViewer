@@ -36,7 +36,6 @@ import {
   copyTableData,
   type TableCopyFormat,
   shouldExpandColumns,
-  detectTimeColumns,
   detectColumnDateFormat
 } from '@/utils/TableUtil'
 import { dateToNumericValue, formatDateLikeOriginal } from '@/utils/DateUtil'
@@ -381,10 +380,7 @@ const hiddenColumnCount = computed(() => {
 
 const pathTitlePrefix = computed(() => (maxPane.value === 'table' ? props.title?.trim() || '' : ''))
 
-// Check if there are any timestamp columns for chart feature
-const hasTimeColumns = computed(() => {
-  return detectTimeColumns(tableData.value as any, columns.value as any).length > 0
-})
+const hasChartRows = computed(() => tableData.value.length > 0)
 
 // Current state for preset selector
 const currentPresetState = computed(() => ({
@@ -2203,13 +2199,13 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
         />
         
         <Button
-          v-if="hasTimeColumns"
           icon="pi pi-chart-bar"
           size="small"
           :severity="showChart ? 'primary' : 'secondary'"
+          :disabled="!hasChartRows"
           text
           @click="showChart = !showChart"
-          v-tooltip.top="'Time series chart'"
+          v-tooltip.top="'Chart'"
         />
         
         <Button
@@ -2340,7 +2336,7 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
     </div>
     
     <TimeSeriesChart
-      v-if="showChart && hasTimeColumns"
+      v-if="showChart && hasChartRows"
       :data="filteredData as any"
       :columns="columns as any"
       :show-status-model="chartShowStatus"
@@ -2372,7 +2368,7 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
     />
 
     <div
-      v-if="showChart && hasTimeColumns"
+      v-if="showChart && hasChartRows"
       class="chart-table-divider"
       :class="{ resizing: isResizingChartHeight }"
       @mousedown="startChartHeightResize"
