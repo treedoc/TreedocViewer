@@ -75,7 +75,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update:fieldQuery': [query: FieldQuery]
-  'update-column-filter': [field: string, value: string, isNegate: boolean]
+  'update-column-filter': [field: string, value: string | string[], isNegate: boolean]
   'hide-column': []
 }>()
 
@@ -198,9 +198,11 @@ const localLinkExpression = ref(props.fieldQuery.linkExpression || '')
 const showExtendedFields = ref(false)
 const showFormat = ref(false)
 const selectedValues = ref<string[]>([])
+const selectedBreakdownValues = ref<string[]>([])
 const BREAKDOWN_FIELDS_DEBOUNCE_MS = 1000
 const MAX_DISPLAYED_BREAKDOWN_ROWS = 2000
 const MAX_DISPLAYED_TOP_VALUES = 500
+const BREAKDOWN_SELECTION_COLUMN_WIDTH = 34
 
 function getFieldQueryBreakdownFields(fq: FieldQuery): string[] {
   return fq.statisticBreakdownFields?.length
@@ -801,6 +803,44 @@ function handleBreakdownValueButtonClick(buttonId: string, value: string) {
   }
 }
 
+const canSelectBreakdownValues = computed(() => breakdownFields.value.length === 1)
+
+const selectedBreakdownFilterValues = computed(() => {
+  if (!canSelectBreakdownValues.value) return []
+  return selectedBreakdownValues.value.filter(value => value !== '')
+})
+
+const statisticTableDisplayWidth = computed(() => {
+  return statisticTableWidth.value + (canSelectBreakdownValues.value ? BREAKDOWN_SELECTION_COLUMN_WIDTH : 0)
+})
+
+function isBreakdownValueSelected(value: string): boolean {
+  return selectedBreakdownValues.value.includes(value)
+}
+
+function toggleBreakdownValueSelection(value: string, checked: boolean) {
+  if (!canSelectBreakdownValues.value || value === '') return
+  if (checked) {
+    if (!selectedBreakdownValues.value.includes(value)) {
+      selectedBreakdownValues.value = [...selectedBreakdownValues.value, value]
+    }
+    return
+  }
+  selectedBreakdownValues.value = selectedBreakdownValues.value.filter(v => v !== value)
+}
+
+function clearBreakdownValueSelection() {
+  selectedBreakdownValues.value = []
+}
+
+function applySelectedBreakdownValuesFilter(isNegate: boolean) {
+  if (!canSelectBreakdownValues.value) return
+  const breakdownField = breakdownFields.value[0]
+  const values = selectedBreakdownFilterValues.value
+  if (!breakdownField || values.length === 0) return
+  emit('update-column-filter', breakdownField, values, isNegate)
+}
+
 // Preview of extracted fields from pattern
 const previewPatternFields = computed(() => {
   if (!localPatternExtract.value) return []
@@ -1104,6 +1144,18 @@ watch(() => displayedTopValues.value.map(item => item.val).join('\u0000'), (topV
   selectedValues.value = selectedValues.value.filter(value => allowed.has(value) && isTopValueSelectable(value))
 })
 
+watch(
+  [() => breakdownFieldsKey.value, () => displayedStatisticRows.value.map(row => row.values[0]).join('\u0000')],
+  ([, displayedValuesKey]) => {
+    if (!canSelectBreakdownValues.value) {
+      selectedBreakdownValues.value = []
+      return
+    }
+    const allowed = new Set(displayedValuesKey ? displayedValuesKey.split('\u0000') : [])
+    selectedBreakdownValues.value = selectedBreakdownValues.value.filter(value => allowed.has(value) && value !== '')
+  }
+)
+
 function formatNumber(val: number): string {
   return val.toLocaleString(undefined, { maximumFractionDigits: 2 })
 }
@@ -1406,6 +1458,41 @@ user=${userId}, action=$action"
               filter
               class="stats-breakdown-select"
             />
+            <div
+              v-if="canSelectBreakdownValues"
+              class="breakdown-selection-actions"
+              :class="{ 'is-inactive': selectedBreakdownFilterValues.length === 0 }"
+            >
+              <Button
+                label="Filter In"
+                icon="pi pi-filter"
+                size="small"
+                outlined
+                class="breakdown-filter-btn"
+                :disabled="selectedBreakdownFilterValues.length === 0"
+                @click="applySelectedBreakdownValuesFilter(false)"
+              />
+              <Button
+                label="Filter Out"
+                icon="pi pi-filter-slash"
+                size="small"
+                severity="secondary"
+                outlined
+                class="breakdown-filter-btn"
+                :disabled="selectedBreakdownFilterValues.length === 0"
+                @click="applySelectedBreakdownValuesFilter(true)"
+              />
+              <Button
+                icon="pi pi-times"
+                size="small"
+                text
+                severity="secondary"
+                class="breakdown-filter-btn breakdown-clear-btn"
+                :disabled="selectedBreakdownFilterValues.length === 0"
+                v-tooltip.top="'Clear selection'"
+                @click="clearBreakdownValueSelection"
+              />
+            </div>
             <Button
               v-if="statisticRows.length > 0"
               icon="pi pi-copy"
@@ -1419,13 +1506,17 @@ user=${userId}, action=$action"
           </div>
           <div
             v-if="statisticRows.length > 0"
-            v-memo="[breakdownFieldsKey, selectedBreakdownValue, filteredData, field, statsTableHeight, hasBreakdownFields, displayedStatisticRows, statisticTableWidth, statsColumnWidths, resizingStatsColumnKey, activeStatisticSortField, statisticSortOrder]"
+            v-memo="[breakdownFieldsKey, selectedBreakdownValue, selectedBreakdownValues, filteredData, field, statsTableHeight, hasBreakdownFields, displayedStatisticRows, statisticTableDisplayWidth, statsColumnWidths, resizingStatsColumnKey, activeStatisticSortField, statisticSortOrder]"
             class="stats-breakdown-table-wrap"
             :class="{ 'is-compact': !hasBreakdownFields }"
             :style="hasBreakdownFields ? { height: statsTableHeight + 'px' } : undefined"
           >
-            <table class="stats-breakdown-table" :style="{ width: statisticTableWidth + 'px' }">
+            <table class="stats-breakdown-table" :style="{ width: statisticTableDisplayWidth + 'px' }">
               <colgroup>
+                <col
+                  v-if="canSelectBreakdownValues"
+                  :style="{ width: BREAKDOWN_SELECTION_COLUMN_WIDTH + 'px' }"
+                />
                 <col
                   v-for="col in statisticTableColumns"
                   :key="col.key"
@@ -1434,6 +1525,7 @@ user=${userId}, action=$action"
               </colgroup>
               <thead>
                 <tr>
+                  <th v-if="canSelectBreakdownValues" class="breakdown-select-header"></th>
                   <th
                     v-for="col in statisticTableColumns"
                     :key="col.key"
@@ -1463,6 +1555,17 @@ user=${userId}, action=$action"
                   :class="{ 'is-selected': breakdownFields.length > 0 && selectedBreakdownValue === row.key }"
                   @click="breakdownFields.length > 0 && (selectedBreakdownValue = selectedBreakdownValue === row.key ? null : row.key)"
                 >
+                  <td v-if="canSelectBreakdownValues" class="breakdown-select-cell">
+                    <input
+                      v-if="row.values[0] !== ''"
+                      type="checkbox"
+                      class="breakdown-value-checkbox"
+                      :checked="isBreakdownValueSelected(row.values[0])"
+                      :aria-label="`Select ${row.values[0]}`"
+                      @click.stop
+                      @change="toggleBreakdownValueSelection(row.values[0], ($event.target as HTMLInputElement).checked)"
+                    />
+                  </td>
                   <td
                     v-for="(value, index) in row.values"
                     :key="`${row.key}-${index}`"
@@ -1474,7 +1577,6 @@ user=${userId}, action=$action"
                       v-if="breakdownFields.length === 1 && index === 0"
                       :buttons="getBreakdownValueButtons()"
                       layout="absolute"
-                      :position-below="true"
                       class="breakdown-value-actions"
                       @click="handleBreakdownValueButtonClick($event, value)"
                     />
@@ -2012,6 +2114,32 @@ user=${userId}, action=$action"
   flex-shrink: 0;
 }
 
+.breakdown-selection-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.breakdown-selection-actions.is-inactive {
+  opacity: 0.78;
+}
+
+.breakdown-filter-btn :deep(.p-button) {
+  padding: 4px 7px;
+  font-size: 0.72rem;
+}
+
+.breakdown-filter-btn :deep(.p-button .p-button-icon) {
+  font-size: 0.72rem;
+}
+
+.breakdown-clear-btn :deep(.p-button) {
+  width: 28px;
+  padding-left: 0;
+  padding-right: 0;
+}
+
 .stats-breakdown-table-wrap {
   overflow: auto;
   border: 1px solid var(--tdv-surface-border);
@@ -2074,6 +2202,23 @@ user=${userId}, action=$action"
   background: var(--tdv-surface-light);
   color: var(--tdv-text-muted);
   font-weight: 600;
+}
+
+.breakdown-select-header,
+.breakdown-select-cell {
+  width: 34px;
+  text-align: center !important;
+  vertical-align: middle !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+.breakdown-value-checkbox {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  cursor: pointer;
+  accent-color: var(--tdv-primary);
 }
 
 .stats-resizable-header {
@@ -2201,6 +2346,15 @@ user=${userId}, action=$action"
   opacity: 1 !important;
   transition-delay: 300ms;
   pointer-events: auto;
+}
+
+:global(.breakdown-value-actions.hover-button-bar.layout-absolute) {
+  top: 50%;
+  right: 4px;
+  left: auto;
+  bottom: auto;
+  transform: translateY(-50%);
+  z-index: 5;
 }
 
 .breakdown-total-value {

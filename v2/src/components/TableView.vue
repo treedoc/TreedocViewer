@@ -643,8 +643,12 @@ function updateFieldQuery(query: FieldQuery) {
   }
 }
 
-function updateColumnValueFilter(field: string, value: string, isNegate: boolean) {
-  if (value === '') {
+function updateColumnValueFilter(field: string, value: string | string[], isNegate: boolean) {
+  const values = Array.isArray(value) ? value.filter(v => v !== '') : [value]
+
+  if (values.length === 0) return
+
+  if (!Array.isArray(value) && value === '') {
     fieldQueries.value[field] = {
       ...(fieldQueries.value[field] || createFieldQuery(field)),
       field,
@@ -664,7 +668,7 @@ function updateColumnValueFilter(field: string, value: string, isNegate: boolean
   fieldQueries.value[field] = {
     ...(fieldQueries.value[field] || createFieldQuery(field)),
     field,
-    query: value,
+    query: values.join(', '),
     isRegex: false,
     isExact: true,
     isNegate,
