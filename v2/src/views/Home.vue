@@ -112,6 +112,24 @@ function applyEventLoading(data: any) {
   }
 }
 
+function summarizeEmbeddedMessage(data: any) {
+  return {
+    type: data?.type,
+    hasData: data?.data !== undefined,
+    dataType: Array.isArray(data?.data) ? 'array' : typeof data?.data,
+    dataSize: Array.isArray(data?.data)
+      ? data.data.length
+      : typeof data?.data === 'string'
+        ? data.data.length
+        : undefined,
+    hasOptions: data?.options !== undefined || data?.option !== undefined,
+    hasPreset: data?.preset !== undefined || data?.initialPreset !== undefined,
+    initialPath: typeof data?.initialPath === 'string' ? data.initialPath : undefined,
+    loading: data?.loading ?? data?.isLoading,
+    hasLoadingMessage: data?.loadingMessage !== undefined || data?.message !== undefined,
+  }
+}
+
 function handleEmbeddedMessage(evt: MessageEvent) {
   if (
     evt.data?.type !== 'tdv-setData'
@@ -120,6 +138,8 @@ function handleEmbeddedMessage(evt: MessageEvent) {
   ) {
     return
   }
+
+  console.log('[Home] Received embedded event:', summarizeEmbeddedMessage(evt.data))
 
   applyEventLoading(evt.data)
 
@@ -148,6 +168,7 @@ function handleEmbeddedMessage(evt: MessageEvent) {
 function setupEmbeddedMode() {
   if (embeddedId) {
     // Notify parent that we're ready
+    console.log('[Home] Embedded mode ready:', { embeddedId })
     window.parent.postMessage({ type: 'tdv-ready', id: embeddedId }, '*')
     if (window.opener) {
       window.opener.postMessage({ type: 'tdv-ready', id: embeddedId }, '*')
