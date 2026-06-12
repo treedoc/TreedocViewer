@@ -126,14 +126,24 @@ interface PieChartConfig {
   total: number
 }
 
+interface PieChartSource {
+  key: string
+  title: string
+  valuesByLabel: Map<string, number>
+}
+
 interface PieLegendRow {
   label: string
   groupParts: string[]
-  count: number
-  total: number
+  values: Record<string, number>
 }
 
-type LegendSortField = 'name' | 'max' | 'mean' | `group:${number}`
+interface PieLegendTableRow {
+  row: PieLegendRow
+  originalIndex: number
+}
+
+type LegendSortField = 'name' | 'max' | 'mean' | `group:${number}` | `pie:${string}`
 type LegendSortOrder = 1 | -1
 type LegendColumnKey = LegendSortField
 
@@ -374,7 +384,7 @@ const pieChartsControl = computed({
   }
 })
 const chartHasData = computed(() => {
-  return renderTimeSeriesChart.value || (renderPieCharts.value && pieLegendRows.value.length > 0)
+  return renderTimeSeriesChart.value || (renderPieCharts.value && pieChartSources.value.length > 0)
 })
 const chartLayoutStyle = computed(() => {
   const height = props.chartHeight ?? 250
@@ -615,24 +625,105 @@ const pieSlices = computed<PieSliceStats[]>(() => {
   })
 })
 
-const pieLegendRows = computed<PieLegendRow[]>(() => {
-  return pieSlices.value.map(slice => {
-    let total = 0
-    for (const column of effectiveValueColumns.value) {
+const pieChartSources = computed<PieChartSource[]>(() => {
+  const charts: PieChartSource[] = []
+
+  if (showCount.value) {
+    const valuesByLabel = new Map<string, number>()
+    for (const slice of pieSlices.value) valuesByLabel.set(slice.label, slice.count)
+    if (Array.from(valuesByLabel.values()).some(value => value > 0)) {
+      charts.push({
+        key: 'pie:count',
+        title: 'Row Count',
+        valuesByLabel,
+      })
+    }
+  }
+
+  for (const column of effectiveValueColumns.value) {
+    const valuesByLabel = new Map<string, number>()
+    for (const slice of pieSlices.value) {
       const value = getValueForStats(slice.valueStats[column])
-      if (value !== null && Number.isFinite(value)) total += value
+      if (value !== null) valuesByLabel.set(slice.label, value)
+    }
+    if (Array.from(valuesByLabel.values()).some(value => value > 0)) {
+      charts.push({
+        key: `pie:value:${column}`,
+        title: `${valueAgg.value.toUpperCase()} ${column}`,
+        valuesByLabel,
+      })
+    }
+  }
+
+  if (showValueSum.value && effectiveValueColumns.value.length > 0) {
+    const valuesByLabel = new Map<string, number>()
+    for (const slice of pieSlices.value) {
+      let total = 0
+      let hasValue = false
+      for (const column of effectiveValueColumns.value) {
+        const value = getValueForStats(slice.valueStats[column])
+        if (value === null || !Number.isFinite(value)) continue
+        total += value
+        hasValue = true
+      }
+      if (hasValue) valuesByLabel.set(slice.label, total)
+    }
+    if (Array.from(valuesByLabel.values()).some(value => value > 0)) {
+      charts.push({
+        key: 'pie:value-sum',
+        title: `SUM visible ${valueAgg.value.toUpperCase()}`,
+        valuesByLabel,
+      })
+    }
+  }
+
+  return charts
+})
+
+const pieLegendMetricColumns = computed(() => pieChartSources.value.map(source => ({
+  key: source.key as LegendSortField,
+  title: source.title,
+})))
+
+const pieLegendRows = computed<PieLegendRow[]>(() => {
+  const metricKeys = pieLegendMetricColumns.value.map(column => column.key)
+
+  return pieSlices.value.map(slice => {
+    const values: Record<string, number> = {}
+    for (const source of pieChartSources.value) {
+      values[source.key] = source.valuesByLabel.get(slice.label) || 0
     }
 
     return {
       label: slice.label,
       groupParts: slice.label === 'All' ? [] : slice.label.split(' | '),
-      count: slice.count,
-      total,
+      values,
     }
-  }).sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, undefined, { numeric: true, sensitivity: 'base' }))
+  }).sort((a, b) => {
+    const primaryKey = metricKeys[0]
+    const diff = (b.values[primaryKey] || 0) - (a.values[primaryKey] || 0)
+    return diff || a.label.localeCompare(b.label, undefined, { numeric: true, sensitivity: 'base' })
+  })
 })
 
 const allPieSlicesHidden = computed(() => pieLegendRows.value.length > 0 && pieLegendRows.value.every(row => !isPieSliceVisible(row.label)))
+const showPieLegendNameColumn = computed(() => effectiveGroupColumns.value.length === 0)
+
+const pieLegendResizableColumnKeys = computed<LegendColumnKey[]>(() => [
+  ...(showPieLegendNameColumn.value ? ['name' as const] : []),
+  ...effectiveGroupColumns.value.map((_, index) => `group:${index}` as const),
+  ...pieLegendMetricColumns.value.map(column => column.key),
+])
+
+const pieLegendTableWidth = computed(() => {
+  const resizableWidth = pieLegendResizableColumnKeys.value.reduce((sum, key) => sum + getLegendColumnWidth(key), 0)
+  return LEGEND_VISIBILITY_COL_WIDTH + LEGEND_COLOR_COL_WIDTH + resizableWidth
+})
+const pieLegendColumnCount = computed(() => {
+  return 2
+    + (showPieLegendNameColumn.value ? 1 : effectiveGroupColumns.value.length)
+    + pieLegendMetricColumns.value.length
+})
 
 function aggregateValues(values: number[]): { max: number; mean: number } {
   if (values.length === 0) return { max: 0, mean: 0 }
@@ -740,6 +831,32 @@ const filteredLegendRows = computed<LegendRow[]>(() => {
   return rows.sort((a, b) => compareLegendRows(a, b, field) * order)
 })
 
+const filteredPieLegendRows = computed<PieLegendTableRow[]>(() => {
+  const metricKeys = new Set(pieLegendMetricColumns.value.map(column => column.key))
+  const rows = pieLegendRows.value
+    .map((row, originalIndex) => ({ row, originalIndex }))
+    .filter(({ row }) => {
+      if (showPieLegendNameColumn.value && !matchesLegendFilter('name', row.label)) return false
+
+      for (let index = 0; index < effectiveGroupColumns.value.length; index++) {
+        if (!matchesLegendFilter(`group:${index}`, row.groupParts[index] || '')) return false
+      }
+
+      for (const column of pieLegendMetricColumns.value) {
+        if (!matchesLegendMetricFilter(column.key, row.values[column.key] || 0)) return false
+      }
+      return true
+    })
+
+  let field = legendSortField.value
+  if (!showPieLegendNameColumn.value && field === 'name') field = pieLegendMetricColumns.value[0]?.key || 'name'
+  if ((field === 'max' || field === 'mean' || field.startsWith('pie:')) && !metricKeys.has(field)) {
+    field = pieLegendMetricColumns.value[0]?.key || 'name'
+  }
+  const order = legendSortOrder.value
+  return rows.sort((a, b) => comparePieLegendRows(a, b, field) * order)
+})
+
 function createLegendFilterQuery(field: LegendSortField): FieldQuery {
   return {
     field,
@@ -818,7 +935,7 @@ function matchesLegendFilterValue(field: LegendSortField, displayValue: string, 
   return matchFieldQuery(displayValue, query)
 }
 
-function matchesLegendMetricFilter(field: 'max' | 'mean', value: number): boolean {
+function matchesLegendMetricFilter(field: LegendSortField, value: number): boolean {
   return matchesLegendFilterValue(field, `${formatMetric(value)} ${String(value)}`, value)
 }
 
@@ -838,12 +955,36 @@ function compareLegendRows(a: LegendRow, b: LegendRow, field: LegendSortField): 
   return diff === 0 ? a.originalIndex - b.originalIndex : diff
 }
 
+function comparePieLegendRows(a: PieLegendTableRow, b: PieLegendTableRow, field: LegendSortField): number {
+  if (field.startsWith('pie:')) {
+    const diff = (a.row.values[field] || 0) - (b.row.values[field] || 0)
+    return diff === 0 ? a.originalIndex - b.originalIndex : diff
+  }
+  if (field === 'max') {
+    const diff = (a.row.values[field] || 0) - (b.row.values[field] || 0)
+    return diff === 0 ? a.originalIndex - b.originalIndex : diff
+  }
+  if (field === 'mean') {
+    const diff = (a.row.values[field] || 0) - (b.row.values[field] || 0)
+    return diff === 0 ? a.originalIndex - b.originalIndex : diff
+  }
+
+  const aValue = field === 'name'
+    ? a.row.label
+    : a.row.groupParts[Number(field.split(':')[1])] || ''
+  const bValue = field === 'name'
+    ? b.row.label
+    : b.row.groupParts[Number(field.split(':')[1])] || ''
+  const diff = aValue.localeCompare(bValue, undefined, { numeric: true, sensitivity: 'base' })
+  return diff === 0 ? a.originalIndex - b.originalIndex : diff
+}
+
 function setLegendSort(field: LegendSortField) {
   if (legendSortField.value === field) {
     legendSortOrder.value = legendSortOrder.value === 1 ? -1 : 1
   } else {
     legendSortField.value = field
-    legendSortOrder.value = field === 'max' || field === 'mean' ? -1 : 1
+    legendSortOrder.value = field === 'max' || field === 'mean' || field.startsWith('pie:') ? -1 : 1
   }
 }
 
@@ -1033,60 +1174,16 @@ function getPieData(title: string, valuesByLabel: Map<string, number>): ChartDat
 const pieChartConfigs = computed<PieChartConfig[]>(() => {
   const charts: PieChartConfig[] = []
 
-  if (showCount.value) {
-    const valuesByLabel = new Map<string, number>()
-    for (const slice of pieSlices.value) valuesByLabel.set(slice.label, slice.count)
-    const total = Array.from(valuesByLabel.values()).reduce((sum, value) => sum + value, 0)
-    if (total > 0) {
-      charts.push({
-        key: 'count',
-        title: 'Row Count',
-        data: getPieData('Row Count', valuesByLabel),
-        total,
-      })
-    }
-  }
-
-  for (const column of effectiveValueColumns.value) {
-    const valuesByLabel = new Map<string, number>()
-    for (const slice of pieSlices.value) {
-      const value = getValueForStats(slice.valueStats[column])
-      if (value !== null) valuesByLabel.set(slice.label, value)
-    }
-    const total = Array.from(valuesByLabel.values()).reduce((sum, value) => sum + value, 0)
-    if (total > 0) {
-      const aggLabel = valueAgg.value.toUpperCase()
-      charts.push({
-        key: `value:${column}`,
-        title: `${aggLabel} ${column}`,
-        data: getPieData(`${aggLabel} ${column}`, valuesByLabel),
-        total,
-      })
-    }
-  }
-
-  if (showValueSum.value && effectiveValueColumns.value.length > 0) {
-    const valuesByLabel = new Map<string, number>()
-    for (const slice of pieSlices.value) {
-      let total = 0
-      let hasValue = false
-      for (const column of effectiveValueColumns.value) {
-        const value = getValueForStats(slice.valueStats[column])
-        if (value === null || !Number.isFinite(value)) continue
-        total += value
-        hasValue = true
-      }
-      if (hasValue) valuesByLabel.set(slice.label, total)
-    }
-    const total = Array.from(valuesByLabel.values()).reduce((sum, value) => sum + value, 0)
-    if (total > 0) {
-      charts.push({
-        key: 'value-sum',
-        title: `SUM visible ${valueAgg.value.toUpperCase()}`,
-        data: getPieData(`SUM visible ${valueAgg.value.toUpperCase()}`, valuesByLabel),
-        total,
-      })
-    }
+  for (const source of pieChartSources.value) {
+    const data = getPieData(source.title, source.valuesByLabel)
+    const total = (data.datasets[0]?.data || []).reduce((sum, value) => sum + Number(value || 0), 0)
+    if (total <= 0) continue
+    charts.push({
+      key: source.key,
+      title: source.title,
+      data,
+      total,
+    })
   }
 
   return charts
@@ -1511,9 +1608,11 @@ function toggleAllPieSlices() {
 }
 
 function startLegendResize(event: MouseEvent) {
+  const dividerRect = (event.currentTarget as HTMLElement | null)?.getBoundingClientRect()
   const chartRect = chartRef.value?.chart?.canvas?.getBoundingClientRect()
-  if (!chartRect) return
-  legendResizeRight.value = chartRect.right + legendWidth.value
+  const dividerRight = dividerRect?.right ?? chartRect?.right
+  if (dividerRight == null) return
+  legendResizeRight.value = dividerRight + legendWidth.value
   isResizingLegend.value = true
   window.addEventListener('mousemove', updateLegendResize)
   window.addEventListener('mouseup', stopLegendResize)
@@ -1995,23 +2094,6 @@ onBeforeUnmount(() => {
               </template>
             </tbody>
           </table>
-          <BasicColumnFilterPopover
-            ref="legendFilterPopoverRef"
-            v-model:query="activeLegendFilterText"
-            v-model:is-regex="activeLegendFilterQuery.isRegex"
-            v-model:is-exact="activeLegendFilterQuery.isExact"
-            v-model:is-negate="activeLegendFilterQuery.isNegate"
-            v-model:is-array="activeLegendFilterQuery.isArray"
-            v-model:is-disabled="activeLegendFilterQuery.isDisabled"
-            v-model:is-js="activeLegendFilterIsJs"
-            :field="activeLegendFilterTitle"
-            :show-js="true"
-            :show-hide-column="false"
-            popover-class="legend-filter-popover"
-            :width="320"
-            @clear="clearActiveLegendFilter"
-            @keydown="onLegendFilterKeydown"
-          />
         </aside>
       </div>
 
@@ -2042,12 +2124,19 @@ onBeforeUnmount(() => {
           <span>All pie slices are hidden</span>
         </div>
 
+        <div
+          v-if="pieLegendRows.length > 0"
+          class="legend-divider"
+          :class="{ resizing: isResizingLegend }"
+          @mousedown="startLegendResize"
+        />
+
         <aside
           v-if="pieLegendRows.length > 0"
           class="value-legend pie-legend"
           :style="{ width: `${legendWidth}px` }"
         >
-          <table>
+          <table :style="{ minWidth: `${pieLegendTableWidth}px` }">
             <colgroup>
               <col :style="{ width: `${LEGEND_VISIBILITY_COL_WIDTH}px` }" />
               <col :style="{ width: `${LEGEND_COLOR_COL_WIDTH}px` }" />
@@ -2056,9 +2145,12 @@ onBeforeUnmount(() => {
                 :key="`pie-group-col:${groupIndex}`"
                 :style="{ width: `${getLegendColumnWidth(`group:${groupIndex}`)}px` }"
               />
-              <col v-if="effectiveGroupColumns.length === 0" :style="{ width: `${getLegendColumnWidth('name')}px` }" />
-              <col :style="{ width: `${getLegendColumnWidth('max')}px` }" />
-              <col v-if="effectiveValueColumns.length > 0" :style="{ width: `${getLegendColumnWidth('mean')}px` }" />
+              <col v-if="showPieLegendNameColumn" :style="{ width: `${getLegendColumnWidth('name')}px` }" />
+              <col
+                v-for="metricColumn in pieLegendMetricColumns"
+                :key="`pie-metric-col:${metricColumn.key}`"
+                :style="{ width: `${getLegendColumnWidth(metricColumn.key)}px` }"
+              />
             </colgroup>
             <thead>
               <tr>
@@ -2074,19 +2166,98 @@ onBeforeUnmount(() => {
                 </th>
                 <th class="color-col"></th>
                 <th
-                  v-for="groupColumnName in effectiveGroupColumns"
+                  v-for="(groupColumnName, groupIndex) in effectiveGroupColumns"
                   :key="`pie-header:${groupColumnName}`"
+                  class="legend-filterable-header legend-resizable-header"
+                  @mouseenter="onLegendHeaderMouseEnter($event, `group:${groupIndex}`, groupColumnName)"
+                  @mouseleave="cancelLegendFilterHover"
                 >
-                  {{ groupColumnName }}
+                  <div class="legend-header-content">
+                    <button
+                      type="button"
+                      class="legend-sort-button"
+                      :class="{ 'has-filter': isLegendFilterActive(`group:${groupIndex}`), 'has-disabled-filter': isLegendFilterDisabled(`group:${groupIndex}`) }"
+                      @click="setLegendSort(`group:${groupIndex}`)"
+                    >
+                      <span>{{ groupColumnName }}</span>
+                      <i :class="getLegendSortIcon(`group:${groupIndex}`)"></i>
+                    </button>
+                    <i
+                      class="pi pi-filter legend-filter-indicator"
+                      :class="{ active: isLegendFilterActive(`group:${groupIndex}`), 'filter-disabled': isLegendFilterDisabled(`group:${groupIndex}`) }"
+                      @click.stop="showLegendFilterPopover($event, `group:${groupIndex}`, groupColumnName)"
+                    ></i>
+                  </div>
+                  <span
+                    class="legend-column-resize-handle"
+                    @mousedown="startLegendColumnResize($event, `group:${groupIndex}`)"
+                  />
                 </th>
-                <th v-if="effectiveGroupColumns.length === 0">Name</th>
-                <th class="numeric-col">Count</th>
-                <th v-if="effectiveValueColumns.length > 0" class="numeric-col">Value</th>
+                <th
+                  v-if="showPieLegendNameColumn"
+                  class="legend-filterable-header legend-resizable-header"
+                  @mouseenter="onLegendHeaderMouseEnter($event, 'name', 'Name')"
+                  @mouseleave="cancelLegendFilterHover"
+                >
+                  <div class="legend-header-content">
+                    <button
+                      type="button"
+                      class="legend-sort-button"
+                      :class="{ 'has-filter': isLegendFilterActive('name'), 'has-disabled-filter': isLegendFilterDisabled('name') }"
+                      @click="setLegendSort('name')"
+                    >
+                      <span>Name</span>
+                      <i :class="getLegendSortIcon('name')"></i>
+                    </button>
+                    <i
+                      class="pi pi-filter legend-filter-indicator"
+                      :class="{ active: isLegendFilterActive('name'), 'filter-disabled': isLegendFilterDisabled('name') }"
+                      @click.stop="showLegendFilterPopover($event, 'name', 'Name')"
+                    ></i>
+                  </div>
+                  <span
+                    class="legend-column-resize-handle"
+                    @mousedown="startLegendColumnResize($event, 'name')"
+                  />
+                </th>
+                <th
+                  v-for="metricColumn in pieLegendMetricColumns"
+                  :key="`pie-metric-header:${metricColumn.key}`"
+                  class="numeric-col legend-filterable-header legend-resizable-header"
+                  @mouseenter="onLegendHeaderMouseEnter($event, metricColumn.key, metricColumn.title)"
+                  @mouseleave="cancelLegendFilterHover"
+                >
+                  <div class="legend-header-content">
+                    <button
+                      type="button"
+                      class="legend-sort-button numeric-sort"
+                      :class="{ 'has-filter': isLegendFilterActive(metricColumn.key), 'has-disabled-filter': isLegendFilterDisabled(metricColumn.key) }"
+                      @click="setLegendSort(metricColumn.key)"
+                    >
+                      <span>{{ metricColumn.title }}</span>
+                      <i :class="getLegendSortIcon(metricColumn.key)"></i>
+                    </button>
+                    <i
+                      class="pi pi-filter legend-filter-indicator"
+                      :class="{ active: isLegendFilterActive(metricColumn.key), 'filter-disabled': isLegendFilterDisabled(metricColumn.key) }"
+                      @click.stop="showLegendFilterPopover($event, metricColumn.key, metricColumn.title)"
+                    ></i>
+                  </div>
+                  <span
+                    class="legend-column-resize-handle"
+                    @mousedown="startLegendColumnResize($event, metricColumn.key)"
+                  />
+                </th>
               </tr>
             </thead>
             <tbody>
+              <tr v-if="filteredPieLegendRows.length === 0">
+                <td class="legend-empty" :colspan="pieLegendColumnCount">
+                  No slices match the legend filters
+                </td>
+              </tr>
               <tr
-                v-for="row in pieLegendRows"
+                v-for="{ row } in filteredPieLegendRows"
                 :key="row.label"
                 :class="{ hidden: !isPieSliceVisible(row.label) }"
               >
@@ -2114,15 +2285,20 @@ onBeforeUnmount(() => {
                   {{ row.groupParts[index] || '' }}
                 </td>
                 <td v-if="effectiveGroupColumns.length === 0" :title="row.label">{{ row.label }}</td>
-                <td class="numeric-col">{{ formatMetric(row.count) }}</td>
-                <td v-if="effectiveValueColumns.length > 0" class="numeric-col">{{ formatMetric(row.total) }}</td>
+                <td
+                  v-for="metricColumn in pieLegendMetricColumns"
+                  :key="`${row.label}:${metricColumn.key}`"
+                  class="numeric-col"
+                >
+                  {{ formatMetric(row.values[metricColumn.key] || 0) }}
+                </td>
               </tr>
             </tbody>
           </table>
         </aside>
       </div>
     </div>
-    
+
     <div class="no-data" v-else-if="props.data.length === 0">
       <i class="pi pi-info-circle"></i>
       <span>No rows to display</span>
@@ -2137,6 +2313,24 @@ onBeforeUnmount(() => {
       <i class="pi pi-info-circle"></i>
       <span>Enable count or select value columns to display the chart</span>
     </div>
+
+    <BasicColumnFilterPopover
+      ref="legendFilterPopoverRef"
+      v-model:query="activeLegendFilterText"
+      v-model:is-regex="activeLegendFilterQuery.isRegex"
+      v-model:is-exact="activeLegendFilterQuery.isExact"
+      v-model:is-negate="activeLegendFilterQuery.isNegate"
+      v-model:is-array="activeLegendFilterQuery.isArray"
+      v-model:is-disabled="activeLegendFilterQuery.isDisabled"
+      v-model:is-js="activeLegendFilterIsJs"
+      :field="activeLegendFilterTitle"
+      :show-js="true"
+      :show-hide-column="false"
+      popover-class="legend-filter-popover"
+      :width="320"
+      @clear="clearActiveLegendFilter"
+      @keydown="onLegendFilterKeydown"
+    />
   </div>
 </template>
 
