@@ -62,6 +62,8 @@ const props = defineProps<{
   showCountModel?: boolean
   showValueSumModel?: boolean
   valueAggModel?: ValueAggregation
+  showPieChartsModel?: boolean
+  pieChartsPerRowModel?: number
   timeSelectionStartModel?: number | null
   timeSelectionEndModel?: number | null
   chartHeight?: number
@@ -79,6 +81,8 @@ const emit = defineEmits<{
   'update:showCount': [value: boolean]
   'update:showValueSum': [value: boolean]
   'update:valueAgg': [value: ValueAggregation]
+  'update:showPieCharts': [value: boolean]
+  'update:pieChartsPerRow': [value: number]
   'update:chartHeight': [value: number]
   'update:time-range': [payload: { timeColumn: string; startMs: number | null; endMs: number | null }]
 }>()
@@ -153,6 +157,8 @@ const effectiveGroupColumns = ref<string[]>([...groupColumns.value])
 const showCount = ref(props.showCountModel ?? true)
 const showValueSum = ref(props.showValueSumModel ?? false)
 const valueAgg = ref<ValueAggregation>(props.valueAggModel ?? 'sum')
+const showPieCharts = ref(props.showPieChartsModel ?? false)
+const pieChartsPerRow = ref(props.pieChartsPerRowModel ?? 3)
 const bucketSize = ref<TimeBucket>(props.bucketSizeModel || 'minute')
 const autoDetectBucket = ref(!props.bucketSizeModel) // Auto-detect only if no saved bucket
 const isMaximized = ref(props.showStatusModel === 'maximized')
@@ -210,6 +216,8 @@ watch(hiddenGroups, (val) => emit('update:hiddenGroups', val))
 watch(showCount, (val) => emit('update:showCount', val))
 watch(showValueSum, (val) => emit('update:showValueSum', val))
 watch(valueAgg, (val) => emit('update:valueAgg', val))
+watch(showPieCharts, (val) => emit('update:showPieCharts', val))
+watch(pieChartsPerRow, (val) => emit('update:pieChartsPerRow', val))
 watch(() => props.showStatusModel, (val) => {
   isMaximized.value = val === 'maximized'
 })
@@ -250,6 +258,14 @@ watch(() => props.showValueSumModel, (val) => {
 watch(() => props.valueAggModel, (val) => {
   const next = val ?? 'sum'
   if (valueAgg.value !== next) valueAgg.value = next
+})
+watch(() => props.showPieChartsModel, (val) => {
+  const next = val ?? false
+  if (showPieCharts.value !== next) showPieCharts.value = next
+})
+watch(() => props.pieChartsPerRowModel, (val) => {
+  const next = val ?? 3
+  if (pieChartsPerRow.value !== next) pieChartsPerRow.value = next
 })
 
 watch([valueColumns, groupColumns], () => {
@@ -340,10 +356,18 @@ const countSeriesCount = computed(() => {
   if (groupedCountEnabled.value) return visibleCountGroupKeys.value.length
   return visibleCountGroupKeys.value.length > MAX_RENDERED_SERIES ? 1 : 0
 })
-const usePieMode = computed(() => !timeColumn.value || chartBuckets.value.length <= 1)
+const hasUsableTimeSeriesAxis = computed(() => !!timeColumn.value && chartBuckets.value.length > 1)
+const timeSeriesHasData = computed(() => chartBuckets.value.length > 0 && (countSeriesCount.value > 0 || valueSeriesSummaries.value.length > 0))
+const renderTimeSeriesChart = computed(() => hasUsableTimeSeriesAxis.value && timeSeriesHasData.value)
+const renderPieCharts = computed(() => !hasUsableTimeSeriesAxis.value || showPieCharts.value)
+const pieChartsControl = computed({
+  get: () => renderPieCharts.value,
+  set: (value: boolean) => {
+    showPieCharts.value = value
+  }
+})
 const chartHasData = computed(() => {
-  if (usePieMode.value) return pieChartConfigs.value.length > 0
-  return chartBuckets.value.length > 0 && (countSeriesCount.value > 0 || valueSeriesSummaries.value.length > 0)
+  return (renderTimeSeriesChart.value || (renderPieCharts.value && pieChartConfigs.value.length > 0))
 })
 const chartLayoutStyle = computed(() => {
   const height = props.chartHeight ?? 250
@@ -352,6 +376,9 @@ const chartLayoutStyle = computed(() => {
     minHeight: `${height}px`
   }
 })
+const pieGridStyle = computed(() => ({
+  gridTemplateColumns: `repeat(${Math.max(1, Math.min(pieChartsPerRow.value, pieChartConfigs.value.length || 1))}, minmax(0, 1fr))`
+}))
 
 // Auto-select first time column
 watch(timeColumns, (cols) => {
@@ -952,6 +979,7 @@ function getPieData(title: string, valuesByLabel: Map<string, number>): ChartDat
   const rows = pieGroupLabels.value
     .map(label => ({ label, value: valuesByLabel.get(label) || 0 }))
     .filter(row => Number.isFinite(row.value) && row.value > 0)
+    .sort((a, b) => b.value - a.value || a.label.localeCompare(b.label, undefined, { numeric: true, sensitivity: 'base' }))
 
   return {
     labels: rows.map(row => row.label),
@@ -1376,6 +1404,15 @@ const valueAggOptions: { label: string; value: ValueAggregation }[] = [
   { label: 'Max', value: 'max' }
 ]
 
+const pieChartsPerRowOptions = [
+  { label: '1', value: 1 },
+  { label: '2', value: 2 },
+  { label: '3', value: 3 },
+  { label: '4', value: 4 },
+  { label: '5', value: 5 },
+  { label: '6', value: 6 },
+]
+
 function onBucketChange() {
   autoDetectBucket.value = false
 }
@@ -1650,13 +1687,29 @@ onBeforeUnmount(() => {
         <span>Sum</span>
       </label>
 
+      <label class="control-group checkbox-control">
+        <Checkbox v-model="pieChartsControl" :binary="true" :disabled="!hasUsableTimeSeriesAxis" />
+        <span>Pie</span>
+      </label>
+
+      <div v-if="renderPieCharts" class="control-group">
+        <label>Per Row:</label>
+        <Select
+          v-model="pieChartsPerRow"
+          :options="pieChartsPerRowOptions"
+          optionLabel="label"
+          optionValue="value"
+          class="control-select per-row-select"
+        />
+      </div>
+
       <div class="control-group">
         <Button
           icon="pi pi-refresh"
           size="small"
           text
           severity="secondary"
-          :disabled="usePieMode || !hasTimeSelection"
+          :disabled="!renderTimeSeriesChart || !hasTimeSelection"
           @click="resetTimeSelection"
           v-tooltip.top="'Reset time selection'"
         />
@@ -1682,11 +1735,232 @@ onBeforeUnmount(() => {
     
     <div
       class="chart-layout"
-      :class="{ maximized: isMaximized, 'pie-mode': usePieMode }"
+      :class="{ maximized: isMaximized, 'with-pie': renderPieCharts, 'with-time-series': renderTimeSeriesChart }"
       :style="chartLayoutStyle"
       v-if="chartHasData"
     >
-      <div v-if="usePieMode" class="pie-chart-grid">
+      <div v-if="renderTimeSeriesChart" class="time-series-row">
+        <div class="chart-container" @mousedown.capture="startTimeSelectionDrag">
+          <Bar
+            ref="chartRef"
+            :data="chartJsData"
+            :options="chartOptions"
+            dataset-id-key="seriesKey"
+            :update-mode="CHART_UPDATE_MODE"
+          />
+          <div v-if="isDraggingSelection" class="selection-overlay" :style="dragOverlayStyle" />
+        </div>
+
+        <div
+          v-if="valueColumns.length > 0"
+          class="legend-divider"
+          :class="{ resizing: isResizingLegend }"
+          @mousedown="startLegendResize"
+        />
+
+        <aside
+          v-if="valueColumns.length > 0"
+          class="value-legend"
+          :style="{ width: `${legendWidth}px` }"
+        >
+          <table :style="{ minWidth: `${legendTableWidth}px` }">
+            <colgroup>
+              <col :style="{ width: `${LEGEND_VISIBILITY_COL_WIDTH}px` }" />
+              <col :style="{ width: `${LEGEND_COLOR_COL_WIDTH}px` }" />
+              <col v-if="showLegendNameColumn" :style="{ width: `${getLegendColumnWidth('name')}px` }" />
+              <col
+                v-for="(_, groupIndex) in effectiveGroupColumns"
+                :key="`group-col:${groupIndex}`"
+                :style="{ width: `${getLegendColumnWidth(`group:${groupIndex}`)}px` }"
+              />
+              <col :style="{ width: `${getLegendColumnWidth('max')}px` }" />
+              <col :style="{ width: `${getLegendColumnWidth('mean')}px` }" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th class="visibility-col">
+                  <Button
+                    :icon="allValueSeriesHidden ? 'pi pi-eye' : 'pi pi-eye-slash'"
+                    text
+                    size="small"
+                    severity="secondary"
+                    @click="toggleAllValueSeries"
+                    v-tooltip.top="allValueSeriesHidden ? 'Show matching value series' : 'Hide all value series'"
+                  />
+                </th>
+                <th class="color-col"></th>
+                <th
+                  v-if="showLegendNameColumn"
+                  class="legend-filterable-header legend-resizable-header"
+                  @mouseenter="onLegendHeaderMouseEnter($event, 'name', 'Name')"
+                  @mouseleave="cancelLegendFilterHover"
+                >
+                  <div class="legend-header-content">
+                    <button
+                      type="button"
+                      class="legend-sort-button"
+                      :class="{ 'has-filter': isLegendFilterActive('name'), 'has-disabled-filter': isLegendFilterDisabled('name') }"
+                      @click="setLegendSort('name')"
+                    >
+                      <span>Name</span>
+                      <i :class="getLegendSortIcon('name')"></i>
+                    </button>
+                    <i
+                      class="pi pi-filter legend-filter-indicator"
+                      :class="{ active: isLegendFilterActive('name'), 'filter-disabled': isLegendFilterDisabled('name') }"
+                      @click.stop="showLegendFilterPopover($event, 'name', 'Name')"
+                    ></i>
+                  </div>
+                  <span
+                    class="legend-column-resize-handle"
+                    @mousedown="startLegendColumnResize($event, 'name')"
+                  />
+                </th>
+                <th
+                  v-for="(groupColumnName, groupIndex) in effectiveGroupColumns"
+                  :key="groupColumnName"
+                  class="legend-filterable-header legend-resizable-header"
+                  @mouseenter="onLegendHeaderMouseEnter($event, `group:${groupIndex}`, groupColumnName)"
+                  @mouseleave="cancelLegendFilterHover"
+                >
+                  <div class="legend-header-content">
+                    <button
+                      type="button"
+                      class="legend-sort-button"
+                      :class="{ 'has-filter': isLegendFilterActive(`group:${groupIndex}`), 'has-disabled-filter': isLegendFilterDisabled(`group:${groupIndex}`) }"
+                      @click="setLegendSort(`group:${groupIndex}`)"
+                    >
+                      <span>{{ groupColumnName }}</span>
+                      <i :class="getLegendSortIcon(`group:${groupIndex}`)"></i>
+                    </button>
+                    <i
+                      class="pi pi-filter legend-filter-indicator"
+                      :class="{ active: isLegendFilterActive(`group:${groupIndex}`), 'filter-disabled': isLegendFilterDisabled(`group:${groupIndex}`) }"
+                      @click.stop="showLegendFilterPopover($event, `group:${groupIndex}`, groupColumnName)"
+                    ></i>
+                  </div>
+                  <span
+                    class="legend-column-resize-handle"
+                    @mousedown="startLegendColumnResize($event, `group:${groupIndex}`)"
+                  />
+                </th>
+                <th
+                  class="numeric-col legend-filterable-header legend-resizable-header"
+                  @mouseenter="onLegendHeaderMouseEnter($event, 'max', 'Max')"
+                  @mouseleave="cancelLegendFilterHover"
+                >
+                  <div class="legend-header-content">
+                    <button
+                      type="button"
+                      class="legend-sort-button numeric-sort"
+                      :class="{ 'has-filter': isLegendFilterActive('max'), 'has-disabled-filter': isLegendFilterDisabled('max') }"
+                      @click="setLegendSort('max')"
+                    >
+                      <span>Max</span>
+                      <i :class="getLegendSortIcon('max')"></i>
+                    </button>
+                    <i
+                      class="pi pi-filter legend-filter-indicator"
+                      :class="{ active: isLegendFilterActive('max'), 'filter-disabled': isLegendFilterDisabled('max') }"
+                      @click.stop="showLegendFilterPopover($event, 'max', 'Max')"
+                    ></i>
+                  </div>
+                  <span
+                    class="legend-column-resize-handle"
+                    @mousedown="startLegendColumnResize($event, 'max')"
+                  />
+                </th>
+                <th
+                  class="numeric-col legend-filterable-header legend-resizable-header"
+                  @mouseenter="onLegendHeaderMouseEnter($event, 'mean', 'Mean')"
+                  @mouseleave="cancelLegendFilterHover"
+                >
+                  <div class="legend-header-content">
+                    <button
+                      type="button"
+                      class="legend-sort-button numeric-sort"
+                      :class="{ 'has-filter': isLegendFilterActive('mean'), 'has-disabled-filter': isLegendFilterDisabled('mean') }"
+                      @click="setLegendSort('mean')"
+                    >
+                      <span>Mean</span>
+                      <i :class="getLegendSortIcon('mean')"></i>
+                    </button>
+                    <i
+                      class="pi pi-filter legend-filter-indicator"
+                      :class="{ active: isLegendFilterActive('mean'), 'filter-disabled': isLegendFilterDisabled('mean') }"
+                      @click.stop="showLegendFilterPopover($event, 'mean', 'Mean')"
+                    ></i>
+                  </div>
+                  <span
+                    class="legend-column-resize-handle"
+                    @mousedown="startLegendColumnResize($event, 'mean')"
+                  />
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-if="filteredLegendRows.length === 0">
+                <td class="legend-empty" :colspan="effectiveGroupColumns.length + (showLegendNameColumn ? 5 : 4)">
+                  No series match the legend filters
+                </td>
+              </tr>
+              <template v-else>
+                <tr
+                  v-for="{ series, originalIndex } in filteredLegendRows"
+                  :key="series.key"
+                  :class="{ hidden: !isValueSeriesVisible(series, originalIndex) }"
+                >
+                  <td class="visibility-col">
+                    <Button
+                      :icon="isValueSeriesVisible(series, originalIndex) ? 'pi pi-eye' : 'pi pi-eye-slash'"
+                      text
+                      size="small"
+                      severity="secondary"
+                      @click="toggleSeriesVisibility(series, originalIndex)"
+                      v-tooltip.top="isValueSeriesVisible(series, originalIndex) ? 'Hide series' : 'Show series'"
+                    />
+                  </td>
+                  <td class="color-col">
+                    <span
+                      class="series-color"
+                      :style="{ backgroundColor: getSeriesColor(series).border }"
+                    />
+                  </td>
+                  <td v-if="showLegendNameColumn" class="series-name" :title="series.name">{{ series.valueColumn }}</td>
+                  <td
+                    v-for="(_, index) in effectiveGroupColumns"
+                    :key="`${series.key}:${index}`"
+                    :title="series.groupParts[index] || ''"
+                  >
+                    {{ series.groupParts[index] || '' }}
+                  </td>
+                  <td class="numeric-col">{{ formatMetric(series.max) }}</td>
+                  <td class="numeric-col">{{ formatMetric(series.mean) }}</td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+          <BasicColumnFilterPopover
+            ref="legendFilterPopoverRef"
+            v-model:query="activeLegendFilterText"
+            v-model:is-regex="activeLegendFilterQuery.isRegex"
+            v-model:is-exact="activeLegendFilterQuery.isExact"
+            v-model:is-negate="activeLegendFilterQuery.isNegate"
+            v-model:is-array="activeLegendFilterQuery.isArray"
+            v-model:is-disabled="activeLegendFilterQuery.isDisabled"
+            v-model:is-js="activeLegendFilterIsJs"
+            :field="activeLegendFilterTitle"
+            :show-js="true"
+            :show-hide-column="false"
+            popover-class="legend-filter-popover"
+            :width="320"
+            @clear="clearActiveLegendFilter"
+            @keydown="onLegendFilterKeydown"
+          />
+        </aside>
+      </div>
+
+      <div v-if="renderPieCharts && pieChartConfigs.length > 0" class="pie-chart-grid" :style="pieGridStyle">
         <section
           v-for="pieChart in pieChartConfigs"
           :key="pieChart.key"
@@ -1706,225 +1980,6 @@ onBeforeUnmount(() => {
           </div>
         </section>
       </div>
-
-      <div v-else class="chart-container" @mousedown.capture="startTimeSelectionDrag">
-        <Bar
-          ref="chartRef"
-          :data="chartJsData"
-          :options="chartOptions"
-          dataset-id-key="seriesKey"
-          :update-mode="CHART_UPDATE_MODE"
-        />
-        <div v-if="isDraggingSelection" class="selection-overlay" :style="dragOverlayStyle" />
-      </div>
-
-      <div
-        v-if="!usePieMode && valueColumns.length > 0"
-        class="legend-divider"
-        :class="{ resizing: isResizingLegend }"
-        @mousedown="startLegendResize"
-      />
-
-      <aside
-        v-if="!usePieMode && valueColumns.length > 0"
-        class="value-legend"
-        :style="{ width: `${legendWidth}px` }"
-      >
-        <table :style="{ minWidth: `${legendTableWidth}px` }">
-          <colgroup>
-            <col :style="{ width: `${LEGEND_VISIBILITY_COL_WIDTH}px` }" />
-            <col :style="{ width: `${LEGEND_COLOR_COL_WIDTH}px` }" />
-            <col v-if="showLegendNameColumn" :style="{ width: `${getLegendColumnWidth('name')}px` }" />
-            <col
-              v-for="(_, groupIndex) in effectiveGroupColumns"
-              :key="`group-col:${groupIndex}`"
-              :style="{ width: `${getLegendColumnWidth(`group:${groupIndex}`)}px` }"
-            />
-            <col :style="{ width: `${getLegendColumnWidth('max')}px` }" />
-            <col :style="{ width: `${getLegendColumnWidth('mean')}px` }" />
-          </colgroup>
-          <thead>
-            <tr>
-              <th class="visibility-col">
-                <Button
-                  :icon="allValueSeriesHidden ? 'pi pi-eye' : 'pi pi-eye-slash'"
-                  text
-                  size="small"
-                  severity="secondary"
-                  @click="toggleAllValueSeries"
-                  v-tooltip.top="allValueSeriesHidden ? 'Show matching value series' : 'Hide all value series'"
-                />
-              </th>
-              <th class="color-col"></th>
-              <th
-                v-if="showLegendNameColumn"
-                class="legend-filterable-header legend-resizable-header"
-                @mouseenter="onLegendHeaderMouseEnter($event, 'name', 'Name')"
-                @mouseleave="cancelLegendFilterHover"
-              >
-                <div class="legend-header-content">
-                  <button
-                    type="button"
-                    class="legend-sort-button"
-                    :class="{ 'has-filter': isLegendFilterActive('name'), 'has-disabled-filter': isLegendFilterDisabled('name') }"
-                    @click="setLegendSort('name')"
-                  >
-                    <span>Name</span>
-                    <i :class="getLegendSortIcon('name')"></i>
-                  </button>
-                  <i
-                    class="pi pi-filter legend-filter-indicator"
-                    :class="{ active: isLegendFilterActive('name'), 'filter-disabled': isLegendFilterDisabled('name') }"
-                    @click.stop="showLegendFilterPopover($event, 'name', 'Name')"
-                  ></i>
-                </div>
-                <span
-                  class="legend-column-resize-handle"
-                  @mousedown="startLegendColumnResize($event, 'name')"
-                />
-              </th>
-              <th
-                v-for="(groupColumnName, groupIndex) in effectiveGroupColumns"
-                :key="groupColumnName"
-                class="legend-filterable-header legend-resizable-header"
-                @mouseenter="onLegendHeaderMouseEnter($event, `group:${groupIndex}`, groupColumnName)"
-                @mouseleave="cancelLegendFilterHover"
-              >
-                <div class="legend-header-content">
-                  <button
-                    type="button"
-                    class="legend-sort-button"
-                    :class="{ 'has-filter': isLegendFilterActive(`group:${groupIndex}`), 'has-disabled-filter': isLegendFilterDisabled(`group:${groupIndex}`) }"
-                    @click="setLegendSort(`group:${groupIndex}`)"
-                  >
-                    <span>{{ groupColumnName }}</span>
-                    <i :class="getLegendSortIcon(`group:${groupIndex}`)"></i>
-                  </button>
-                  <i
-                    class="pi pi-filter legend-filter-indicator"
-                    :class="{ active: isLegendFilterActive(`group:${groupIndex}`), 'filter-disabled': isLegendFilterDisabled(`group:${groupIndex}`) }"
-                    @click.stop="showLegendFilterPopover($event, `group:${groupIndex}`, groupColumnName)"
-                  ></i>
-                </div>
-                <span
-                  class="legend-column-resize-handle"
-                  @mousedown="startLegendColumnResize($event, `group:${groupIndex}`)"
-                />
-              </th>
-              <th
-                class="numeric-col legend-filterable-header legend-resizable-header"
-                @mouseenter="onLegendHeaderMouseEnter($event, 'max', 'Max')"
-                @mouseleave="cancelLegendFilterHover"
-              >
-                <div class="legend-header-content">
-                  <button
-                    type="button"
-                    class="legend-sort-button numeric-sort"
-                    :class="{ 'has-filter': isLegendFilterActive('max'), 'has-disabled-filter': isLegendFilterDisabled('max') }"
-                    @click="setLegendSort('max')"
-                  >
-                    <span>Max</span>
-                    <i :class="getLegendSortIcon('max')"></i>
-                  </button>
-                  <i
-                    class="pi pi-filter legend-filter-indicator"
-                    :class="{ active: isLegendFilterActive('max'), 'filter-disabled': isLegendFilterDisabled('max') }"
-                    @click.stop="showLegendFilterPopover($event, 'max', 'Max')"
-                  ></i>
-                </div>
-                <span
-                  class="legend-column-resize-handle"
-                  @mousedown="startLegendColumnResize($event, 'max')"
-                />
-              </th>
-              <th
-                class="numeric-col legend-filterable-header legend-resizable-header"
-                @mouseenter="onLegendHeaderMouseEnter($event, 'mean', 'Mean')"
-                @mouseleave="cancelLegendFilterHover"
-              >
-                <div class="legend-header-content">
-                  <button
-                    type="button"
-                    class="legend-sort-button numeric-sort"
-                    :class="{ 'has-filter': isLegendFilterActive('mean'), 'has-disabled-filter': isLegendFilterDisabled('mean') }"
-                    @click="setLegendSort('mean')"
-                  >
-                    <span>Mean</span>
-                    <i :class="getLegendSortIcon('mean')"></i>
-                  </button>
-                  <i
-                    class="pi pi-filter legend-filter-indicator"
-                    :class="{ active: isLegendFilterActive('mean'), 'filter-disabled': isLegendFilterDisabled('mean') }"
-                    @click.stop="showLegendFilterPopover($event, 'mean', 'Mean')"
-                  ></i>
-                </div>
-                <span
-                  class="legend-column-resize-handle"
-                  @mousedown="startLegendColumnResize($event, 'mean')"
-                />
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-if="filteredLegendRows.length === 0">
-              <td class="legend-empty" :colspan="effectiveGroupColumns.length + (showLegendNameColumn ? 5 : 4)">
-                No series match the legend filters
-              </td>
-            </tr>
-            <template v-else>
-              <tr
-                v-for="{ series, originalIndex } in filteredLegendRows"
-                :key="series.key"
-                :class="{ hidden: !isValueSeriesVisible(series, originalIndex) }"
-              >
-                <td class="visibility-col">
-                  <Button
-                    :icon="isValueSeriesVisible(series, originalIndex) ? 'pi pi-eye' : 'pi pi-eye-slash'"
-                    text
-                    size="small"
-                    severity="secondary"
-                    @click="toggleSeriesVisibility(series, originalIndex)"
-                    v-tooltip.top="isValueSeriesVisible(series, originalIndex) ? 'Hide series' : 'Show series'"
-                  />
-                </td>
-                <td class="color-col">
-                  <span
-                    class="series-color"
-                    :style="{ backgroundColor: getSeriesColor(series).border }"
-                  />
-                </td>
-                <td v-if="showLegendNameColumn" class="series-name" :title="series.name">{{ series.valueColumn }}</td>
-                <td
-                  v-for="(_, index) in effectiveGroupColumns"
-                  :key="`${series.key}:${index}`"
-                  :title="series.groupParts[index] || ''"
-                >
-                  {{ series.groupParts[index] || '' }}
-                </td>
-                <td class="numeric-col">{{ formatMetric(series.max) }}</td>
-                <td class="numeric-col">{{ formatMetric(series.mean) }}</td>
-              </tr>
-            </template>
-          </tbody>
-        </table>
-        <BasicColumnFilterPopover
-          ref="legendFilterPopoverRef"
-          v-model:query="activeLegendFilterText"
-          v-model:is-regex="activeLegendFilterQuery.isRegex"
-          v-model:is-exact="activeLegendFilterQuery.isExact"
-          v-model:is-negate="activeLegendFilterQuery.isNegate"
-          v-model:is-array="activeLegendFilterQuery.isArray"
-          v-model:is-disabled="activeLegendFilterQuery.isDisabled"
-          v-model:is-js="activeLegendFilterIsJs"
-          :field="activeLegendFilterTitle"
-          :show-js="true"
-          :show-hide-column="false"
-          popover-class="legend-filter-popover"
-          :width="320"
-          @clear="clearActiveLegendFilter"
-          @keydown="onLegendFilterKeydown"
-        />
-      </aside>
     </div>
     
     <div class="no-data" v-else-if="props.data.length === 0">
@@ -1988,6 +2043,10 @@ onBeforeUnmount(() => {
   min-width: 90px;
 }
 
+.per-row-select {
+  min-width: 68px;
+}
+
 .checkbox-control {
   cursor: pointer;
   user-select: none;
@@ -2001,13 +2060,22 @@ onBeforeUnmount(() => {
 
 .chart-layout {
   display: flex;
+  flex-direction: column;
   min-height: 250px;
   height: 250px;
+  overflow: auto;
   transition: height 0.2s ease;
 }
 
-.chart-layout.pie-mode {
-  overflow: auto;
+.time-series-row {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.chart-layout.with-time-series.with-pie .time-series-row {
+  min-height: 220px;
+  border-bottom: 1px solid var(--tdv-surface-border);
 }
 
 .chart-container {
@@ -2020,10 +2088,13 @@ onBeforeUnmount(() => {
 .pie-chart-grid {
   display: grid;
   flex: 1 1 auto;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 10px;
   min-width: 0;
   padding: 10px;
+}
+
+.chart-layout.with-time-series.with-pie .pie-chart-grid {
+  min-height: 220px;
 }
 
 .pie-chart-panel {

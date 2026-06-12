@@ -142,6 +142,8 @@ const chartHiddenGroups = ref<Set<string>>(new Set())
 const chartShowCount = ref(true)
 const chartShowValueSum = ref(false)
 const chartValueAgg = ref<'avg' | 'sum' | 'max'>('sum')
+const chartShowPieCharts = ref(false)
+const chartPieChartsPerRow = ref(3)
 const chartTimeSelectionStart = ref<number | null>(null)
 const chartTimeSelectionEnd = ref<number | null>(null)
 const chartTimeSelectionColumn = ref('')
@@ -412,6 +414,8 @@ function applyChartState(cs: ChartState) {
   chartShowCount.value = cs.showCount ?? true
   chartShowValueSum.value = cs.showValueSum ?? false
   chartValueAgg.value = cs.valueAgg ?? 'sum'
+  chartShowPieCharts.value = cs.showPieCharts ?? false
+  chartPieChartsPerRow.value = cs.pieChartsPerRow ?? 3
   chartTimeSelectionStart.value = cs.timeSelectionStart ?? null
   chartTimeSelectionEnd.value = cs.timeSelectionEnd ?? null
   chartTimeSelectionColumn.value = cs.timeSelectionColumn ?? ''
@@ -2015,6 +2019,8 @@ function saveCurrentTableState() {
         showCount: chartShowCount.value,
         showValueSum: chartShowValueSum.value,
         valueAgg: chartValueAgg.value,
+        showPieCharts: chartShowPieCharts.value,
+        pieChartsPerRow: chartPieChartsPerRow.value,
         timeSelectionStart: chartTimeSelectionStart.value,
         timeSelectionEnd: chartTimeSelectionEnd.value,
         timeSelectionColumn: chartTimeSelectionColumn.value,
@@ -2350,6 +2356,8 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
       :show-count-model="chartShowCount"
       :show-value-sum-model="chartShowValueSum"
       :value-agg-model="chartValueAgg"
+      :show-pie-charts-model="chartShowPieCharts"
+      :pie-charts-per-row-model="chartPieChartsPerRow"
       :time-selection-start-model="chartTimeSelectionStart"
       :time-selection-end-model="chartTimeSelectionEnd"
       @close="showChart = false"
@@ -2363,6 +2371,8 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
       @update:show-count="chartShowCount = $event"
       @update:show-value-sum="chartShowValueSum = $event"
       @update:value-agg="chartValueAgg = $event"
+      @update:show-pie-charts="chartShowPieCharts = $event"
+      @update:pie-charts-per-row="chartPieChartsPerRow = $event"
       @update:chart-height="chartHeight = clampChartHeight($event)"
       @update:time-range="onChartTimeRange"
     />

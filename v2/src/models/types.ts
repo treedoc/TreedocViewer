@@ -105,6 +105,8 @@ export interface ChartState {
   showCount?: boolean
   showValueSum?: boolean
   valueAgg?: 'avg' | 'sum' | 'max'
+  showPieCharts?: boolean
+  pieChartsPerRow?: number
   timeSelectionStart?: number | null
   timeSelectionEnd?: number | null
   timeSelectionColumn?: string
