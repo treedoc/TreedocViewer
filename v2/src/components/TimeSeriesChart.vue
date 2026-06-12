@@ -109,8 +109,7 @@ type LegendSortField = 'name' | 'max' | 'mean' | `group:${number}`
 type LegendSortOrder = 1 | -1
 type LegendColumnKey = LegendSortField
 
-const MAX_RENDERED_SERIES = 100
-const MAX_GROUPED_COUNT_SERIES = 100
+const MAX_RENDERED_SERIES = 200
 const TOOLTIP_SINGLE_SERIES_THRESHOLD = 50
 const DEBOUNCE_MS = 250
 const CHART_UPDATE_MODE = 'none'
@@ -210,6 +209,7 @@ watch(() => props.valueColumnsModel, (val) => {
 watch(() => props.groupColumnsModel, (val) => {
   if (!sameStringArray(groupColumns.value, val)) {
     groupColumns.value = val ? [...val] : []
+    sanitizeGroupColumns()
     applyEffectiveColumnsImmediately()
   }
 }, { deep: true })
@@ -260,7 +260,25 @@ const timeColumns = computed(() => detectTimeColumns(props.data, props.columns))
 const timeColumnFormat = computed(() => timeColumn.value ? detectColumnDateFormat(props.data, timeColumn.value) : null)
 const numericColumns = computed(() => detectNumericColumns(props.data, props.columns))
 const GROUP_BY_MAX_UNIQUE_VALUES = 1000
-const groupableColumns = computed(() => detectGroupableColumns(props.data, props.columns, GROUP_BY_MAX_UNIQUE_VALUES))
+const visibleChartColumns = computed(() => props.columns.filter(col => col.visible))
+const groupableColumns = computed(() => detectGroupableColumns(props.data, visibleChartColumns.value, GROUP_BY_MAX_UNIQUE_VALUES))
+
+function getValidGroupColumns(cols: string[]) {
+  const validFields = new Set(groupableColumns.value.filter(field => field !== timeColumn.value))
+  return cols.filter(field => validFields.has(field))
+}
+
+function sanitizeGroupColumns() {
+  const next = getValidGroupColumns(groupColumns.value)
+  if (!sameStringArray(groupColumns.value, next)) {
+    groupColumns.value = next
+    applyEffectiveColumnsImmediately()
+  }
+}
+
+watch([groupableColumns, timeColumn], () => {
+  sanitizeGroupColumns()
+}, { immediate: true })
 
 const groupColumnCardinality = computed<Record<string, number>>(() => {
   const result: Record<string, number> = {}
@@ -303,7 +321,7 @@ const countSeriesCount = computed(() => {
   if (!showCount.value) return 0
   if (effectiveGroupColumns.value.length === 0) return 1
   if (groupedCountEnabled.value) return visibleCountGroupKeys.value.length
-  return visibleCountGroupKeys.value.length > MAX_GROUPED_COUNT_SERIES ? 1 : 0
+  return visibleCountGroupKeys.value.length > MAX_RENDERED_SERIES ? 1 : 0
 })
 const chartHasData = computed(() => chartBuckets.value.length > 0 && (countSeriesCount.value > 0 || valueSeriesSummaries.value.length > 0))
 const chartLayoutStyle = computed(() => {
@@ -496,7 +514,7 @@ const visibleCountGroupKeys = computed(() => {
 const groupedCountEnabled = computed(() => {
   return effectiveGroupColumns.value.length > 0
     && visibleCountGroupKeys.value.length > 0
-    && visibleCountGroupKeys.value.length <= MAX_GROUPED_COUNT_SERIES
+    && visibleCountGroupKeys.value.length <= MAX_RENDERED_SERIES
 })
 
 function aggregateValues(values: number[]): { max: number; mean: number } {
@@ -931,37 +949,33 @@ const effectiveTimeRange = computed(() => {
 const chartJsData = computed<ChartData<'bar'>>(() => {
   const datasets: any[] = []
   
-  if (showCount.value && groupedCountEnabled.value && visibleCountGroupKeys.value.length > 0) {
-    visibleCountGroupKeys.value.forEach((group, index) => {
-      const color = colorPalette[index % colorPalette.length]
-      const key = `count:${group}`
+  if (showCount.value) {
+    if (groupedCountEnabled.value) {
+      visibleCountGroupKeys.value.forEach((group, index) => {
+        const color = colorPalette[index % colorPalette.length]
+        const key = `count:${group}`
+        datasets.push({
+          label: group,
+          data: chartBuckets.value.map(d => ({ x: d.time.getTime(), y: d.countGroups[group] || 0 })),
+          backgroundColor: color.bg,
+          borderColor: color.border,
+          borderWidth: 1,
+          yAxisID: 'y',
+          stack: 'stack0',
+          seriesKey: key
+        })
+      })
+    } else {
       datasets.push({
-        label: group,
-        data: chartBuckets.value.map(d => ({ x: d.time.getTime(), y: d.countGroups[group] || 0 })),
-        backgroundColor: color.bg,
-        borderColor: color.border,
+        label: 'Row Count',
+        data: chartBuckets.value.map(d => ({ x: d.time.getTime(), y: d.count })),
+        backgroundColor: 'rgba(54, 162, 235, 0.6)',
+        borderColor: 'rgba(54, 162, 235, 1)',
         borderWidth: 1,
         yAxisID: 'y',
-        stack: 'stack0',
-        seriesKey: key
+        seriesKey: 'count:All'
       })
-    })
-  } else if (
-    showCount.value
-    && (
-      effectiveGroupColumns.value.length === 0
-      || visibleCountGroupKeys.value.length > MAX_GROUPED_COUNT_SERIES
-    )
-  ) {
-    datasets.push({
-      label: 'Row Count',
-      data: chartBuckets.value.map(d => ({ x: d.time.getTime(), y: d.count })),
-      backgroundColor: 'rgba(54, 162, 235, 0.6)',
-      borderColor: 'rgba(54, 162, 235, 1)',
-      borderWidth: 1,
-      yAxisID: 'y',
-      seriesKey: 'count:All'
-    })
+    }    
   }
   
   visibleValueSeries.value.forEach((series, index) => {
