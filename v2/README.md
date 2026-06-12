@@ -120,6 +120,7 @@ In that URL, `maxPane:table` opens the table pane maximized, and `globalRule.cha
       // Viewer is ready, send data and optional view configuration.
       document.getElementById('tdvFrame').contentWindow.postMessage({
         type: 'tdv-setData',
+        loading: false,
         data: [
           { ts: "2026-06-01T00:00:00Z", service: "api", count: 8 },
           { ts: "2026-06-01T00:00:00Z", service: "web", count: 5 },
@@ -151,13 +152,34 @@ Embedded messages support:
 
 | Message field | Description |
 |---------------|-------------|
-| `type` | Use `tdv-setData` to send data and optional config, or `tdv-setOptions` to update config without replacing data. |
+| `type` | Use `tdv-setData` to send data and optional config, `tdv-setOptions` to update config without replacing data, or `tdv-setLoading` to control the embedded loading overlay. |
 | `data` | Data payload for `tdv-setData`. |
 | `initialPath` | Node path to select after loading or updating config. |
 | `options` / `option` | Viewer options as an object or JSONEx string. Supports `title`, `maxPane`, and `globalRule`. |
 | `preset` / `initialPreset` | Table preset as an object or JSONEx string. |
+| `loading` / `isLoading` | Boolean loading overlay state. Also accepts string values such as `"true"` / `"false"`. |
+| `loadingMessage` / `message` | Optional loading overlay text. |
 
 `globalRule` in event options works the same as the URL `option.globalRule`: it is applied as a catch-all preset rule with `pathPattern:"**"` and only needs the attributes you want to override.
+
+To control only the loading overlay, send `tdv-setLoading`:
+
+```js
+const frame = document.getElementById('tdvFrame').contentWindow
+
+frame.postMessage({
+  type: 'tdv-setLoading',
+  loading: true,
+  message: 'Loading report...'
+}, '*')
+
+frame.postMessage({
+  type: 'tdv-setLoading',
+  loading: false
+}, '*')
+```
+
+`loading` and `loadingMessage` can also be included on `tdv-setData` or `tdv-setOptions` messages, so a host app can show the overlay before a report switch and hide it with the data/config update.
 
 ### As a Vue Component
 

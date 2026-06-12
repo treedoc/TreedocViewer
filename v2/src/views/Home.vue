@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref, computed, nextTick, onMounted, watch } from 'vue'
+import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import Select from 'primevue/select'
+import ProgressSpinner from 'primevue/progressspinner'
 import JsonTreeTable from '../components/JsonTreeTable.vue'
 import sampleData from '../data/sampleData'
 import { useTreeStore } from '../stores/treeStore'
@@ -27,6 +28,8 @@ const optionParam = urlParams.get('option') || hashParams.get('option') || undef
 const eventOptions = ref<TDVOptions | undefined>()
 const eventPresetParam = ref<string | undefined>()
 const eventInitialPath = ref(initialPathParam)
+const eventLoading = ref(false)
+const eventLoadingMessage = ref('')
 
 const urlOptions = computed<TDVOptions | undefined>(() => {
   if (!optionParam) return undefined
@@ -85,6 +88,62 @@ function applyEventConfig() {
   })
 }
 
+function parseBooleanParam(value: unknown): boolean | undefined {
+  if (typeof value === 'boolean') return value
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase()
+    if (['true', '1', 'yes', 'on'].includes(normalized)) return true
+    if (['false', '0', 'no', 'off'].includes(normalized)) return false
+  }
+  if (typeof value === 'number') return value !== 0
+  return undefined
+}
+
+function applyEventLoading(data: any) {
+  const nextLoading = parseBooleanParam(data.loading ?? data.isLoading)
+  if (nextLoading !== undefined) {
+    eventLoading.value = nextLoading
+  }
+
+  if (typeof data.loadingMessage === 'string') {
+    eventLoadingMessage.value = data.loadingMessage
+  } else if (typeof data.message === 'string') {
+    eventLoadingMessage.value = data.message
+  }
+}
+
+function handleEmbeddedMessage(evt: MessageEvent) {
+  if (
+    evt.data?.type !== 'tdv-setData'
+    && evt.data?.type !== 'tdv-setOptions'
+    && evt.data?.type !== 'tdv-setLoading'
+  ) {
+    return
+  }
+
+  applyEventLoading(evt.data)
+
+  if (evt.data.type === 'tdv-setLoading') {
+    return
+  }
+
+  const nextOptions = parseOptionsParam(evt.data.options ?? evt.data.option)
+  if (nextOptions) eventOptions.value = nextOptions
+
+  const nextPreset = parsePresetParam(evt.data.preset ?? evt.data.initialPreset)
+  if (nextPreset !== undefined) eventPresetParam.value = nextPreset
+
+  if (typeof evt.data.initialPath === 'string') {
+    eventInitialPath.value = evt.data.initialPath
+  }
+
+  if (evt.data.type === 'tdv-setData') {
+    store.loadData(evt.data.data)
+  }
+
+  applyEventConfig()
+}
+
 // Handle embedded mode
 function setupEmbeddedMode() {
   if (embeddedId) {
@@ -95,27 +154,7 @@ function setupEmbeddedMode() {
     }
     
     // Listen for data/config from parent
-    window.addEventListener('message', (evt) => {
-      if (evt.data?.type !== 'tdv-setData' && evt.data?.type !== 'tdv-setOptions') {
-        return
-      }
-
-      const nextOptions = parseOptionsParam(evt.data.options ?? evt.data.option)
-      if (nextOptions) eventOptions.value = nextOptions
-
-      const nextPreset = parsePresetParam(evt.data.preset ?? evt.data.initialPreset)
-      if (nextPreset !== undefined) eventPresetParam.value = nextPreset
-
-      if (typeof evt.data.initialPath === 'string') {
-        eventInitialPath.value = evt.data.initialPath
-      }
-
-      if (evt.data.type === 'tdv-setData') {
-        store.loadData(evt.data.data)
-      }
-
-      applyEventConfig()
-    })
+    window.addEventListener('message', handleEmbeddedMessage)
   }
 }
 
@@ -149,6 +188,12 @@ onMounted(async () => {
   }
 })
 
+onUnmounted(() => {
+  if (embeddedId) {
+    window.removeEventListener('message', handleEmbeddedMessage)
+  }
+})
+
 // Sync sample selection with loaded data
 watch(() => store.rawText, (text) => {
   // Check if current text matches a sample
@@ -174,6 +219,11 @@ watch(() => store.rawText, (text) => {
       :title="title"
       root-object-key="root"
     >
+      <div v-if="eventLoading" class="embedded-loading-overlay">
+        <ProgressSpinner class="embedded-loading-spinner" />
+        <div v-if="eventLoadingMessage" class="embedded-loading-message">{{ eventLoadingMessage }}</div>
+      </div>
+
       <template #title>
         <a href="https://www.treedoc.org" class="app-title">
           <i class="pi pi-sitemap"></i>
@@ -209,6 +259,35 @@ watch(() => store.rawText, (text) => {
   height: 100vh;
   width: 100vw;
   overflow: hidden;
+  position: relative;
+}
+
+.embedded-loading-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--tdv-text);
+  background: color-mix(in srgb, var(--tdv-bg) 74%, transparent);
+  backdrop-filter: blur(2px);
+}
+
+.embedded-loading-spinner {
+  width: 48px;
+  height: 48px;
+}
+
+.embedded-loading-message {
+  max-width: min(420px, calc(100vw - 48px));
+  padding: 0 8px;
+  font-size: 0.9rem;
+  color: var(--tdv-text-muted);
+  text-align: center;
+  overflow-wrap: anywhere;
 }
 
 .app-title {
