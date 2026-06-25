@@ -634,7 +634,7 @@ const pieChartSources = computed<PieChartSource[]>(() => {
     if (Array.from(valuesByLabel.values()).some(value => value > 0)) {
       charts.push({
         key: 'pie:count',
-        title: 'Row Count',
+        title: 'count',
         valuesByLabel,
       })
     }
@@ -649,7 +649,7 @@ const pieChartSources = computed<PieChartSource[]>(() => {
     if (Array.from(valuesByLabel.values()).some(value => value > 0)) {
       charts.push({
         key: `pie:value:${column}`,
-        title: `${valueAgg.value.toUpperCase()} ${column}`,
+        title: column,
         valuesByLabel,
       })
     }
@@ -671,7 +671,7 @@ const pieChartSources = computed<PieChartSource[]>(() => {
     if (Array.from(valuesByLabel.values()).some(value => value > 0)) {
       charts.push({
         key: 'pie:value-sum',
-        title: `SUM visible ${valueAgg.value.toUpperCase()}`,
+        title: 'visible',
         valuesByLabel,
       })
     }
