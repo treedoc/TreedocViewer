@@ -39,12 +39,12 @@
     "@playwright/test": "^1.60.0",
     "@types/lodash-es": "^4.17.12",
     "@types/node": "^25.9.1",
-    "@vitejs/plugin-vue": "^6.0.7",
+    "@vitejs/plugin-vue": "^6.0.8",
     "gh-pages": "^6.3.0",
     "jsdom": "^26.0.0",
     "typescript": "~6.0.3",
-    "vite": "^8.0.14",
-    "vitest": "^3.2.4",
+    "vite": "^8.1.5",
+    "vitest": "^4.1.10",
     "vue-tsc": "^3.3.3"
   }
 }
