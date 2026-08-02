@@ -355,6 +355,33 @@ test.describe('TreeDoc Viewer - Main UI Features', () => {
     });
   });
 
+  test.describe('Chart Grouping', () => {
+    test.beforeEach(async ({ page }) => {
+      await enterJsonData(page, sampleData);
+      await ensureTableViewVisible(page);
+    });
+
+    test('should preserve a column filter when its group-by field is removed', async ({ page }) => {
+      const statusHeader = page.locator('.column-header').filter({ hasText: 'status' });
+      await statusHeader.click();
+      await page.locator('.p-popover').waitFor({ state: 'visible' });
+      await page.locator('.filter-input').fill('Success');
+      await page.locator('.filter-input').press('Enter');
+      await expect(page.locator('.p-datatable-tbody tr')).toHaveCount(2);
+
+      await page.locator('.table-view .pi-chart-bar').locator('..').click();
+      const groupBy = page.locator('.control-group').filter({ hasText: 'Group By:' }).locator('.p-multiselect');
+      await groupBy.click();
+      await page.locator('.p-multiselect-option').filter({ hasText: /^status/ }).click();
+      await expect(groupBy.locator('.p-chip')).toContainText('status');
+
+      await groupBy.locator('.p-chip-remove-icon').click();
+
+      await expect(page.locator('.p-datatable-tbody tr')).toHaveCount(2);
+      await expect(statusHeader.locator('.pi-filter-fill')).toBeVisible();
+    });
+  });
+
   test.describe('Dark Mode', () => {
     test('should toggle dark mode', async ({ page }) => {
       await page.locator('.theme-toggle').click();
