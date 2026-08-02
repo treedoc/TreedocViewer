@@ -6,6 +6,9 @@
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#3b82f6",
+  "launch_handler": {
+    "client_mode": "focus-existing"
+  },
   "icons": [
     {
       "src": "/favicon.svg",
@@ -19,7 +22,9 @@
       "action": "/",
       "accept": {
         "application/json": [".json"],
-        "text/plain": [".txt", ".log", ".yaml", ".yml", ".xml", ".csv", ".tsv", ".prometheus"]
+        "text/csv": [".csv"],
+        "text/tab-separated-values": [".tsv"],
+        "text/plain": [".txt", ".log", ".yaml", ".yml", ".xml", ".prometheus"]
       }
     }
   ]

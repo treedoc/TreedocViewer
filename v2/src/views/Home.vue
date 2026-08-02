@@ -7,6 +7,7 @@ import sampleData from '../data/sampleData'
 import { useTreeStore } from '../stores/treeStore'
 import { TDJSONParser } from 'treedoc'
 import type { TDVOptions } from '../models/types'
+import { TDV_PWA_LAUNCH_EVENT, type PwaLaunchConfig } from '../utils/PwaLaunch'
 
 const store = useTreeStore()
 const jsonTreeTableRef = ref<InstanceType<typeof JsonTreeTable>>()
@@ -164,6 +165,35 @@ function handleEmbeddedMessage(evt: MessageEvent) {
   applyEventConfig()
 }
 
+function handlePwaLaunchConfig(evt: Event) {
+  const config = (evt as CustomEvent<PwaLaunchConfig>).detail
+  if (!config) return
+
+  console.log('[Home] Received PWA launch configuration:', {
+    hasOptions: config.option !== undefined,
+    hasPreset: config.preset !== undefined,
+    initialPath: config.initialPath,
+    title: config.title,
+  })
+
+  const nextOptions = parseOptionsParam(config.option)
+  if (nextOptions || config.title) {
+    eventOptions.value = {
+      ...(nextOptions || {}),
+      ...(config.title ? { title: config.title } : {}),
+    }
+  }
+
+  const nextPreset = parsePresetParam(config.preset)
+  if (nextPreset !== undefined) eventPresetParam.value = nextPreset
+
+  if (config.initialPath) {
+    eventInitialPath.value = config.initialPath
+  }
+
+  applyEventConfig()
+}
+
 // Handle embedded mode
 function setupEmbeddedMode() {
   if (embeddedId) {
@@ -181,6 +211,7 @@ function setupEmbeddedMode() {
 
 onMounted(async () => {
   setupEmbeddedMode()
+  window.addEventListener(TDV_PWA_LAUNCH_EVENT, handlePwaLaunchConfig)
   
   // Load data from URL param
   if (dataParam) {
@@ -210,6 +241,7 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  window.removeEventListener(TDV_PWA_LAUNCH_EVENT, handlePwaLaunchConfig)
   if (embeddedId) {
     window.removeEventListener('message', handleEmbeddedMessage)
   }
