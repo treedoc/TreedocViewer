@@ -12,6 +12,11 @@ import './assets/main.css'
 import App from './App.vue'
 import Home from './views/Home.vue'
 import { useTreeStore } from './stores/treeStore'
+import {
+  dispatchPwaLaunchConfig,
+  parsePwaLaunchConfig,
+  TDV_PWA_CONFIG_SIDECAR,
+} from './utils/PwaLaunch'
 
 const router = createRouter({
   history: createWebHashHistory(),
@@ -43,28 +48,52 @@ app.mount('#app')
 console.log('[PWA] launchQueue available:', 'launchQueue' in window)
 
 if ('launchQueue' in window) {
-  (window as any).launchQueue.setConsumer(async (launchParams: any) => {
-    console.log('[PWA] launchQueue consumer called, files:', launchParams.files?.length || 0)
-    
-    if (!launchParams.files || launchParams.files.length === 0) {
-      console.log('[PWA] No files in launchParams')
-      return
-    }
-    
+  let launchChain = Promise.resolve()
+
+  async function handlePwaLaunch(launchParams: any) {
+    console.log('[PWA] launchQueue consumer called:', {
+      files: launchParams.files?.length || 0,
+      targetURL: launchParams.targetURL,
+    })
+
     const store = useTreeStore()
-    
-    for (const fileHandle of launchParams.files) {
+
+    let config = launchParams.targetURL
+      ? parsePwaLaunchConfig(launchParams.targetURL)
+      : null
+    let dataFile: File | undefined
+
+    for (const fileHandle of launchParams.files || []) {
       try {
         console.log('[PWA] Processing file handle:', fileHandle.name)
         const file = await fileHandle.getFile()
-        const content = await file.text()
-        console.log(`[PWA] Loaded file: ${file.name}, size: ${content.length}`)
-        store.setTextImmediate(content)
-        break // Only load first file
+        if (file.name === TDV_PWA_CONFIG_SIDECAR) {
+          config = parsePwaLaunchConfig(await file.text()) ?? config
+        } else if (!dataFile) {
+          dataFile = file
+        }
       } catch (e) {
         console.error('[PWA] Failed to load file:', e)
       }
     }
+
+    if (dataFile) {
+      const content = await dataFile.text()
+      console.log(`[PWA] Loaded file: ${dataFile.name}, size: ${content.length}`)
+      store.setTextImmediate(content)
+    }
+
+    if (config) {
+      dispatchPwaLaunchConfig(config)
+    }
+  }
+
+  (window as any).launchQueue.setConsumer((launchParams: any) => {
+    // File reads are asynchronous. Serialize launches so a configuration URL
+    // sent immediately after a file is always applied to the newly loaded data.
+    launchChain = launchChain
+      .then(() => handlePwaLaunch(launchParams))
+      .catch(e => console.error('[PWA] Failed to handle launch:', e))
   })
 } else {
   console.log('[PWA] launchQueue not available - file handler API not supported')

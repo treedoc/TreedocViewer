@@ -2,6 +2,9 @@
   "name": "treedoc-viewer",
   "version": "2.0.0",
   "type": "module",
+  "bin": {
+    "treedoc-open": "bin/treedoc-open.mjs"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc && vite build",

@@ -1,0 +1,4 @@
+interface:
+  display_name: "TreeDoc Viewer"
+  short_description: "Open local data files in configured TreeDoc views"
+  default_prompt: "Use $treedoc-viewer to open a local JSON or CSV file in TreeDoc Viewer with my requested viewer configuration."

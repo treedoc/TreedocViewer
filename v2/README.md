@@ -78,6 +78,34 @@ Simply open the application in your browser after running the dev server. You ca
 - Paste content directly
 - Select from sample data
 
+### Open a local file with chart configuration (macOS)
+
+The installed PWA can receive a local file and viewer configuration without a
+browser file picker. Link the bundled CLI once from the `v2` directory:
+
+```bash
+npm link
+```
+
+Then open a file using the same `option`, `preset`, `initialPath`, and `title`
+parameters accepted by the web app:
+
+```bash
+treedoc-open ./report.csv \
+  --option '{maxPane:table,globalRule:{chartState:{showStatus:maximized,timeColumn:timestamp,valueColumns:[amount],groupColumns:[category],valueAgg:sum}}}' \
+  --initialPath /
+```
+
+The option and preset values use TreeDoc's existing JSONEx syntax and are placed
+directly in the launch URL (normal URL percent-encoding is applied; no Base64
+wrapper is used). Run with `--dry-run` to inspect the file and configuration URL
+that would be sent to the installed `TreeDoc Viewer` app.
+
+The CLI invokes the PWA once with the local file and a temporary configuration
+sidecar containing that URL. The sidecar is deleted automatically after 30
+seconds. Each invocation opens a new PWA window, so multiple files can remain
+open and the configuration is scoped to the file opened by that invocation.
+
 ### URL Parameters
 
 The application supports URL parameters for embedding and configuration:
