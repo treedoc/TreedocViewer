@@ -101,9 +101,10 @@ directly in the launch URL (normal URL percent-encoding is applied; no Base64
 wrapper is used). Run with `--dry-run` to inspect the file and configuration URL
 that would be sent to the installed `TreeDoc Viewer` app.
 
-The CLI invokes the macOS PWA twice: first with the local file and then with the
-configuration URL. TreeDoc serializes both `launchQueue` deliveries so the
-configuration is applied after the file has loaded.
+The CLI invokes the PWA once with the local file and a temporary configuration
+sidecar containing that URL. The sidecar is deleted automatically after 30
+seconds. Each invocation opens a new PWA window, so multiple files can remain
+open and the configuration is scoped to the file opened by that invocation.
 
 ### URL Parameters
 

@@ -76,16 +76,19 @@ node <repo-root>/v2/bin/treedoc-open.mjs \
 ```
 
 Omit unused parameters. Always pass each value as one shell argument and quote
-it safely. The launcher first sends the local file to the PWA and then sends a
-configuration URL. TreeDoc serializes both `launchQueue` deliveries so the view
-configuration applies after parsing the file.
+it safely. The launcher sends the local file and a temporary configuration
+sidecar in one PWA launch. Each invocation opens a new PWA window, so existing
+files remain open and the configuration applies only to the file opened by that
+invocation. The launcher removes the sidecar automatically.
 
 Before the live launch, use `--dry-run` when the generated configuration is
 complex or derived from natural language. Confirm that:
 
-- The first launch target is the intended absolute local file.
-- The second target is `https://www.treedoc.org/` with only the requested
-  `option`, `preset`, `initialPath`, and `title` parameters.
+- `localFile` is the intended absolute local file.
+- `configUrl` is `https://www.treedoc.org/` with only the requested `option`,
+  `preset`, `initialPath`, and `title` parameters.
+- There is one file-launch batch containing the local file and a temporary
+  `.treedoc-launch-config.json` sidecar.
 - The URL contains no file contents, credentials, or unrelated data.
 
 Then rerun without `--dry-run`.

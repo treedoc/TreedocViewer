@@ -7,7 +7,7 @@
   "background_color": "#ffffff",
   "theme_color": "#3b82f6",
   "launch_handler": {
-    "client_mode": "focus-existing"
+    "client_mode": "navigate-new"
   },
   "icons": [
     {
@@ -20,6 +20,7 @@
   "file_handlers": [
     {
       "action": "/",
+      "launch_type": "single-client",
       "accept": {
         "application/json": [".json"],
         "text/csv": [".csv"],

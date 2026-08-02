@@ -1,4 +1,5 @@
 export const TDV_PWA_LAUNCH_EVENT = 'tdv-pwa-launch-config'
+export const TDV_PWA_CONFIG_SIDECAR = '.treedoc-launch-config.json'
 
 export interface PwaLaunchConfig {
   option?: string

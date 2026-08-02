@@ -12,7 +12,11 @@ import './assets/main.css'
 import App from './App.vue'
 import Home from './views/Home.vue'
 import { useTreeStore } from './stores/treeStore'
-import { dispatchPwaLaunchConfig, parsePwaLaunchConfig } from './utils/PwaLaunch'
+import {
+  dispatchPwaLaunchConfig,
+  parsePwaLaunchConfig,
+  TDV_PWA_CONFIG_SIDECAR,
+} from './utils/PwaLaunch'
 
 const router = createRouter({
   history: createWebHashHistory(),
@@ -54,24 +58,33 @@ if ('launchQueue' in window) {
 
     const store = useTreeStore()
 
+    let config = launchParams.targetURL
+      ? parsePwaLaunchConfig(launchParams.targetURL)
+      : null
+    let dataFile: File | undefined
+
     for (const fileHandle of launchParams.files || []) {
       try {
         console.log('[PWA] Processing file handle:', fileHandle.name)
         const file = await fileHandle.getFile()
-        const content = await file.text()
-        console.log(`[PWA] Loaded file: ${file.name}, size: ${content.length}`)
-        store.setTextImmediate(content)
-        break // Only load first file
+        if (file.name === TDV_PWA_CONFIG_SIDECAR) {
+          config = parsePwaLaunchConfig(await file.text()) ?? config
+        } else if (!dataFile) {
+          dataFile = file
+        }
       } catch (e) {
         console.error('[PWA] Failed to load file:', e)
       }
     }
 
-    if (launchParams.targetURL) {
-      const config = parsePwaLaunchConfig(launchParams.targetURL)
-      if (config) {
-        dispatchPwaLaunchConfig(config)
-      }
+    if (dataFile) {
+      const content = await dataFile.text()
+      console.log(`[PWA] Loaded file: ${dataFile.name}, size: ${content.length}`)
+      store.setTextImmediate(content)
+    }
+
+    if (config) {
+      dispatchPwaLaunchConfig(config)
     }
   }
 
