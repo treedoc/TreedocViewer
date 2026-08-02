@@ -72,7 +72,6 @@ const props = defineProps<{
 const emit = defineEmits<{
   close: []
   'update:showStatus': [value: ChartShowStatus]
-  'update:groupFilter': [field: string, values: string[]]
   'update:timeColumn': [value: string]
   'update:valueColumns': [value: string[]]
   'update:groupColumns': [value: string[]]
@@ -412,13 +411,9 @@ watch([() => timeColumn.value, () => props.data], () => {
 }, { immediate: true })
 
 // Reset hidden series when grouping changes
-watch(groupColumns, (newCols, oldCols) => {
+watch(groupColumns, () => {
   hiddenGroups.value = new Set()
   explicitlyShownValueSeries.value = new Set()
-  const newSet = new Set(newCols)
-  for (const oldCol of oldCols || []) {
-    if (!newSet.has(oldCol)) emit('update:groupFilter', oldCol, [])
-  }
 }, { deep: true })
 
 watch(timeColumn, () => {

@@ -680,34 +680,6 @@ function updateColumnValueFilter(field: string, value: string | string[], isNega
   }
 }
 
-// Handle chart group filter sync
-function onChartGroupFilter(field: string, values: string[]) {
-  if (values.length === 0) {
-    // Clear the filter for this field
-    if (fieldQueries.value[field]) {
-      fieldQueries.value[field] = {
-        ...fieldQueries.value[field],
-        query: '',
-        isArray: false,
-        isDisabled: false,
-      }
-    }
-  } else {
-    // Set array filter with selected values
-    fieldQueries.value[field] = {
-      field,
-      query: values.join(','),
-      isRegex: false,
-      isExact: false,
-      isNegate: false,
-      isArray: true,
-      isPattern: false,
-      isDisabled: false,
-      patternFields: [],
-    }
-  }
-}
-
 function onChartTimeRange(payload: { timeColumn: string; startMs: number | null; endMs: number | null }) {
   const prevColumn = chartTimeSelectionColumn.value
 
@@ -2366,7 +2338,6 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
       :time-selection-end-model="chartTimeSelectionEnd"
       @close="showChart = false"
       @update:show-status="chartShowStatus = $event"
-      @update:group-filter="onChartGroupFilter"
       @update:time-column="chartTimeColumn = $event"
       @update:value-columns="chartValueColumns = $event"
       @update:group-columns="chartGroupColumns = $event"
