@@ -1858,7 +1858,7 @@ onBeforeUnmount(() => {
           size="small"
           text
           severity="secondary"
-          :disabled="!renderTimeSeriesChart || !hasTimeSelection"
+          :disabled="!hasTimeSelection"
           @click="resetTimeSelection"
           v-tooltip.top="'Reset time selection'"
         />

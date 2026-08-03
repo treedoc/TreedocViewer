@@ -382,6 +382,37 @@ test.describe('TreeDoc Viewer - Main UI Features', () => {
     });
   });
 
+  test.describe('Chart Time Selection', () => {
+    test('should allow resetting a selection containing a single time point', async ({ page }) => {
+      const selectedTime = Date.parse('2026-08-02T00:01:00Z');
+      const timeSeriesData = [
+        { timestamp: '2026-08-02T00:00:00Z', value: 10 },
+        { timestamp: '2026-08-02T00:01:00Z', value: 20 },
+        { timestamp: '2026-08-02T00:02:00Z', value: 30 },
+      ];
+      const option = '{maxPane:table,globalRule:{chartState:{showStatus:maximized,timeColumn:timestamp,valueColumns:[value],bucketSize:minute,timeSelectionStart:'
+        + selectedTime
+        + ',timeSelectionEnd:'
+        + selectedTime
+        + ',timeSelectionColumn:timestamp}}}';
+      const params = new URLSearchParams({
+        data: JSON.stringify(timeSeriesData),
+        option,
+      });
+
+      await page.goto('/?' + params.toString());
+      await page.locator('.time-series-chart').waitFor({ state: 'visible', timeout: 10000 });
+      await expect(page.locator('.p-datatable-tbody tr')).toHaveCount(1);
+
+      const resetTimeSelection = page.locator('.time-series-chart .pi-refresh').locator('..');
+      await expect(resetTimeSelection).toBeEnabled();
+      await resetTimeSelection.click();
+
+      await expect(page.locator('.p-datatable-tbody tr')).toHaveCount(3);
+      await expect(resetTimeSelection).toBeDisabled();
+    });
+  });
+
   test.describe('Dark Mode', () => {
     test('should toggle dark mode', async ({ page }) => {
       await page.locator('.theme-toggle').click();
