@@ -21,6 +21,33 @@ describe('DateUtil date format metadata', () => {
     expect(formatDateLikeOriginal(date!, format)).toBe('2026-03-23T18:51:07Z')
   })
 
+  it('recognizes an ISO timestamp with a space and timezone offset', () => {
+    const timestamp = '2026-08-09 00:00:00+00:00'
+    const format = detectDateFormat(timestamp)
+    const date = tryParseDate(timestamp)
+
+    expect(format?.name).toBe('ISO with space')
+    expect(date?.toISOString()).toBe('2026-08-09T00:00:00.000Z')
+    expect(formatDateLikeOriginal(date!, format)).toBe(timestamp)
+  })
+
+  it('formats a space-separated ISO timestamp in its original non-UTC offset', () => {
+    const timestamp = '2026-08-09 02:30:00+02:30'
+    const format = detectDateFormat(timestamp)
+    const date = tryParseDate(timestamp)
+
+    expect(date?.toISOString()).toBe('2026-08-09T00:00:00.000Z')
+    expect(formatDateLikeOriginal(date!, format)).toBe(timestamp)
+  })
+
+  it('preserves the space separator for a UTC Z suffix', () => {
+    const timestamp = '2026-08-09 00:00:00Z'
+    const format = detectDateFormat(timestamp)
+    const date = tryParseDate(timestamp)
+
+    expect(formatDateLikeOriginal(date!, format)).toBe(timestamp)
+  })
+
   it('preserves numeric timestamp units', () => {
     const format = detectDateFormat('1599461650')
     const date = tryParseDate('1599461650')

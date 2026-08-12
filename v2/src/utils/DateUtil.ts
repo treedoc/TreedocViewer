@@ -60,12 +60,23 @@ function formatIsoDateTime(date: Date, sample: string): string {
     if (getFractionLength(sample) === 0) {
       iso = iso.replace(/\.\d{3}Z$/, 'Z')
     }
+    if (sample[10] === ' ') iso = `${iso.slice(0, 10)} ${iso.slice(11)}`
     return iso
   }
 
-  const base = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}${formatFraction(date, sample)}`
   const tz = sample.match(/([+-]\d{2}:?\d{2})$/)?.[1]
-  return tz ? `${base}${tz}` : base
+  const separator = sample[10] === ' ' ? ' ' : 'T'
+
+  if (tz) {
+    const sign = tz.startsWith('-') ? -1 : 1
+    const digits = tz.slice(1).replace(':', '')
+    const offsetMinutes = sign * (Number(digits.slice(0, 2)) * 60 + Number(digits.slice(2, 4)))
+    const adjusted = new Date(date.getTime() + offsetMinutes * 60_000)
+    const base = `${adjusted.getUTCFullYear()}-${pad(adjusted.getUTCMonth() + 1)}-${pad(adjusted.getUTCDate())}${separator}${pad(adjusted.getUTCHours())}:${pad(adjusted.getUTCMinutes())}:${pad(adjusted.getUTCSeconds())}${formatFraction(adjusted, sample)}`
+    return `${base}${tz}`
+  }
+
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}${separator}${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}${formatFraction(date, sample)}`
 }
 
 /**
@@ -80,10 +91,14 @@ export const DATE_PATTERNS: DatePattern[] = [
     sortable: true,
   },
   {
-    // ISO date with space: 2026-03-23 18:51:07
+    // ISO date with space: 2026-03-23 18:51:07 or 2026-03-23 18:51:07+00:00
     name: 'ISO with space',
-    regex: /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(\.\d+)?$/,
-    format: (date, sample) => formatLocalDateTime(date, '-', true, sample),
+    regex: /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:?\d{2})?$/,
+    parse: (match) => {
+      const d = new Date(match[0].replace(' ', 'T'))
+      return isValidDate(d) ? d : null
+    },
+    format: formatIsoDateTime,
     sortable: true,
   },
   {
