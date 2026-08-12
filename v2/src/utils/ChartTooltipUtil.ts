@@ -36,6 +36,6 @@ export function getHtmlTooltipPosition(
 
   return {
     left: Math.max(0, Math.min(preferredLeft, container.width - tooltip.width)),
-    top: Math.max(0, Math.min(pointer.y - tooltip.height / 2, container.height - tooltip.height)),
+    top: Math.max(0, Math.min(pointer.y, container.height - tooltip.height)),
   }
 }

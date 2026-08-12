@@ -9,7 +9,7 @@ describe('getHtmlTooltipPosition', () => {
       { width: 300, height: 200 },
     )).toEqual({
       left: 212,
-      top: 200,
+      top: 300,
     })
   })
 
@@ -20,7 +20,7 @@ describe('getHtmlTooltipPosition', () => {
       { width: 300, height: 200 },
     )).toEqual({
       left: 488,
-      top: 200,
+      top: 300,
     })
   })
 
@@ -32,12 +32,20 @@ describe('getHtmlTooltipPosition', () => {
     )).toBe(false)
   })
 
-  it('clamps a tall tooltip within the chart container', () => {
+  it('aligns the tooltip top with the pointer when space is available', () => {
     expect(getHtmlTooltipPosition(
       { width: 1000, height: 600 },
       { x: 800, y: 50 },
       { width: 300, height: 500 },
-    )).toEqual({ left: 488, top: 0 })
+    )).toEqual({ left: 488, top: 50 })
+  })
+
+  it('shifts the tooltip upward only when it would overflow the bottom', () => {
+    expect(getHtmlTooltipPosition(
+      { width: 1000, height: 600 },
+      { x: 800, y: 500 },
+      { width: 300, height: 200 },
+    )).toEqual({ left: 488, top: 400 })
   })
 })
 

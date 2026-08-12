@@ -1295,9 +1295,15 @@ function renderTimeSeriesTooltip({ chart, tooltip }: any) {
   tooltipEl.appendChild(body)
   tooltipEl.style.opacity = '1'
 
+  // caretX/caretY point to the active data element, which can be far from the
+  // mouse vertically. Chart.js retains the actual event position separately.
+  const pointer = tooltip._eventPosition
   const position = getHtmlTooltipPosition(
     { width: container.clientWidth, height: container.clientHeight },
-    { x: chart.canvas.offsetLeft + tooltip.caretX, y: chart.canvas.offsetTop + tooltip.caretY },
+    {
+      x: chart.canvas.offsetLeft + (pointer?.x ?? tooltip.caretX),
+      y: chart.canvas.offsetTop + (pointer?.y ?? tooltip.caretY),
+    },
     { width: tooltipEl.offsetWidth, height: tooltipEl.offsetHeight },
   )
   if (!position) return
