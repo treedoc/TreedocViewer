@@ -17,12 +17,13 @@ import {
   Tooltip,
   Legend,
   type ChartData,
-  type ChartOptions
+  type ChartOptions,
 } from 'chart.js'
 import 'chartjs-adapter-date-fns'
 import type { TableRow, TableColumn, TimeBucket } from '@/utils/TableUtil'
 import { detectTimeColumns, detectNumericColumns, detectGroupableColumns, detectBucketSize, detectColumnDateFormat } from '@/utils/TableUtil'
 import { formatDateLikeOriginal, tryParseDate } from '@/utils/DateUtil'
+import { getHtmlTooltipPosition, getTooltipDatasetLabel } from '@/utils/ChartTooltipUtil'
 import Select from 'primevue/select'
 import MultiSelect from 'primevue/multiselect'
 import Button from 'primevue/button'
@@ -1241,6 +1242,69 @@ function isHighlightedTooltipItem(item: any): boolean {
   return tooltipItemCount > 1 && item.datasetIndex === getHighlightedTooltipDatasetIndex(item.chart)
 }
 
+function renderTimeSeriesTooltip({ chart, tooltip }: any) {
+  const container = chart.canvas?.parentElement as HTMLElement | null
+  if (!container) return
+
+  let tooltipEl = container.querySelector<HTMLElement>('.time-series-html-tooltip')
+  if (!tooltipEl) {
+    tooltipEl = document.createElement('div')
+    tooltipEl.className = 'time-series-html-tooltip'
+    container.appendChild(tooltipEl)
+  }
+
+  if (tooltip.opacity === 0) {
+    tooltipEl.style.opacity = '0'
+    return
+  }
+
+  tooltipEl.replaceChildren()
+
+  if (tooltip.title?.length) {
+    const title = document.createElement('div')
+    title.className = 'time-series-tooltip-title'
+    title.textContent = tooltip.title.join(' ')
+    tooltipEl.appendChild(title)
+  }
+
+  const body = document.createElement('div')
+  body.className = 'time-series-tooltip-body'
+  tooltip.dataPoints.forEach((item: any, index: number) => {
+    const highlighted = isHighlightedTooltipItem(item)
+    const row = document.createElement('div')
+    row.className = 'time-series-tooltip-row'
+    if (highlighted) row.classList.add('highlighted')
+
+    const color = tooltip.labelColors?.[index]
+    const swatch = document.createElement('span')
+    swatch.className = 'time-series-tooltip-swatch'
+    if (typeof color?.backgroundColor === 'string') swatch.style.backgroundColor = color.backgroundColor
+    if (typeof color?.borderColor === 'string') swatch.style.borderColor = color.borderColor
+
+    const label = document.createElement('span')
+    label.className = 'time-series-tooltip-label'
+    label.textContent = `${highlighted ? '▶ ' : ''}${getTooltipDatasetLabel(item.dataset)}`
+
+    const value = document.createElement('strong')
+    value.className = 'time-series-tooltip-value'
+    value.textContent = item.formattedValue
+
+    row.append(swatch, label, value)
+    body.appendChild(row)
+  })
+  tooltipEl.appendChild(body)
+  tooltipEl.style.opacity = '1'
+
+  const position = getHtmlTooltipPosition(
+    { width: container.clientWidth, height: container.clientHeight },
+    { x: chart.canvas.offsetLeft + tooltip.caretX, y: chart.canvas.offsetTop + tooltip.caretY },
+    { width: tooltipEl.offsetWidth, height: tooltipEl.offsetHeight },
+  )
+  if (!position) return
+  tooltipEl.style.left = `${position.left}px`
+  tooltipEl.style.top = `${position.top}px`
+}
+
 // Calculate time range with padding to include edge data points
 const timeRange = computed(() => {
   if (chartBuckets.value.length === 0) return { min: undefined, max: undefined }
@@ -1305,6 +1369,7 @@ const chartJsData = computed<ChartData<'bar'>>(() => {
     const color = getSeriesColor(series)
     datasets.push({
       label: `${valueAgg.value.toUpperCase()} ${series.name}`,
+      tooltipLabel: series.name,
       data: chartBuckets.value.map(bucket => {
         const groupKey = getGroupKey(series.groupParts)
         const value = getValueForStats(bucket.valueGroups[series.valueColumn!]?.[groupKey])
@@ -1325,6 +1390,7 @@ const chartJsData = computed<ChartData<'bar'>>(() => {
   if (showValueSum.value && visibleValueSeries.value.length > 0) {
     datasets.push({
       label: `SUM visible ${valueAgg.value.toUpperCase()}`,
+      tooltipLabel: 'SUM visible',
       data: chartBuckets.value.map(bucket => {
         let sum = 0
         let count = 0
@@ -1418,6 +1484,8 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => {
         display: false
       },
       tooltip: {
+        enabled: false,
+        external: renderTimeSeriesTooltip,
         backgroundColor: 'rgba(17, 24, 39, 0.6)',
         borderColor: 'rgba(255, 255, 255, 0.18)',
         borderWidth: 1,
@@ -1428,7 +1496,8 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => {
             return formatDateLikeOriginal(new Date(x), timeColumnFormat.value)
           },
           label: (item: any) => {
-            const label = item.dataset?.label ? `${item.dataset.label}: ` : ''
+            const datasetLabel = getTooltipDatasetLabel(item.dataset)
+            const label = datasetLabel ? `${datasetLabel}: ` : ''
             const marker = isHighlightedTooltipItem(item) ? '▶ ' : ''
             return `${marker}${label}${item.formattedValue}`
           },
@@ -2419,6 +2488,77 @@ onBeforeUnmount(() => {
   flex: 1 1 auto;
   min-width: 0;
   padding: 12px;
+}
+
+.chart-container :deep(.time-series-html-tooltip) {
+  position: absolute;
+  z-index: 4;
+  max-width: min(520px, calc(100% - 24px));
+  padding: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 6px;
+  background: rgba(17, 24, 39, 0.82);
+  color: #fff;
+  font: 12px/1.2 Arial, sans-serif;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.chart-container :deep(.time-series-tooltip-title) {
+  margin-bottom: 5px;
+  font-weight: 600;
+}
+
+.chart-container :deep(.time-series-tooltip-body) {
+  display: grid;
+  gap: 3px;
+}
+
+.chart-container :deep(.time-series-tooltip-row) {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  margin: 0 -4px;
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.chart-container :deep(.time-series-tooltip-row.highlighted) {
+  background: rgba(255, 255, 255, 0.2);
+  box-shadow: inset 2px 0 0 #fff;
+}
+
+.chart-container :deep(.time-series-tooltip-swatch) {
+  width: 10px;
+  height: 10px;
+  border: 1px solid transparent;
+  border-radius: 2px;
+}
+
+.chart-container :deep(.time-series-tooltip-label) {
+  min-width: 0;
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.76);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chart-container :deep(.time-series-tooltip-row.highlighted .time-series-tooltip-label) {
+  color: #fff;
+  font-weight: 700;
+}
+
+.chart-container :deep(.time-series-tooltip-value) {
+  justify-self: end;
+  padding-left: 12px;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  text-align: right;
+  white-space: nowrap;
 }
 
 .pie-chart-grid {
