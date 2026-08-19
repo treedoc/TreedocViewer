@@ -351,7 +351,7 @@ watch(
 const timeColumns = computed(() => detectTimeColumns(props.data, props.columns))
 const timeColumnFormat = computed(() => timeColumn.value ? detectColumnDateFormat(props.data, timeColumn.value) : null)
 const numericColumns = computed(() => detectNumericColumns(props.data, props.columns))
-const GROUP_BY_MAX_UNIQUE_VALUES = 1000
+const GROUP_BY_MAX_UNIQUE_VALUES = 2000
 const visibleChartColumns = computed(() => props.columns.filter(col => col.visible))
 const groupableColumns = computed(() => detectGroupableColumns(props.data, visibleChartColumns.value, GROUP_BY_MAX_UNIQUE_VALUES))
 
