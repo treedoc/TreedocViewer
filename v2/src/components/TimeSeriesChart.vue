@@ -18,6 +18,7 @@ import {
   Legend,
   type ChartData,
   type ChartOptions,
+  type Plugin,
 } from 'chart.js'
 import 'chartjs-adapter-date-fns'
 import type { TableRow, TableColumn, TimeBucket } from '@/utils/TableUtil'
@@ -117,6 +118,47 @@ interface PieSliceStats {
   label: string
   count: number
   valueStats: Record<string, { sum: number; count: number; max: number }>
+}
+
+const crosshairPlugin: Plugin<'bar'> = {
+  id: 'treedocCrosshair',
+  afterEvent(chart, args) {
+    const event = args.event
+    const area = chart.chartArea
+    const isInside = event.type !== 'mouseout'
+      && typeof event.x === 'number'
+      && typeof event.y === 'number'
+      && event.x >= area.left
+      && event.x <= area.right
+      && event.y >= area.top
+      && event.y <= area.bottom
+    const next = isInside ? { x: event.x as number, y: event.y as number } : null
+    const previous = (chart as any).$tdvCrosshair
+
+    if (previous?.x === next?.x && previous?.y === next?.y) return
+    ;(chart as any).$tdvCrosshair = next
+    args.changed = true
+  },
+  afterDraw(chart) {
+    const crosshair = (chart as any).$tdvCrosshair as { x: number; y: number } | null
+    if (!crosshair) return
+
+    const { ctx, chartArea } = chart
+    ctx.save()
+    ctx.beginPath()
+    ctx.rect(chartArea.left, chartArea.top, chartArea.width, chartArea.height)
+    ctx.clip()
+    ctx.beginPath()
+    ctx.setLineDash([4, 3])
+    ctx.lineWidth = 1
+    ctx.strokeStyle = 'rgba(51, 65, 85, 0.58)'
+    ctx.moveTo(crosshair.x, chartArea.top)
+    ctx.lineTo(crosshair.x, chartArea.bottom)
+    ctx.moveTo(chartArea.left, crosshair.y)
+    ctx.lineTo(chartArea.right, crosshair.y)
+    ctx.stroke()
+    ctx.restore()
+  },
 }
 
 interface PieChartConfig {
@@ -1272,7 +1314,7 @@ function renderTimeSeriesTooltip({ chart, tooltip }: any) {
   if (typeof tooltipTimestamp === 'number' && Number.isFinite(tooltipTimestamp)) {
     const localTime = document.createElement('div')
     localTime.className = 'time-series-tooltip-local-time'
-    localTime.textContent = `Local time: ${formatLocalTooltipDateTime(tooltipTimestamp)}`
+    localTime.textContent = formatLocalTooltipDateTime(tooltipTimestamp)
     tooltipEl.appendChild(localTime)
   }
 
@@ -1980,6 +2022,7 @@ onBeforeUnmount(() => {
             ref="chartRef"
             :data="chartJsData"
             :options="chartOptions"
+            :plugins="[crosshairPlugin]"
             dataset-id-key="seriesKey"
             :update-mode="CHART_UPDATE_MODE"
           />
