@@ -22,7 +22,7 @@ import {
 import 'chartjs-adapter-date-fns'
 import type { TableRow, TableColumn, TimeBucket } from '@/utils/TableUtil'
 import { detectTimeColumns, detectNumericColumns, detectGroupableColumns, detectBucketSize, detectColumnDateFormat } from '@/utils/TableUtil'
-import { formatDateLikeOriginal, tryParseDate } from '@/utils/DateUtil'
+import { formatDateLikeOriginal, formatLocalTooltipDateTime, tryParseDate } from '@/utils/DateUtil'
 import { getHtmlTooltipPosition, getTooltipDatasetLabel } from '@/utils/ChartTooltipUtil'
 import Select from 'primevue/select'
 import MultiSelect from 'primevue/multiselect'
@@ -1243,14 +1243,15 @@ function isHighlightedTooltipItem(item: any): boolean {
 }
 
 function renderTimeSeriesTooltip({ chart, tooltip }: any) {
-  const container = chart.canvas?.parentElement as HTMLElement | null
-  if (!container) return
+  const canvas = chart.canvas as HTMLCanvasElement | null
+  if (!canvas) return
 
-  let tooltipEl = container.querySelector<HTMLElement>('.time-series-html-tooltip')
+  let tooltipEl = chart.$tdvHtmlTooltip as HTMLElement | undefined
   if (!tooltipEl) {
     tooltipEl = document.createElement('div')
     tooltipEl.className = 'time-series-html-tooltip'
-    container.appendChild(tooltipEl)
+    document.body.appendChild(tooltipEl)
+    chart.$tdvHtmlTooltip = tooltipEl
   }
 
   if (tooltip.opacity === 0) {
@@ -1265,6 +1266,14 @@ function renderTimeSeriesTooltip({ chart, tooltip }: any) {
     title.className = 'time-series-tooltip-title'
     title.textContent = tooltip.title.join(' ')
     tooltipEl.appendChild(title)
+  }
+
+  const tooltipTimestamp = tooltip.dataPoints?.[0]?.parsed?.x
+  if (typeof tooltipTimestamp === 'number' && Number.isFinite(tooltipTimestamp)) {
+    const localTime = document.createElement('div')
+    localTime.className = 'time-series-tooltip-local-time'
+    localTime.textContent = `Local time: ${formatLocalTooltipDateTime(tooltipTimestamp)}`
+    tooltipEl.appendChild(localTime)
   }
 
   const body = document.createElement('div')
@@ -1298,11 +1307,12 @@ function renderTimeSeriesTooltip({ chart, tooltip }: any) {
   // caretX/caretY point to the active data element, which can be far from the
   // mouse vertically. Chart.js retains the actual event position separately.
   const pointer = tooltip._eventPosition
+  const canvasBounds = canvas.getBoundingClientRect()
   const position = getHtmlTooltipPosition(
-    { width: container.clientWidth, height: container.clientHeight },
+    { width: window.innerWidth, height: window.innerHeight },
     {
-      x: chart.canvas.offsetLeft + (pointer?.x ?? tooltip.caretX),
-      y: chart.canvas.offsetTop + (pointer?.y ?? tooltip.caretY),
+      x: canvasBounds.left + (pointer?.x ?? tooltip.caretX),
+      y: canvasBounds.top + (pointer?.y ?? tooltip.caretY),
     },
     { width: tooltipEl.offsetWidth, height: tooltipEl.offsetHeight },
   )
@@ -1835,6 +1845,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('mouseup', stopLegendResize)
   window.removeEventListener('mousemove', updateLegendColumnResize)
   window.removeEventListener('mouseup', stopLegendColumnResize)
+  chartRef.value?.chart?.$tdvHtmlTooltip?.remove()
 })
 </script>
 
@@ -2496,10 +2507,10 @@ onBeforeUnmount(() => {
   padding: 12px;
 }
 
-.chart-container :deep(.time-series-html-tooltip) {
-  position: absolute;
-  z-index: 4;
-  max-width: min(520px, calc(100% - 24px));
+:global(.time-series-html-tooltip) {
+  position: fixed;
+  z-index: 10000;
+  max-width: min(520px, calc(100vw - 24px));
   padding: 8px;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.18);
@@ -2511,17 +2522,24 @@ onBeforeUnmount(() => {
   opacity: 0;
 }
 
-.chart-container :deep(.time-series-tooltip-title) {
-  margin-bottom: 5px;
+:global(.time-series-tooltip-title) {
   font-weight: 600;
 }
 
-.chart-container :deep(.time-series-tooltip-body) {
+:global(.time-series-tooltip-local-time) {
+  margin-top: 2px;
+  margin-bottom: 5px;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+:global(.time-series-tooltip-body) {
   display: grid;
   gap: 3px;
 }
 
-.chart-container :deep(.time-series-tooltip-row) {
+:global(.time-series-tooltip-row) {
   display: grid;
   grid-template-columns: 12px minmax(0, 1fr) auto;
   align-items: center;
@@ -2532,19 +2550,19 @@ onBeforeUnmount(() => {
   border-radius: 3px;
 }
 
-.chart-container :deep(.time-series-tooltip-row.highlighted) {
+:global(.time-series-tooltip-row.highlighted) {
   background: rgba(255, 255, 255, 0.2);
   box-shadow: inset 2px 0 0 #fff;
 }
 
-.chart-container :deep(.time-series-tooltip-swatch) {
+:global(.time-series-tooltip-swatch) {
   width: 10px;
   height: 10px;
   border: 1px solid transparent;
   border-radius: 2px;
 }
 
-.chart-container :deep(.time-series-tooltip-label) {
+:global(.time-series-tooltip-label) {
   min-width: 0;
   overflow: hidden;
   color: rgba(255, 255, 255, 0.76);
@@ -2552,12 +2570,12 @@ onBeforeUnmount(() => {
   white-space: nowrap;
 }
 
-.chart-container :deep(.time-series-tooltip-row.highlighted .time-series-tooltip-label) {
+:global(.time-series-tooltip-row.highlighted .time-series-tooltip-label) {
   color: #fff;
   font-weight: 700;
 }
 
-.chart-container :deep(.time-series-tooltip-value) {
+:global(.time-series-tooltip-value) {
   justify-self: end;
   padding-left: 12px;
   color: #fff;

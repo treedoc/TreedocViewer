@@ -339,6 +339,27 @@ export function formatDate(d: Date): string {
   return `${date},${time}`
 }
 
+/**
+ * Format a timestamp in the viewer's local timezone for display alongside a
+ * source value that may use a different timezone or representation.
+ */
+export function formatLocalTooltipDateTime(
+  value: Date | number,
+  locales?: Intl.LocalesArgument,
+  timeZone?: string,
+): string {
+  return new Intl.DateTimeFormat(locales, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    second: '2-digit',
+    timeZoneName: 'short',
+    ...(timeZone ? { timeZone } : {}),
+  }).format(value)
+}
+
 export function formatDateLikeOriginal(date: Date, format: DateFormatInfo | null | undefined): string {
   if (!format) return formatDate(date)
 

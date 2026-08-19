@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { detectDateFormat, formatDateLikeOriginal, tryParseDate } from './DateUtil'
+import { detectDateFormat, formatDateLikeOriginal, formatLocalTooltipDateTime, tryParseDate } from './DateUtil'
 
 describe('DateUtil date format metadata', () => {
   it('detects and formats slash-separated timestamps', () => {
@@ -56,5 +56,13 @@ describe('DateUtil date format metadata', () => {
     expect(format?.numericUnit).toBe('seconds')
     expect(date).not.toBeNull()
     expect(formatDateLikeOriginal(date!, format)).toBe('1599461650')
+  })
+
+  it('formats a timestamp as a localized time with timezone', () => {
+    const result = formatLocalTooltipDateTime(Date.parse('2026-08-09T00:00:00Z'), 'en-US', 'UTC')
+
+    expect(result).toContain('Aug 9, 2026')
+    expect(result).toContain('12:00:00 AM')
+    expect(result).toContain('UTC')
   })
 })
