@@ -46,6 +46,8 @@ Use **Open with TreeDoc Viewer** from the command palette, editor title context 
 
 Create a Visual Studio Marketplace publisher, then create an Azure DevOps personal access token with the **Marketplace: Manage** scope.
 
+To create PET: https://aex.dev.azure.com/me -> click link: dev.azure.com/$user -> User Settings -> Personal Access Tokens
+
 ```bash
 cd vscode-extension
 npm run build
