@@ -62,6 +62,7 @@ const COLUMN_WIDTH_CELL_PADDING_PX = 32
 
 const props = defineProps<{
   title?: string
+  embedded?: boolean
 }>()
 
 // Recursively remove $$-prefixed keys from an object (TDNode internal metadata)
@@ -2170,7 +2171,7 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
       <div class="table-toolbar">
         <!-- Open file button (only in fullscreen mode) -->
         <Button
-          v-if="maxPane === 'table'"
+          v-if="maxPane === 'table' && !props.embedded"
           icon="pi pi-folder-open"
           size="small"
           text

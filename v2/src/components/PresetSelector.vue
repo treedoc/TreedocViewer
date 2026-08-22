@@ -39,26 +39,28 @@ const manageMenuItems = computed(() => [
     : []),
   { label: 'Save as a new preset', icon: 'pi pi-save', command: () => openSaveDialog() },
   { label: 'Manage presets', icon: 'pi pi-cog', command: () => openManageDialog() },
-  {
-    label: 'Select preset',
-    icon: 'pi pi-list',
-    items: presetOptions.value.map(option => ({
-      label: option.label,
-      class: option.value === selectedPresetName.value ? 'preset-current' : 'preset-submenu-item',
-      style: {
-        paddingLeft: '1.25rem',
-        ...(option.value === selectedPresetName.value
-          ? {
-              background: 'var(--p-highlight-background, rgba(59, 130, 246, 0.14))',
-              color: 'var(--p-highlight-color, var(--p-primary-color))',
-              fontWeight: '700',
-            }
-          : {}),
-      },
-      icon: option.value === selectedPresetName.value ? 'pi pi-check' : undefined,
-      command: () => onPresetChange(option.value),
-    })),
-  },
+  ...(presetOptions.value.length > 0
+    ? [{
+        label: 'Select preset',
+        icon: 'pi pi-list',
+        items: presetOptions.value.map(option => ({
+          label: option.label,
+          class: option.value === selectedPresetName.value ? 'preset-current' : 'preset-submenu-item',
+          style: {
+            paddingLeft: '1.25rem',
+            ...(option.value === selectedPresetName.value
+              ? {
+                  background: 'var(--p-highlight-background, rgba(59, 130, 246, 0.14))',
+                  color: 'var(--p-highlight-color, var(--p-primary-color))',
+                  fontWeight: '700',
+                }
+              : {}),
+          },
+          icon: option.value === selectedPresetName.value ? 'pi pi-check' : undefined,
+          command: () => onPresetChange(option.value),
+        })),
+      }]
+    : []),
 ])
 import { onMounted } from 'vue'
 

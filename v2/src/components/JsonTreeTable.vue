@@ -650,7 +650,7 @@ defineExpose({ openUrl, applyPresetConfig })
           :root-object-key="rootObjectKey"
           :expand-level="1"
         />
-        <TableView v-else-if="maxPane === 'table'" ref="tableViewRef" :title="tableTitle" />
+        <TableView v-else-if="maxPane === 'table'" ref="tableViewRef" :title="tableTitle" :embedded="props.embedded" />
       </div>
 
       <Splitpanes
@@ -697,7 +697,7 @@ defineExpose({ openUrl, applyPresetConfig })
             @keydown="onKeyDown($event, 'table')"
             tabindex="0"
           >
-            <TableView ref="tableViewRef" :title="tableTitle" />
+            <TableView ref="tableViewRef" :title="tableTitle" :embedded="props.embedded" />
           </div>
         </Pane>
       </Splitpanes>

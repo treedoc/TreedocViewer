@@ -28,7 +28,7 @@ import { getHtmlTooltipPosition, getTooltipDatasetLabel } from '@/utils/ChartToo
 import Select from 'primevue/select'
 import MultiSelect from 'primevue/multiselect'
 import Button from 'primevue/button'
-import Checkbox from 'primevue/checkbox'
+import ToggleSwitch from 'primevue/toggleswitch'
 import BasicColumnFilterPopover from './BasicColumnFilterPopover.vue'
 import type { ChartShowStatus, FieldQuery } from '@/models/types'
 import { matchFieldQuery } from '@/utils/QueryUtil'
@@ -1994,29 +1994,29 @@ onBeforeUnmount(() => {
         />
       </div>
 
-      <label class="control-group checkbox-control">
-        <Checkbox v-model="showCount" :binary="true" />
+      <label class="control-group toggle-control">
         <span>Count</span>
+        <ToggleSwitch v-model="showCount" aria-label="Toggle count" />
       </label>
 
-      <label class="control-group checkbox-control">
-        <Checkbox v-model="showValueSum" :binary="true" :disabled="valueColumns.length === 0 || stacked" />
+      <label class="control-group toggle-control">
         <span>Sum</span>
+        <ToggleSwitch v-model="showValueSum" :disabled="valueColumns.length === 0 || stacked" aria-label="Toggle sum" />
       </label>
 
-      <label class="control-group checkbox-control">
-        <Checkbox v-model="stacked" :binary="true" :disabled="valueColumns.length === 0" />
+      <label class="control-group toggle-control">
         <span>Stack</span>
+        <ToggleSwitch v-model="stacked" :disabled="valueColumns.length === 0" aria-label="Toggle stacked chart" />
       </label>
 
-      <label class="control-group checkbox-control">
-        <Checkbox v-model="barChart" :binary="true" :disabled="valueColumns.length === 0" />
+      <label class="control-group toggle-control">
         <span>Bar</span>
+        <ToggleSwitch v-model="barChart" :disabled="valueColumns.length === 0" aria-label="Toggle bar chart" />
       </label>
 
-      <label class="control-group checkbox-control">
-        <Checkbox v-model="pieChartsControl" :binary="true" :disabled="!hasUsableTimeSeriesAxis" />
+      <label class="control-group toggle-control">
         <span>Pie</span>
+        <ToggleSwitch v-model="pieChartsControl" :disabled="!hasUsableTimeSeriesAxis" aria-label="Toggle pie charts" />
       </label>
 
       <div v-if="renderPieCharts" class="control-group">
@@ -2030,7 +2030,7 @@ onBeforeUnmount(() => {
         />
       </div>
 
-      <div class="control-group">
+      <div class="control-group icon-control">
         <Button
           icon="pi pi-refresh"
           size="small"
@@ -2533,14 +2533,31 @@ onBeforeUnmount(() => {
   gap: 6px;
 }
 
-.control-group label {
-  font-size: 0.8rem;
+/* Put dropdown labels above their controls to keep the chart toolbar compact. */
+.chart-controls > .control-group:not(.checkbox-control):not(.icon-control) {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.control-group label,
+.toggle-control > span {
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: 500;
   color: var(--tdv-text-muted);
   white-space: nowrap;
 }
 
 .control-select {
   min-width: 120px;
+}
+
+:deep(.control-select .p-select-label),
+:deep(.control-select .p-multiselect-label),
+:global(.time-series-chart .p-select-option),
+:global(.time-series-chart .p-multiselect-option) {
+  font-size: 0.78rem;
 }
 
 .multi-control {
@@ -2559,6 +2576,16 @@ onBeforeUnmount(() => {
 .checkbox-control {
   cursor: pointer;
   user-select: none;
+}
+
+.toggle-control {
+  cursor: pointer;
+  user-select: none;
+  min-width: 42px;
+}
+
+:deep(.toggle-control .p-toggleswitch) {
+  margin-block: 6px;
 }
 
 .chart-actions {
