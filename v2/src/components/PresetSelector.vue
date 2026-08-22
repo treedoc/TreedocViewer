@@ -5,6 +5,7 @@ import Checkbox from 'primevue/checkbox'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
+import Menu from 'primevue/menu'
 import type { QueryPreset, Column, PathRule } from '@/models/types'
 import { cleanColumnForSave, findMatchingPathRule, matchPathPattern } from '@/models/types'
 import {
@@ -21,6 +22,7 @@ import {
 import { TD } from 'treedoc'
 import { useToast } from 'primevue/usetoast'
 import { getFieldValueColors } from '@/utils/ValueColorService'
+import { Logger } from '@/utils/Logger'
 import {
   TDJSONParser,
   TDJSONWriter,
@@ -28,6 +30,36 @@ import {
   TDObjectCoder,
   TDObjectCoderOption,
 } from 'treedoc'
+
+const logger = new Logger('PresetSelector')
+const manageMenuRef = ref<InstanceType<typeof Menu> | null>(null)
+const manageMenuItems = computed(() => [
+  ...(selectedPresetName.value
+    ? [{ label: 'Save current preset', icon: 'pi pi-save', command: () => openUpdatePresetDialog() }]
+    : []),
+  { label: 'Save as a new preset', icon: 'pi pi-save', command: () => openSaveDialog() },
+  { label: 'Manage presets', icon: 'pi pi-cog', command: () => openManageDialog() },
+  {
+    label: 'Select preset',
+    icon: 'pi pi-list',
+    items: presetOptions.value.map(option => ({
+      label: option.label,
+      class: option.value === selectedPresetName.value ? 'preset-current' : 'preset-submenu-item',
+      style: {
+        paddingLeft: '1.25rem',
+        ...(option.value === selectedPresetName.value
+          ? {
+              background: 'var(--p-highlight-background, rgba(59, 130, 246, 0.14))',
+              color: 'var(--p-highlight-color, var(--p-primary-color))',
+              fontWeight: '700',
+            }
+          : {}),
+      },
+      icon: option.value === selectedPresetName.value ? 'pi pi-check' : undefined,
+      command: () => onPresetChange(option.value),
+    })),
+  },
+])
 import { onMounted } from 'vue'
 
 export interface CurrentState {
@@ -661,7 +693,7 @@ onMounted(() => {
   
   if (sharedData) {
     if (import.meta.env.DEV) {
-      console.log('[PresetSelector] Received sharedData:', sharedData)
+      logger.log('Received sharedData:', sharedData)
     }
     
     try {
@@ -671,7 +703,7 @@ onMounted(() => {
       try {
         const node = TDJSONParser.get().parse(sharedData)
         dataObject = node.toObject(false)
-        if (import.meta.env.DEV) console.log('[PresetSelector] Parsed via TDJSONParser:', dataObject)
+        if (import.meta.env.DEV) logger.log('Parsed via TDJSONParser:', dataObject)
       } catch (tdError) {
         if (import.meta.env.DEV) console.warn('[PresetSelector] TDJSONParser failed, trying JSON.parse', tdError)
         // Fallback to plain JSON
@@ -1137,48 +1169,26 @@ const currentConflict = computed(() => {
 
 <template>
   <div class="preset-selector">
-    <!-- Preset Dropdown -->
-    <Select
-      v-model="selectedPresetName"
-      :options="presetOptions"
-      optionLabel="label"
-      optionValue="value"
-      placeholder="Select preset..."
-      class="preset-dropdown"
-      :showClear="true"
-      @change="onPresetChange($event.value)"
-    />
-    
-    <!-- Save Button -->
-    <Button
-      icon="pi pi-save"
-      size="small"
-      text
-      :severity="selectedPresetName ? 'primary' : 'secondary'"
-      @click="selectedPresetName ? openUpdatePresetDialog() : openSaveDialog()"
-      v-tooltip.top="selectedPresetName ? 'Update preset' : 'Save as new preset'"
-    />
-    
-    <!-- Save As New Button (when preset selected) -->
-    <Button
-      v-if="selectedPresetName"
-      icon="pi pi-plus"
-      size="small"
-      text
-      severity="secondary"
-      @click="openSaveDialog"
-      v-tooltip.top="'Save as new preset'"
-    />
-    
-    <!-- Manage Button -->
     <Button
       icon="pi pi-cog"
       size="small"
       text
       severity="secondary"
-      @click="openManageDialog"
+      @click="manageMenuRef?.toggle($event)"
       v-tooltip.top="'Manage presets'"
     />
+    <Menu ref="manageMenuRef" class="preset-manage-menu" :model="manageMenuItems" :popup="true">
+      <template #item="{ item, props: menuProps }">
+        <a
+          v-bind="menuProps.action"
+          :class="item.class"
+          :style="item.style"
+        >
+          <span v-if="item.icon" :class="item.icon" class="p-menuitem-icon" />
+          <span class="p-menuitem-text">{{ item.label }}</span>
+        </a>
+      </template>
+    </Menu>
   </div>
   
   <!-- Save Dialog -->
@@ -1223,6 +1233,10 @@ const currentConflict = computed(() => {
     :dismissableMask="true"
   >
     <div class="save-dialog-content">
+      <div class="field">
+        <label>Preset name</label>
+        <strong class="current-preset-name">{{ selectedPresetName }}</strong>
+      </div>
       <div class="field">
         <label>Current path</label>
         <div class="current-path-line">
@@ -1915,5 +1929,24 @@ const currentConflict = computed(() => {
   color: var(--tdv-primary);
   flex-shrink: 0;
   margin-top: 2px;
+}
+
+:deep(.preset-manage-menu .p-submenu-list .preset-current .p-menuitem-link),
+:deep(.preset-manage-menu .p-submenu-list .preset-current > .p-menuitem-content) {
+  background: var(--p-highlight-background, rgba(59, 130, 246, 0.14));
+  color: var(--p-highlight-color, var(--p-primary-color));
+  font-weight: 700;
+}
+
+:global(.preset-manage-menu .p-submenu-list .preset-current .p-menuitem-link),
+:global(.preset-manage-menu .p-submenu-list .preset-current > .p-menuitem-content) {
+  background: var(--p-highlight-background, rgba(59, 130, 246, 0.14));
+  color: var(--p-highlight-color, var(--p-primary-color));
+  font-weight: 700;
+}
+
+:deep(.p-submenu-list .preset-current > .p-menuitem-content) {
+  background: var(--p-highlight-background, rgba(59, 130, 246, 0.12));
+  font-weight: 700;
 }
 </style>

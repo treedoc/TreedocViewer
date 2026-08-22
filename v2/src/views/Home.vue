@@ -8,8 +8,10 @@ import { useTreeStore } from '../stores/treeStore'
 import { TDJSONParser } from 'treedoc'
 import type { TDVOptions } from '../models/types'
 import { TDV_PWA_LAUNCH_EVENT, type PwaLaunchConfig } from '../utils/PwaLaunch'
+import { Logger } from '../utils/Logger'
 
 const store = useTreeStore()
+const logger = new Logger('Home')
 const jsonTreeTableRef = ref<InstanceType<typeof JsonTreeTable>>()
 
 // URL parameters (support both query string and hash-based params)
@@ -140,7 +142,7 @@ function handleEmbeddedMessage(evt: MessageEvent) {
     return
   }
 
-  console.log('[Home] Received embedded event:', summarizeEmbeddedMessage(evt.data))
+  logger.log('Received embedded event:', summarizeEmbeddedMessage(evt.data))
 
   applyEventLoading(evt.data)
 
@@ -169,7 +171,7 @@ function handlePwaLaunchConfig(evt: Event) {
   const config = (evt as CustomEvent<PwaLaunchConfig>).detail
   if (!config) return
 
-  console.log('[Home] Received PWA launch configuration:', {
+    logger.log('Received PWA launch configuration:', {
     hasOptions: config.option !== undefined,
     hasPreset: config.preset !== undefined,
     initialPath: config.initialPath,
@@ -198,7 +200,7 @@ function handlePwaLaunchConfig(evt: Event) {
 function setupEmbeddedMode() {
   if (embeddedId) {
     // Notify parent that we're ready
-    console.log('[Home] Embedded mode ready:', { embeddedId })
+    logger.log('Embedded mode ready:', { embeddedId })
     window.parent.postMessage({ type: 'tdv-ready', id: embeddedId }, '*')
     if (window.opener) {
       window.opener.postMessage({ type: 'tdv-ready', id: embeddedId }, '*')
@@ -270,6 +272,7 @@ watch(() => store.rawText, (text) => {
       :initial-preset="initialPreset"
       :options="options"
       :title="title"
+      :embedded="!!embeddedId"
       root-object-key="root"
     >
       <div v-if="eventLoading" class="embedded-loading-overlay">

@@ -17,6 +17,9 @@ import TreeView from './TreeView.vue'
 import TableView from './TableView.vue'
 import { ParseStatus, type TDVOptions, type QueryPreset } from '../models/types'
 import { TDJSONParser } from 'treedoc'
+import { Logger } from '@/utils/Logger'
+
+const logger = new Logger('JsonTreeTable')
 
 const props = defineProps<{
   data?: string | object
@@ -25,6 +28,7 @@ const props = defineProps<{
   title?: string
   rootObjectKey?: string
   initialPreset?: string  // JSONEx encoded preset to apply after data loads
+  embedded?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -183,6 +187,7 @@ function handleFileSelect(event: Event) {
 }
 
 function onDragEnter(event: DragEvent) {
+  if (props.embedded) return
   if (!event.dataTransfer?.types.includes('Files')) return
   event.preventDefault()
   dragDepth.value += 1
@@ -190,6 +195,7 @@ function onDragEnter(event: DragEvent) {
 }
 
 function onDragOver(event: DragEvent) {
+  if (props.embedded) return
   if (!event.dataTransfer?.types.includes('Files')) return
   event.preventDefault()
   if (event.dataTransfer) {
@@ -199,6 +205,7 @@ function onDragOver(event: DragEvent) {
 }
 
 function onDragLeave(event: DragEvent) {
+  if (props.embedded) return
   if (!event.dataTransfer?.types.includes('Files')) return
   event.preventDefault()
   dragDepth.value = Math.max(0, dragDepth.value - 1)
@@ -208,6 +215,7 @@ function onDragLeave(event: DragEvent) {
 }
 
 function onDropFile(event: DragEvent) {
+  if (props.embedded) return
   if (!event.dataTransfer?.files?.length) return
   event.preventDefault()
   isDragOver.value = false
@@ -441,7 +449,7 @@ function applyInitialPreset(
       initialPresetTimer = null
       if (tableViewRef.value) {
         tableViewRef.value.applyPreset(preset)
-        console.log('[JsonTreeTable] Applied initial preset:', preset.name)
+        logger.log('Applied initial preset:', preset.name)
       }
     }
 
@@ -568,6 +576,7 @@ defineExpose({ openUrl, applyPresetConfig })
       <div class="toolbar-center">
         <div class="tdv-toolbar-group">
           <Button
+            v-if="!props.embedded"
             icon="pi pi-folder-open"
             size="small"
             text
@@ -575,6 +584,7 @@ defineExpose({ openUrl, applyPresetConfig })
             v-tooltip.bottom="'Open File'"
           />
           <Button
+            v-if="!props.embedded"
             icon="pi pi-link"
             size="small"
             text

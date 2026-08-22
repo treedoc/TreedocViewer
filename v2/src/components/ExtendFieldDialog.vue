@@ -15,6 +15,9 @@ import type { TDNode } from 'treedoc'
 import { TDNodeType, TDJSONWriter, TDJSONWriterOption } from 'treedoc'
 import { debounce } from 'lodash-es'
 import { matchPattern, parsePatterns, serializePatterns } from '@/utils/QueryUtil'
+import { Logger } from '@/utils/Logger'
+
+const logger = new Logger('ExtendFieldDialog')
 
 export interface ExtendFieldResult {
   type: 'pattern' | 'jsonpath'
@@ -56,23 +59,23 @@ function isTDNode(value: any): value is TDNode {
 function tryParseJson(value: any): any {
   if (value === null || value === undefined) return null
   
-  console.log('[tryParseJson] Input type:', typeof value, 'isObject:', typeof value === 'object')
+  logger.log('tryParseJson input type:', typeof value, 'isObject:', typeof value === 'object')
   
   // Handle TDNode (check with proper detection)
   if (isTDNode(value)) {
     const node = value
-    console.log('[tryParseJson] TDNode type:', node.type, 'SIMPLE:', TDNodeType.SIMPLE, 'value type:', typeof node.value)
+    logger.log('TDNode type:', node.type, 'SIMPLE:', TDNodeType.SIMPLE, 'value type:', typeof node.value)
     
     if (node.type === TDNodeType.SIMPLE) {
       // Try to parse string value as JSON
       if (typeof node.value === 'string') {
-        console.log('[tryParseJson] Trying to parse SIMPLE node.value:', node.value.substring(0, 100))
+      logger.log('Trying to parse SIMPLE node.value:', node.value.substring(0, 100))
         try {
           const parsed = JSON.parse(node.value)
-          console.log('[tryParseJson] Successfully parsed SIMPLE node.value, result type:', typeof parsed)
+        logger.log('Parsed SIMPLE node.value, result type:', typeof parsed)
           return parsed
         } catch (e) {
-          console.log('[tryParseJson] Failed to parse SIMPLE node.value:', e)
+        logger.log('Failed to parse SIMPLE node.value:', e)
           return null
         }
       }
@@ -81,38 +84,38 @@ function tryParseJson(value: any): any {
     // Complex node - convert to plain object via JSON roundtrip to break circular refs
     try {
       const jsonStr = TDJSONWriter.get().writeAsString(node, new TDJSONWriterOption())
-      console.log('[tryParseJson] Complex node converted to:', jsonStr.substring(0, 100))
+      logger.log('Complex node converted to:', jsonStr.substring(0, 100))
       return JSON.parse(jsonStr)
     } catch (e) {
-      console.log('[tryParseJson] Failed to convert complex node:', e)
+      logger.log('Failed to convert complex node:', e)
       return null
     }
   }
   
   // Handle plain objects/arrays - clone via JSON to ensure no circular refs
   if (typeof value === 'object') {
-    console.log('[tryParseJson] Plain object, cloning...')
+    logger.log('Plain object, cloning...')
     try {
       const cloned = JSON.parse(JSON.stringify(value))
-      console.log('[tryParseJson] Successfully cloned object, keys:', Object.keys(cloned))
+      logger.log('Cloned object, keys:', Object.keys(cloned))
       return cloned
     } catch (e) {
-      console.log('[tryParseJson] Failed to clone object:', e)
+      logger.log('Failed to clone object:', e)
       return null
     }
   }
   
   // Handle string that might be JSON
   if (typeof value === 'string') {
-    console.log('[tryParseJson] Trying to parse string:', value.substring(0, 100))
+    logger.log('Trying to parse string:', value.substring(0, 100))
     try {
       const parsed = JSON.parse(value)
       if (typeof parsed === 'object' && parsed !== null) {
-        console.log('[tryParseJson] Successfully parsed string as JSON object')
+        logger.log('Parsed string as JSON object')
         return parsed
       }
     } catch {
-      console.log('[tryParseJson] String is not valid JSON')
+        logger.log('String is not valid JSON')
     }
   }
   
@@ -410,12 +413,12 @@ function findMatchingPattern(cellValue: string, patternExtract: string | undefin
 watch(() => props.visible, (visible) => {
   if (visible) {
     const jsonObj = tryParseJson(props.cellValue)
-    console.log('[ExtendFieldDialog] Opened, cellValue type:', typeof props.cellValue, 'jsonObj:', jsonObj)
+    logger.log('Opened, cellValue type:', typeof props.cellValue, 'jsonObj:', jsonObj)
     
     if (jsonObj && typeof jsonObj === 'object') {
       mode.value = 'jsonpath'
       const paths = extractJsonPaths(jsonObj)
-      console.log('[ExtendFieldDialog] Extracted paths:', paths.length)
+      logger.log('Extracted paths:', paths.length)
       
       // Parse existing extendedFields and pre-select matching paths
       const existingFields = parseExistingExtendedFields(props.currentExtendedFields)
@@ -478,7 +481,7 @@ function mergeWithExistingFields(): string {
 // Debounced sync to parent to avoid UI lagging
 const debouncedEmitExtendedFields = debounce(() => {
   const fields = mergeWithExistingFields()
-  console.log('[ExtendFieldDialog] debouncedEmit emitting:', fields)
+  logger.log('debouncedEmit emitting:', fields)
   emit('updateExtendedFields', fields)
 }, 500)
 

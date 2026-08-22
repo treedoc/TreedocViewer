@@ -4,6 +4,9 @@
 
 import type { FieldQuery } from '@/models/types'
 import { TDJSONParser, TDJSONWriter, TDJSONWriterOption, TDObjectCoder, TDNodeType } from 'treedoc'
+import { Logger } from './Logger'
+
+const logger = new Logger('QueryUtil')
 
 const MAX_EXPRESSION_ERRORS = 100
 const invalidRegexPatterns = new Set<string>()
@@ -154,10 +157,7 @@ export function matchPattern(value: string, pattern: string): Record<string, str
   // Debug mode - enable in browser console: window.DEBUG_PATTERN = true
   if (typeof window !== 'undefined' && window.DEBUG_PATTERN && !match) {
     console.group('matchPattern debug')
-    console.log('Pattern:', pattern)
-    console.log('Regex:', regex)
-    console.log('Value length:', value.length)
-    console.log('Value:', JSON.stringify(value.slice(0, 300)))
+    logger.log('Pattern:', pattern, 'Regex:', regex, 'Value length:', value.length, 'Value:', JSON.stringify(value.slice(0, 300)))
     console.groupEnd()
   }
 
