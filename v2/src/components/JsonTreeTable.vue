@@ -651,7 +651,7 @@ defineExpose({ openUrl, applyPresetConfig })
         @resize="onPaneResize"
         @resized="onPaneResized"
       >
-        <Pane v-if="sourceVisible">
+        <Pane v-if="sourceVisible" :size="16.6667">
           <div 
             class="pane-wrapper"
             :class="{ 'pane-focused': currentPane === 'source', 'resizing': isResizing }"
@@ -663,7 +663,7 @@ defineExpose({ openUrl, applyPresetConfig })
           </div>
         </Pane>
         
-        <Pane v-if="treeVisible">
+        <Pane v-if="treeVisible" :size="16.6667">
           <div 
             class="pane-wrapper"
             :class="{ 'pane-focused': currentPane === 'tree', 'resizing': isResizing }"
@@ -679,7 +679,7 @@ defineExpose({ openUrl, applyPresetConfig })
           </div>
         </Pane>
         
-        <Pane v-if="tableVisible">
+        <Pane v-if="tableVisible" :size="66.6666">
           <div 
             class="pane-wrapper"
             :class="{ 'pane-focused': currentPane === 'table', 'resizing': isResizing }"

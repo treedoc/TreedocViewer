@@ -104,6 +104,8 @@ export interface ChartState {
   hiddenGroups?: string[]
   showCount?: boolean
   showValueSum?: boolean
+  stacked?: boolean
+  barChart?: boolean
   valueAgg?: 'avg' | 'sum' | 'max'
   showPieCharts?: boolean
   pieChartsPerRow?: number

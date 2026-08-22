@@ -50,6 +50,7 @@ const COL_VALUE = '@value'
 const COL_NO = '#'
 const COL_KEY = '@key'
 const CHART_TIME_RANGE_MARKER = '/*tdv_chart_time_range*/'
+const LARGE_RENDER_THRESHOLD = 2 * 1024 * 1024
 
 const STORAGE_KEY_JS_QUERY = 'tdv_recent_js_queries'
 const STORAGE_KEY_EXTENDED_FIELDS = 'tdv_recent_extended_fields'
@@ -108,7 +109,7 @@ function valueToSearchString(value: any): string {
 }
 
 const store = useTreeStore()
-const { textWrap, maxPane } = storeToRefs(store)
+const { textWrap, maxPane, processingPhase } = storeToRefs(store)
 
 const localSelectedNode = shallowRef<TDNode | null>(null)
 
@@ -124,10 +125,20 @@ const extendedFields = ref('')
 const showExtendedFields = ref(false)
 const selectedPresetName = ref<string | null>(null)
 const chartShowStatus = ref<ChartShowStatus>('hidden')
+const chartReady = ref(false)
 const showChart = computed({
   get: () => chartShowStatus.value !== 'hidden',
   set: (visible: boolean) => {
-    chartShowStatus.value = visible ? 'normal' : 'hidden'
+    if (!visible) {
+      chartShowStatus.value = 'hidden'
+      chartReady.value = false
+      return
+    }
+    chartShowStatus.value = 'normal'
+    chartReady.value = false
+    setTimeout(() => {
+      if (chartShowStatus.value !== 'hidden') chartReady.value = true
+    }, 0)
   },
 })
 const first = ref(0)
@@ -141,6 +152,8 @@ const chartBucketSize = ref<import('@/utils/TableUtil').TimeBucket>('minute')
 const chartHiddenGroups = ref<Set<string>>(new Set())
 const chartShowCount = ref(true)
 const chartShowValueSum = ref(false)
+const chartStacked = ref(false)
+const chartBarChart = ref(false)
 const chartValueAgg = ref<'avg' | 'sum' | 'max'>('sum')
 const chartShowPieCharts = ref(false)
 const chartPieChartsPerRow = ref(3)
@@ -233,7 +246,31 @@ interface TableRow {
 
 const columns = ref<TableColumn[]>([])
 const tableData = ref<TableRow[]>([])
+// Building the table clears the current rows before repopulating them. Keep the
+// empty state useful during that short rendering window instead of flashing
+// "No data available" while the chart/table is being laid out.
+const isRendering = ref(false)
+let renderingFrame: number | null = null
+const emptyTableMessage = computed(() => {
+  if (processingPhase.value === 'parsing') return 'Parsing...'
+  if (processingPhase.value === 'rendering' || isRendering.value) return 'Rendering...'
+  return 'No data available'
+})
 const fieldQueries = ref<Record<string, FieldQuery>>({})
+
+function finishRendering() {
+  if (renderingFrame !== null) {
+    cancelAnimationFrame(renderingFrame)
+  }
+  nextTick(() => {
+    renderingFrame = requestAnimationFrame(() => {
+      renderingFrame = requestAnimationFrame(() => {
+        isRendering.value = false
+        renderingFrame = null
+      })
+    })
+  })
+}
 
 // Keep columnVisibility in sync with columns (auto-update when columns change)
 watch(columns, (cols) => {
@@ -413,6 +450,9 @@ function applyChartState(cs: ChartState) {
   chartHiddenGroups.value = new Set(cs.hiddenGroups ?? [])
   chartShowCount.value = cs.showCount ?? true
   chartShowValueSum.value = cs.showValueSum ?? false
+  chartStacked.value = cs.stacked ?? false
+  chartBarChart.value = cs.barChart ?? false
+  if (chartStacked.value) chartShowValueSum.value = false
   chartValueAgg.value = cs.valueAgg ?? 'sum'
   chartShowPieCharts.value = cs.showPieCharts ?? false
   chartPieChartsPerRow.value = cs.pieChartsPerRow ?? 3
@@ -421,6 +461,12 @@ function applyChartState(cs: ChartState) {
   chartTimeSelectionColumn.value = cs.timeSelectionColumn ?? ''
   chartHeight.value = clampChartHeight(cs.chartHeight ?? (cs.showStatus === 'maximized' ? Math.max(400, window.innerHeight - 300) : 250))
   chartShowStatus.value = cs.showStatus ?? 'hidden'
+  chartReady.value = false
+  if (chartShowStatus.value !== 'hidden') {
+    setTimeout(() => {
+      if (chartShowStatus.value !== 'hidden') chartReady.value = true
+    }, 0)
+  }
 }
 
 function applyPreset(preset: QueryPreset) {
@@ -1461,11 +1507,13 @@ function addColumn(field: string, header: string, isExtended: boolean = false) {
 let isBuilding = false
 
 function buildTable(node: TDNode | null, restoreState = true) {
+  isRendering.value = true
   isBuilding = true
   try {
     buildTableInternal(node, restoreState)
   } finally {
     isBuilding = false
+    finishRendering()
   }
 }
 
@@ -1994,6 +2042,8 @@ function saveCurrentTableState() {
         hiddenGroups: Array.from(chartHiddenGroups.value),
         showCount: chartShowCount.value,
         showValueSum: chartShowValueSum.value,
+        stacked: chartStacked.value,
+        barChart: chartBarChart.value,
         valueAgg: chartValueAgg.value,
         showPieCharts: chartShowPieCharts.value,
         pieChartsPerRow: chartPieChartsPerRow.value,
@@ -2013,6 +2063,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('mousemove', updateChartHeightResize)
   window.removeEventListener('mouseup', stopChartHeightResize)
   clearJsQueryDebounceTimer()
+  if (renderingFrame !== null) cancelAnimationFrame(renderingFrame)
   saveCurrentTableState()
 })
 
@@ -2031,7 +2082,14 @@ watch(
     // logger.log(`Selected node changed: ${newNode?.key}`)
     localSelectedNode.value = newNode
     if (newNode) {
-      buildTable(newNode)
+      if (store.rawText.length > LARGE_RENDER_THRESHOLD) {
+        isRendering.value = true
+        setTimeout(() => {
+          if (localSelectedNode.value === newNode) buildTable(newNode)
+        }, 0)
+      } else {
+        buildTable(newNode)
+      }
       first.value = 0
       clearTableSelection()
     }
@@ -2317,8 +2375,13 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
       </div>
     </div>
     
+    <div v-if="showChart && hasChartRows && !chartReady" class="chart-rendering-placeholder">
+      <i class="pi pi-spin pi-spinner"></i>
+      <span>Rendering chart...</span>
+    </div>
+
     <TimeSeriesChart
-      v-if="showChart && hasChartRows"
+      v-if="showChart && hasChartRows && chartReady"
       :data="filteredData as any"
       :columns="columns as any"
       :show-status-model="chartShowStatus"
@@ -2331,6 +2394,8 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
       :hidden-groups-model="chartHiddenGroups"
       :show-count-model="chartShowCount"
       :show-value-sum-model="chartShowValueSum"
+      :stacked-model="chartStacked"
+      :bar-chart-model="chartBarChart"
       :value-agg-model="chartValueAgg"
       :show-pie-charts-model="chartShowPieCharts"
       :pie-charts-per-row-model="chartPieChartsPerRow"
@@ -2345,6 +2410,8 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
       @update:hidden-groups="chartHiddenGroups = $event"
       @update:show-count="chartShowCount = $event"
       @update:show-value-sum="chartShowValueSum = $event"
+      @update:stacked="chartStacked = $event"
+      @update:bar-chart="chartBarChart = $event"
       @update:value-agg="chartValueAgg = $event"
       @update:show-pie-charts="chartShowPieCharts = $event"
       @update:pie-charts-per-row="chartPieChartsPerRow = $event"
@@ -2509,7 +2576,7 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
         <template #empty>
           <div class="empty-table">
             <i class="pi pi-inbox"></i>
-            <span>No data available</span>
+            <span>{{ emptyTableMessage }}</span>
           </div>
         </template>
       </DataTable>
@@ -2899,6 +2966,16 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
   padding: 40px;
   color: var(--tdv-text-muted);
   gap: 8px;
+}
+
+.chart-rendering-placeholder {
+  min-height: 250px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  color: var(--p-text-muted-color, #64748b);
+  font-size: 1.05rem;
 }
 
 .empty-table i {

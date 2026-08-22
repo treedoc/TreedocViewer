@@ -30,6 +30,7 @@ export const useTreeStore = defineStore('tree', () => {
   const rawText = ref('')
   const parseResult = ref('')
   const parseStatus = ref<ParseStatus>(ParseStatus.SUCCESS)
+  const processingPhase = ref<'idle' | 'parsing' | 'rendering'>('idle')
   
   const tree = shallowRef<TreeDoc | null>(null)
   const selectedNode = shallowRef<TDNode | null>(null)
@@ -104,10 +105,21 @@ export const useTreeStore = defineStore('tree', () => {
   }, 300)
   
   function parseText(text: string, detectParser = false) {
+    processingPhase.value = 'parsing'
+    // Yield before parsing very large inputs so the progress state can paint.
+    if (text.length > 2 * 1024 * 1024) {
+      setTimeout(() => parseTextNow(text, detectParser), 0)
+      return
+    }
+    parseTextNow(text, detectParser)
+  }
+
+  function parseTextNow(text: string, detectParser = false) {
     if (!text) {
       tree.value = null
       selectedNode.value = null
       parseResult.value = 'No data'
+      processingPhase.value = 'idle'
       return
     }
     
@@ -147,12 +159,19 @@ export const useTreeStore = defineStore('tree', () => {
       
       // Select root by default
       selectNode(tree.value.root, true)
+      processingPhase.value = 'rendering'
+      // Let the tree/table render one frame with an explicit progress state,
+      // then return to the normal empty-state behavior.
+      setTimeout(() => {
+        if (processingPhase.value === 'rendering') processingPhase.value = 'idle'
+      }, 0)
     } else {
       tree.value = null
       selectedNode.value = null
       history.clear()
       tableStateCache.clear()
       historyVersion.value++
+      processingPhase.value = 'idle'
     }
   }
   
@@ -326,6 +345,7 @@ export const useTreeStore = defineStore('tree', () => {
     rawText,
     parseResult,
     parseStatus,
+    processingPhase,
     tree,
     selectedNode,
     initialNode,

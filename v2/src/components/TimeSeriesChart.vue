@@ -63,6 +63,8 @@ const props = defineProps<{
   hiddenGroupsModel?: Set<string>
   showCountModel?: boolean
   showValueSumModel?: boolean
+  stackedModel?: boolean
+  barChartModel?: boolean
   valueAggModel?: ValueAggregation
   showPieChartsModel?: boolean
   pieChartsPerRowModel?: number
@@ -81,6 +83,8 @@ const emit = defineEmits<{
   'update:hiddenGroups': [value: Set<string>]
   'update:showCount': [value: boolean]
   'update:showValueSum': [value: boolean]
+  'update:stacked': [value: boolean]
+  'update:barChart': [value: boolean]
   'update:valueAgg': [value: ValueAggregation]
   'update:showPieCharts': [value: boolean]
   'update:pieChartsPerRow': [value: number]
@@ -190,6 +194,7 @@ type LegendSortOrder = 1 | -1
 type LegendColumnKey = LegendSortField
 
 const MAX_RENDERED_SERIES = 200
+const MIN_BAR_WIDTH_PX = 4
 const TOOLTIP_SINGLE_SERIES_THRESHOLD = 50
 const DEBOUNCE_MS = 250
 const CHART_UPDATE_MODE = 'none'
@@ -215,6 +220,8 @@ const effectiveValueColumns = ref<string[]>([...valueColumns.value])
 const effectiveGroupColumns = ref<string[]>([...groupColumns.value])
 const showCount = ref(props.showCountModel ?? true)
 const showValueSum = ref(props.showValueSumModel ?? false)
+const stacked = ref(props.stackedModel ?? false)
+const barChart = ref(props.barChartModel ?? false)
 const valueAgg = ref<ValueAggregation>(props.valueAggModel ?? 'sum')
 const showPieCharts = ref(props.showPieChartsModel ?? false)
 const pieChartsPerRow = ref(props.pieChartsPerRowModel ?? 3)
@@ -274,6 +281,13 @@ watch(bucketSize, (val) => emit('update:bucketSize', val))
 watch(hiddenGroups, (val) => emit('update:hiddenGroups', val))
 watch(showCount, (val) => emit('update:showCount', val))
 watch(showValueSum, (val) => emit('update:showValueSum', val))
+watch(stacked, (val) => {
+  if (val && showValueSum.value) showValueSum.value = false
+  emit('update:stacked', val)
+})
+watch(barChart, (val) => {
+  emit('update:barChart', val)
+})
 watch(valueAgg, (val) => emit('update:valueAgg', val))
 watch(showPieCharts, (val) => emit('update:showPieCharts', val))
 watch(pieChartsPerRow, (val) => emit('update:pieChartsPerRow', val))
@@ -313,6 +327,15 @@ watch(() => props.showCountModel, (val) => {
 watch(() => props.showValueSumModel, (val) => {
   const next = val ?? false
   if (showValueSum.value !== next) showValueSum.value = next
+})
+watch(() => props.stackedModel, (val) => {
+  const next = val ?? false
+  if (stacked.value !== next) stacked.value = next
+  if (next && showValueSum.value) showValueSum.value = false
+})
+watch(() => props.barChartModel, (val) => {
+  const next = val ?? false
+  if (barChart.value !== next) barChart.value = next
 })
 watch(() => props.valueAggModel, (val) => {
   const next = val ?? 'sum'
@@ -820,7 +843,16 @@ const valueSeriesSummaries = computed<SeriesSummary[]>(() => {
 
 function isValueSeriesVisible(series: SeriesSummary, index: number): boolean {
   if (hiddenGroups.value.has(series.key)) return false
-  return index < MAX_RENDERED_SERIES || explicitlyShownValueSeries.value.has(series.key)
+  const chartWidth = chartRef.value?.chart?.width || 1200
+  const bucketCount = Math.max(1, chartBuckets.value.length)
+  const maxBarSeries = Math.max(1, Math.floor(chartWidth / MIN_BAR_WIDTH_PX / bucketCount))
+  // A stacked bar uses one bar slot per time bucket, so it can fit the same
+  // number of series as the grouped count bars. Only side-by-side bars need
+  // to reduce the series count to preserve a readable minimum bar width.
+  const maxSeries = barChart.value && !stacked.value
+    ? Math.min(MAX_RENDERED_SERIES, maxBarSeries)
+    : MAX_RENDERED_SERIES
+  return index < maxSeries || explicitlyShownValueSeries.value.has(series.key)
 }
 
 const visibleValueSeries = computed(() => valueSeriesSummaries.value.filter((series, index) => isValueSeriesVisible(series, index)))
@@ -1433,7 +1465,7 @@ const chartJsData = computed<ChartData<'bar'>>(() => {
         const value = getValueForStats(bucket.valueGroups[series.valueColumn!]?.[groupKey])
         return { x: bucket.time.getTime(), y: value }
       }),
-      type: 'line' as const,
+      type: barChart.value ? 'bar' as const : 'line' as const,
       borderColor: color.border,
       backgroundColor: color.bg,
       borderWidth: 2,
@@ -1441,7 +1473,13 @@ const chartJsData = computed<ChartData<'bar'>>(() => {
       yAxisID: 'y1',
       seriesKey: series.key,
       seriesKind: 'value',
-      tension: 0.1
+      tension: 0.1,
+      fill: stacked.value,
+      stack: stacked.value ? 'value-stack' : undefined,
+      barThickness: barChart.value ? MIN_BAR_WIDTH_PX : undefined,
+      maxBarThickness: barChart.value ? 18 : undefined,
+      categoryPercentage: barChart.value ? 0.9 : undefined,
+      barPercentage: barChart.value ? 0.9 : undefined
     })
   })
 
@@ -1479,6 +1517,7 @@ const chartJsData = computed<ChartData<'bar'>>(() => {
 // Chart.js options
 const chartOptions = computed<ChartOptions<'bar'>>(() => {
   const isStacked = !!(showCount.value && groupedCountEnabled.value && visibleCountGroupKeys.value.length > 0)
+  const isValueStacked = stacked.value && visibleValueSeries.value.length > 0
   const tickConfig = getSafeTimeTickConfig(bucketSize.value, effectiveTimeRange.value)
   
   const options: ChartOptions<'bar'> = {
@@ -1578,7 +1617,7 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => {
     scales: {
       x: {
         type: 'time',
-        stacked: isStacked,
+        stacked: isStacked || isValueStacked,
         min: effectiveTimeRange.value.min,
         max: effectiveTimeRange.value.max,
         time: {
@@ -1627,7 +1666,8 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => {
       },
       grid: {
         drawOnChartArea: false
-      }
+      },
+      stacked: isValueStacked
     }
   }
   
@@ -1960,8 +2000,18 @@ onBeforeUnmount(() => {
       </label>
 
       <label class="control-group checkbox-control">
-        <Checkbox v-model="showValueSum" :binary="true" :disabled="valueColumns.length === 0" />
+        <Checkbox v-model="showValueSum" :binary="true" :disabled="valueColumns.length === 0 || stacked" />
         <span>Sum</span>
+      </label>
+
+      <label class="control-group checkbox-control">
+        <Checkbox v-model="stacked" :binary="true" :disabled="valueColumns.length === 0" />
+        <span>Stack</span>
+      </label>
+
+      <label class="control-group checkbox-control">
+        <Checkbox v-model="barChart" :binary="true" :disabled="valueColumns.length === 0" />
+        <span>Bar</span>
       </label>
 
       <label class="control-group checkbox-control">
