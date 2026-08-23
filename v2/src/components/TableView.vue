@@ -2384,6 +2384,7 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
     <TimeSeriesChart
       v-if="showChart && hasChartRows && chartReady"
       :data="filteredData as any"
+      :original-data="tableData as any"
       :columns="columns as any"
       :show-status-model="chartShowStatus"
       :chart-height="chartHeight"

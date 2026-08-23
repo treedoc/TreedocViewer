@@ -52,6 +52,7 @@ ChartJS.register(
 
 const props = defineProps<{
   data: TableRow[]
+  originalData?: TableRow[]
   columns: TableColumn[]
   // Chart state props (for persistence across remounts)
   showStatusModel?: ChartShowStatus
@@ -438,7 +439,18 @@ const countSeriesCount = computed(() => {
   if (groupedCountEnabled.value) return visibleCountGroupKeys.value.length
   return visibleCountGroupKeys.value.length > MAX_RENDERED_SERIES ? 1 : 0
 })
-const hasUsableTimeSeriesAxis = computed(() => !!timeColumn.value && chartBuckets.value.length > 1)
+const originalTimePointCount = computed(() => {
+  if (!timeColumn.value) return 0
+  const rows = props.originalData ?? props.data
+  const buckets = new Set<string>()
+  for (const row of rows) {
+    const date = tryParseDate(getCellAnyValue(row, timeColumn.value))
+    if (date) buckets.add(getBucketKey(date, bucketSize.value))
+    if (buckets.size > 1) break
+  }
+  return buckets.size
+})
+const hasUsableTimeSeriesAxis = computed(() => !!timeColumn.value && originalTimePointCount.value > 1)
 const timeSeriesHasData = computed(() => chartBuckets.value.length > 0 && (countSeriesCount.value > 0 || valueSeriesSummaries.value.length > 0))
 const renderTimeSeriesChart = computed(() => hasUsableTimeSeriesAxis.value && timeSeriesHasData.value)
 const renderPieCharts = computed(() => !hasUsableTimeSeriesAxis.value || showPieCharts.value)
@@ -843,19 +855,35 @@ const valueSeriesSummaries = computed<SeriesSummary[]>(() => {
 
 function isValueSeriesVisible(series: SeriesSummary, index: number): boolean {
   if (hiddenGroups.value.has(series.key)) return false
-  const chartWidth = chartRef.value?.chart?.width || 1200
-  const bucketCount = Math.max(1, chartBuckets.value.length)
-  const maxBarSeries = Math.max(1, Math.floor(chartWidth / MIN_BAR_WIDTH_PX / bucketCount))
-  // A stacked bar uses one bar slot per time bucket, so it can fit the same
-  // number of series as the grouped count bars. Only side-by-side bars need
-  // to reduce the series count to preserve a readable minimum bar width.
-  const maxSeries = barChart.value && !stacked.value
-    ? Math.min(MAX_RENDERED_SERIES, maxBarSeries)
-    : MAX_RENDERED_SERIES
-  return index < maxSeries || explicitlyShownValueSeries.value.has(series.key)
+  return index < MAX_RENDERED_SERIES || explicitlyShownValueSeries.value.has(series.key)
 }
 
 const visibleValueSeries = computed(() => valueSeriesSummaries.value.filter((series, index) => isValueSeriesVisible(series, index)))
+const maxUnstackedBarsPerBucket = computed(() => {
+  const chartWidth = chartRef.value?.chart?.chartArea?.width || chartRef.value?.chart?.width || 1200
+  const bucketCount = Math.max(1, chartBuckets.value.length)
+  return Math.max(1, Math.floor(chartWidth / bucketCount / MIN_BAR_WIDTH_PX))
+})
+const unstackedBarSeriesKeysByBucket = computed(() => {
+  const result = new Map<number, Set<string>>()
+  if (!barChart.value || stacked.value) return result
+
+  for (const bucket of chartBuckets.value) {
+    const ranked = visibleValueSeries.value
+      .map(series => {
+        const groupKey = getGroupKey(series.groupParts)
+        return {
+          key: series.key,
+          value: getValueForStats(bucket.valueGroups[series.valueColumn!]?.[groupKey]),
+        }
+      })
+      .filter((entry): entry is { key: string; value: number } => entry.value !== null && Number.isFinite(entry.value))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, maxUnstackedBarsPerBucket.value)
+    result.set(bucket.time.getTime(), new Set(ranked.map(entry => entry.key)))
+  }
+  return result
+})
 const hasVisibleValueSeries = computed(() => visibleValueSeries.value.length > 0)
 const totalSeriesCount = computed(() => countSeriesCount.value + visibleValueSeries.value.length + (showValueSum.value && hasVisibleValueSeries.value ? 1 : 0))
 const allValueSeriesHidden = computed(() => valueSeriesSummaries.value.length > 0 && valueSeriesSummaries.value.every((series, index) => !isValueSeriesVisible(series, index)))
@@ -1461,6 +1489,9 @@ const chartJsData = computed<ChartData<'bar'>>(() => {
       label: `${valueAgg.value.toUpperCase()} ${series.name}`,
       tooltipLabel: series.name,
       data: chartBuckets.value.map(bucket => {
+        if (barChart.value && !stacked.value && !unstackedBarSeriesKeysByBucket.value.get(bucket.time.getTime())?.has(series.key)) {
+          return { x: bucket.time.getTime(), y: null }
+        }
         const groupKey = getGroupKey(series.groupParts)
         const value = getValueForStats(bucket.valueGroups[series.valueColumn!]?.[groupKey])
         return { x: bucket.time.getTime(), y: value }
@@ -1479,7 +1510,8 @@ const chartJsData = computed<ChartData<'bar'>>(() => {
       barThickness: barChart.value ? MIN_BAR_WIDTH_PX : undefined,
       maxBarThickness: barChart.value ? 18 : undefined,
       categoryPercentage: barChart.value ? 0.9 : undefined,
-      barPercentage: barChart.value ? 0.9 : undefined
+      barPercentage: barChart.value ? 0.9 : undefined,
+      skipNull: barChart.value && !stacked.value
     })
   })
 
@@ -1854,6 +1886,59 @@ function resetTimeSelection() {
 
 const hasTimeSelection = computed(() => timeSelectionStart.value != null && timeSelectionEnd.value != null)
 
+const originalTimeExtent = computed(() => {
+  if (!timeColumn.value) return null
+  const rows = props.originalData ?? props.data
+  let min = Number.POSITIVE_INFINITY
+  let max = Number.NEGATIVE_INFINITY
+  for (const row of rows) {
+    const date = tryParseDate(getCellAnyValue(row, timeColumn.value))
+    if (!date) continue
+    const time = date.getTime()
+    min = Math.min(min, time)
+    max = Math.max(max, time)
+  }
+  return Number.isFinite(min) && Number.isFinite(max) ? { min, max } : null
+})
+
+function pageTimeSelection(direction: -1 | 1) {
+  if (timeSelectionStart.value == null || timeSelectionEnd.value == null) return
+  const start = Math.min(timeSelectionStart.value, timeSelectionEnd.value)
+  const end = Math.max(timeSelectionStart.value, timeSelectionEnd.value)
+  const duration = end - start
+  if (duration <= 0) return
+
+  let nextStart = start + direction * duration / 2
+  let nextEnd = end + direction * duration / 2
+  const extent = originalTimeExtent.value
+  if (extent) {
+    if (nextStart < extent.min) {
+      nextEnd += extent.min - nextStart
+      nextStart = extent.min
+    }
+    if (nextEnd > extent.max) {
+      nextStart -= nextEnd - extent.max
+      nextEnd = extent.max
+    }
+    nextStart = Math.max(extent.min, nextStart)
+    nextEnd = Math.min(extent.max, nextEnd)
+  }
+  if (!hasOriginalDataInRange(nextStart, nextEnd)) return
+  timeSelectionStart.value = nextStart
+  timeSelectionEnd.value = nextEnd
+}
+
+function hasOriginalDataInRange(startMs: number, endMs: number): boolean {
+  if (!timeColumn.value) return false
+  const rows = props.originalData ?? props.data
+  return rows.some(row => {
+    const date = tryParseDate(getCellAnyValue(row, timeColumn.value))
+    if (!date) return false
+    const time = date.getTime()
+    return time >= startMs && time <= endMs
+  })
+}
+
 const dragOverlayStyle = computed(() => {
   if (!isDraggingSelection.value) return { display: 'none' }
   const left = Math.min(dragStartClientX.value, dragCurrentClientX.value)
@@ -1864,7 +1949,20 @@ const dragOverlayStyle = computed(() => {
   }
 })
 
+const persistentSelectionStyle = computed(() => {
+  // Keep the selection out of the Y-axis while retaining the same vertical
+  // coverage used during drag selection, including the X-axis area.
+  if (!hasTimeSelection.value) return { display: 'none' }
+  const area = chartRef.value?.chart?.chartArea
+  if (!area) return {}
+  return {
+    left: `${area.left}px`,
+    width: `${area.right - area.left}px`,
+  }
+})
+
 function startTimeSelectionDrag(event: MouseEvent) {
+  if (event.target instanceof HTMLElement && event.target.closest('.selection-actions')) return
   if (event.button !== 0 || !timeColumn.value || chartBuckets.value.length === 0) return
   const chart = chartRef.value?.chart
   const canvas: HTMLCanvasElement | undefined = chart?.canvas
@@ -1913,6 +2011,7 @@ function endTimeSelectionDrag() {
   const endMs = getChartTimeFromClientX(dragCurrentClientX.value + rectLeft)
 
   if (startMs == null || endMs == null || startMs === endMs) return
+  if (!hasOriginalDataInRange(Math.min(startMs, endMs), Math.max(startMs, endMs))) return
   timeSelectionStart.value = Math.min(startMs, endMs)
   timeSelectionEnd.value = Math.max(startMs, endMs)
 }
@@ -2030,18 +2129,6 @@ onBeforeUnmount(() => {
         />
       </div>
 
-      <div class="control-group icon-control">
-        <Button
-          icon="pi pi-refresh"
-          size="small"
-          text
-          severity="secondary"
-          :disabled="!hasTimeSelection"
-          @click="resetTimeSelection"
-          v-tooltip.top="'Reset time selection'"
-        />
-      </div>
-
       <div class="chart-actions">
         <Button
           :icon="isMaximized ? 'pi pi-window-minimize' : 'pi pi-window-maximize'"
@@ -2077,6 +2164,37 @@ onBeforeUnmount(() => {
             :update-mode="CHART_UPDATE_MODE"
           />
           <div v-if="isDraggingSelection" class="selection-overlay" :style="dragOverlayStyle" />
+          <div v-else-if="hasTimeSelection" class="selection-overlay persistent-selection" :style="persistentSelectionStyle">
+            <div class="selection-actions" @mousedown.stop>
+              <Button
+                icon="pi pi-angle-double-left"
+                rounded
+                outlined
+                severity="secondary"
+                @click.stop="pageTimeSelection(-1)"
+                v-tooltip.top="'Page left by half a page'"
+                aria-label="Page selection left"
+              />
+              <Button
+                icon="pi pi-times"
+                rounded
+                outlined
+                severity="secondary"
+                @click.stop="resetTimeSelection"
+                v-tooltip.top="'Cancel selection'"
+                aria-label="Cancel selection"
+              />
+              <Button
+                icon="pi pi-angle-double-right"
+                rounded
+                outlined
+                severity="secondary"
+                @click.stop="pageTimeSelection(1)"
+                v-tooltip.top="'Page right by half a page'"
+                aria-label="Page selection right"
+              />
+            </div>
+          </div>
         </div>
 
         <div
@@ -2779,6 +2897,39 @@ onBeforeUnmount(() => {
   border: 1px solid rgba(37, 99, 235, 0.6);
   z-index: 3;
   pointer-events: none;
+}
+
+.persistent-selection {
+  right: auto;
+  pointer-events: none;
+}
+
+.selection-actions {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  gap: 6px;
+  opacity: 0;
+  pointer-events: auto;
+  transition: opacity 120ms ease;
+}
+
+.chart-container:hover .selection-actions,
+.selection-actions:focus-within {
+  opacity: 1;
+}
+
+:deep(.selection-actions .p-button) {
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  background: color-mix(in srgb, var(--tdv-surface) 50%, transparent);
+  backdrop-filter: none;
+}
+
+:deep(.selection-actions .p-button:hover) {
+  background: color-mix(in srgb, var(--tdv-surface) 70%, transparent);
 }
 
 .legend-divider {
