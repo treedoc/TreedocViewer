@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch, onBeforeUnmount, nextTick } from 'vue'
+import { computed, ref, watch, onBeforeUnmount, onMounted, nextTick } from 'vue'
 import { Bar, Pie } from 'vue-chartjs'
 import {
   Chart as ChartJS,
@@ -237,6 +237,9 @@ const legendResizeRight = ref(0)
 const timeSelectionStart = ref<number | null>(props.timeSelectionStartModel ?? null)
 const timeSelectionEnd = ref<number | null>(props.timeSelectionEndModel ?? null)
 const chartRef = ref<any>(null)
+const chartContainerRef = ref<HTMLElement | null>(null)
+const chartAreaVersion = ref(0)
+let chartResizeObserver: ResizeObserver | null = null
 const isDraggingSelection = ref(false)
 const dragStartClientX = ref(0)
 const dragCurrentClientX = ref(0)
@@ -1953,6 +1956,7 @@ const persistentSelectionStyle = computed(() => {
   // Keep the selection out of the Y-axis while retaining the same vertical
   // coverage used during drag selection, including the X-axis area.
   if (!hasTimeSelection.value) return { display: 'none' }
+  chartAreaVersion.value
   const area = chartRef.value?.chart?.chartArea
   if (!area) return {}
   return {
@@ -2027,6 +2031,17 @@ onBeforeUnmount(() => {
   window.removeEventListener('mousemove', updateLegendColumnResize)
   window.removeEventListener('mouseup', stopLegendColumnResize)
   chartRef.value?.chart?.$tdvHtmlTooltip?.remove()
+  chartResizeObserver?.disconnect()
+})
+
+onMounted(() => {
+  if (typeof ResizeObserver === 'undefined' || !chartContainerRef.value) return
+  chartResizeObserver = new ResizeObserver(() => {
+    requestAnimationFrame(() => {
+      chartAreaVersion.value++
+    })
+  })
+  chartResizeObserver.observe(chartContainerRef.value)
 })
 </script>
 
@@ -2154,7 +2169,7 @@ onBeforeUnmount(() => {
       v-if="chartHasData"
     >
       <div v-if="renderTimeSeriesChart" class="time-series-row">
-        <div class="chart-container" @mousedown.capture="startTimeSelectionDrag">
+        <div ref="chartContainerRef" class="chart-container" @mousedown.capture="startTimeSelectionDrag">
           <Bar
             ref="chartRef"
             :data="chartJsData"
