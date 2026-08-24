@@ -1958,9 +1958,14 @@ const persistentSelectionStyle = computed(() => {
   if (!hasTimeSelection.value) return { display: 'none' }
   chartAreaVersion.value
   const area = chartRef.value?.chart?.chartArea
-  if (!area) return {}
+  const canvas = chartRef.value?.chart?.canvas as HTMLCanvasElement | undefined
+  const container = chartContainerRef.value
+  if (!area || !canvas || !container) return {}
+  const canvasRect = canvas.getBoundingClientRect()
+  const containerRect = container.getBoundingClientRect()
+  const canvasOffsetLeft = canvasRect.left - containerRect.left
   return {
-    left: `${area.left}px`,
+    left: `${canvasOffsetLeft + area.left}px`,
     width: `${area.right - area.left}px`,
   }
 })
