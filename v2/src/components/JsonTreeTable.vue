@@ -366,9 +366,6 @@ watch(() => props.initialPath, (path) => {
   }
 }, { immediate: true })
 
-// Track if initial preset has been applied
-const initialPresetApplied = ref(false)
-
 function clearInitialPresetTimer() {
   if (initialPresetTimer) {
     clearTimeout(initialPresetTimer)
@@ -387,30 +384,27 @@ function getToastProps(status: ParseStatus) {
   }
 }
 
-// Show parse result as toast and apply initial preset if provided
+// Show the parse result as a toast. Preset application is coordinated by the
+// combined watcher below so one embedded data+options event only rebuilds the
+// table/chart once.
 watch(parseResult, (result) => {
   if (result && result !== 'No data') {
     const props_ = getToastProps(parseStatus.value)
     toast.add({ ...props_, detail: result })
-    
-    // Apply initial preset after successful parse (only once)
-    if (!hasError.value && (props.initialPreset || props.options?.globalRule) && !initialPresetApplied.value) {
-      initialPresetApplied.value = true
-      applyInitialPreset()
-    }
   }
 })
 
+// Data and embedded options commonly change in the same Vue update. Watching
+// them together lets Vue de-duplicate the job and apply the preset once to the
+// new tree, instead of once for the data, once for globalRule, and once again
+// through Home's former explicit applyPresetConfig call.
 watch(
-  [() => props.initialPreset, () => props.options?.globalRule],
-  () => {
-    initialPresetApplied.value = false
-    if (parseResult.value && parseResult.value !== 'No data' && !hasError.value && (props.initialPreset || props.options?.globalRule)) {
-      initialPresetApplied.value = true
-      applyInitialPreset()
-    }
+  [() => store.tree, () => props.initialPreset, () => props.options?.globalRule],
+  ([tree]) => {
+    if (!tree || hasError.value || (!props.initialPreset && !props.options?.globalRule)) return
+    applyInitialPreset(props.initialPreset, props.options, { immediate: true })
   },
-  { deep: true }
+  { deep: true, immediate: true, flush: 'post' }
 )
 
 // Apply initial preset from URL parameter

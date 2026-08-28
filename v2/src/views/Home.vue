@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import Select from 'primevue/select'
 import ProgressSpinner from 'primevue/progressspinner'
 import JsonTreeTable from '../components/JsonTreeTable.vue'
@@ -85,12 +85,6 @@ function parsePresetParam(value: unknown): string | undefined {
   return undefined
 }
 
-function applyEventConfig() {
-  nextTick(() => {
-    jsonTreeTableRef.value?.applyPresetConfig(initialPreset.value, options.value, { immediate: true })
-  })
-}
-
 function parseBooleanParam(value: unknown): boolean | undefined {
   if (typeof value === 'boolean') return value
   if (typeof value === 'string') {
@@ -163,8 +157,6 @@ function handleEmbeddedMessage(evt: MessageEvent) {
   if (evt.data.type === 'tdv-setData') {
     store.loadData(evt.data.data)
   }
-
-  applyEventConfig()
 }
 
 function handlePwaLaunchConfig(evt: Event) {
@@ -192,8 +184,6 @@ function handlePwaLaunchConfig(evt: Event) {
   if (config.initialPath) {
     eventInitialPath.value = config.initialPath
   }
-
-  applyEventConfig()
 }
 
 // Handle embedded mode
