@@ -19,12 +19,14 @@ import {
   type ChartData,
   type ChartOptions,
   type Plugin,
+  type ScriptableScaleContext,
 } from 'chart.js'
 import 'chartjs-adapter-date-fns'
 import type { TableRow, TableColumn, TimeBucket } from '@/utils/TableUtil'
 import { detectTimeColumns, detectNumericColumns, detectGroupableColumns, detectBucketSize, detectColumnDateFormat } from '@/utils/TableUtil'
 import { formatDateLikeOriginal, formatLocalTooltipDateTime, tryParseDate } from '@/utils/DateUtil'
 import { getHtmlTooltipPosition, getTooltipDatasetLabel } from '@/utils/ChartTooltipUtil'
+import { alignTimeRangeToGrid, getUtcDaySpans, isTimeUnitFinerThanDay, type ChartTimeUnit } from '@/utils/ChartTimeGridUtil'
 import Select from 'primevue/select'
 import MultiSelect from 'primevue/multiselect'
 import Button from 'primevue/button'
@@ -162,6 +164,30 @@ const crosshairPlugin: Plugin<'bar'> = {
     ctx.moveTo(chartArea.left, crosshair.y)
     ctx.lineTo(chartArea.right, crosshair.y)
     ctx.stroke()
+    ctx.restore()
+  },
+}
+
+const timeGridPlugin: Plugin<'bar'> = {
+  id: 'treedocTimeGrid',
+  beforeDraw(chart) {
+    const xScale = chart.scales.x
+    const { ctx, chartArea } = chart
+    const min = Number(xScale?.min)
+    const max = Number(xScale?.max)
+    if (!xScale || !Number.isFinite(min) || !Number.isFinite(max)) return
+
+    ctx.save()
+    ctx.beginPath()
+    ctx.rect(chartArea.left, chartArea.top, chartArea.width, chartArea.height)
+    ctx.clip()
+    ctx.fillStyle = 'rgba(148, 163, 184, 0.08)'
+    for (const span of getUtcDaySpans(min, max)) {
+      if (!span.isWeekend) continue
+      const left = Math.max(chartArea.left, xScale.getPixelForValue(span.start))
+      const right = Math.min(chartArea.right, xScale.getPixelForValue(span.end))
+      if (right > left) ctx.fillRect(left, chartArea.top, right - left, chartArea.height)
+    }
     ctx.restore()
   },
 }
@@ -1187,7 +1213,7 @@ const colorPalette = [
   { bg: 'rgba(99, 255, 132, 0.6)', border: 'rgba(99, 255, 132, 1)' },
 ]
 
-type TimeUnit = 'second' | 'minute' | 'hour' | 'day' | 'week' | 'month'
+type TimeUnit = ChartTimeUnit
 
 // Get time unit for chart.js based on bucket size
 function getTimeUnit(bucket: TimeBucket): TimeUnit {
@@ -1558,6 +1584,8 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => {
   const isStacked = !!(showCount.value && groupedCountEnabled.value && visibleCountGroupKeys.value.length > 0)
   const isValueStacked = stacked.value && visibleValueSeries.value.length > 0
   const tickConfig = getSafeTimeTickConfig(bucketSize.value, effectiveTimeRange.value)
+  const displayTimeRange = alignTimeRangeToGrid(effectiveTimeRange.value, tickConfig.unit, tickConfig.stepSize)
+  const defaultGridColor = ChartJS.defaults.borderColor as string
   
   const options: ChartOptions<'bar'> = {
     responsive: true,
@@ -1657,8 +1685,8 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => {
       x: {
         type: 'time',
         stacked: isStacked || isValueStacked,
-        min: effectiveTimeRange.value.min,
-        max: effectiveTimeRange.value.max,
+        min: displayTimeRange.min,
+        max: displayTimeRange.max,
         time: {
           unit: tickConfig.unit,
           displayFormats: {
@@ -1673,8 +1701,18 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => {
         ticks: {
           source: 'auto',
           autoSkip: true,
+          major: {
+            enabled: isTimeUnitFinerThanDay(tickConfig.unit)
+          },
           maxRotation: 45,
           stepSize: tickConfig.stepSize
+        },
+        grid: {
+          color: (context: ScriptableScaleContext) => {
+            return isTimeUnitFinerThanDay(tickConfig.unit) && context.tick?.major
+              ? 'rgba(71, 85, 105, 0.58)'
+              : defaultGridColor
+          }
         }
       },
     }
@@ -2183,7 +2221,7 @@ onMounted(() => {
             ref="chartRef"
             :data="chartJsData"
             :options="chartOptions"
-            :plugins="[crosshairPlugin]"
+            :plugins="[timeGridPlugin, crosshairPlugin]"
             dataset-id-key="seriesKey"
             :update-mode="CHART_UPDATE_MODE"
           />
