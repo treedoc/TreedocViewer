@@ -6,6 +6,12 @@ export interface ChartDaySpan {
   isWeekend: boolean
 }
 
+export interface ChartCalendarAdapter {
+  startOf(timestamp: number, unit: 'day'): number | Date
+  add(timestamp: number, amount: number, unit: 'day'): number | Date
+  format(timestamp: number, format: string): string
+}
+
 export function isTimeUnitFinerThanDay(unit: ChartTimeUnit | undefined): boolean {
   return unit === 'second' || unit === 'minute' || unit === 'hour'
 }
@@ -19,28 +25,28 @@ export function alignTimeRangeToGrid(
   if (!Number.isFinite(range.min) || !Number.isFinite(range.max) || range.max <= range.min) return range
 
   const step = Math.max(1, Math.floor(stepSize))
-  const oneUtcDayLater = new Date(range.min)
-  oneUtcDayLater.setUTCDate(oneUtcDayLater.getUTCDate() + 1)
-  const shouldAnchorToMidnight = range.max >= oneUtcDayLater.getTime()
-  const utcMidnight = new Date(range.min)
-  utcMidnight.setUTCHours(0, 0, 0, 0)
+  const oneLocalDayLater = new Date(range.min)
+  oneLocalDayLater.setDate(oneLocalDayLater.getDate() + 1)
+  const shouldAnchorToMidnight = range.max >= oneLocalDayLater.getTime()
+  const localMidnight = new Date(range.min)
+  localMidnight.setHours(0, 0, 0, 0)
   const align = (value: number, roundUp: boolean): number => {
     const date = new Date(value)
     if (unit === 'second') {
-      date.setUTCMilliseconds(0)
-      if (roundUp && date.getTime() < value) date.setUTCSeconds(date.getUTCSeconds() + step)
+      date.setMilliseconds(0)
+      if (roundUp && date.getTime() < value) date.setSeconds(date.getSeconds() + step)
     } else if (unit === 'minute') {
-      date.setUTCMinutes(Math.floor(date.getUTCMinutes() / step) * step, 0, 0)
-      if (roundUp && date.getTime() < value) date.setUTCMinutes(date.getUTCMinutes() + step)
+      date.setMinutes(Math.floor(date.getMinutes() / step) * step, 0, 0)
+      if (roundUp && date.getTime() < value) date.setMinutes(date.getMinutes() + step)
     } else {
-      date.setUTCHours(Math.floor(date.getUTCHours() / step) * step, 0, 0, 0)
-      if (roundUp && date.getTime() < value) date.setUTCHours(date.getUTCHours() + step)
+      date.setHours(Math.floor(date.getHours() / step) * step, 0, 0, 0)
+      if (roundUp && date.getTime() < value) date.setHours(date.getHours() + step)
     }
     return date.getTime()
   }
 
   const alignedMin = shouldAnchorToMidnight
-    ? utcMidnight.getTime()
+    ? localMidnight.getTime()
     : align(range.min, false)
 
   return {
@@ -49,22 +55,28 @@ export function alignTimeRangeToGrid(
   }
 }
 
-export function getUtcDaySpans(min: number, max: number): ChartDaySpan[] {
+export function getAdapterDaySpans(
+  min: number,
+  max: number,
+  adapter: ChartCalendarAdapter,
+): ChartDaySpan[] {
   if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) return []
 
-  const cursor = new Date(min)
-  cursor.setUTCHours(0, 0, 0, 0)
+  let cursor = Number(adapter.startOf(min, 'day'))
+  if (!Number.isFinite(cursor)) return []
   const spans: ChartDaySpan[] = []
 
-  while (cursor.getTime() < max) {
-    const start = cursor.getTime()
-    const dayOfWeek = cursor.getUTCDay()
-    cursor.setUTCDate(cursor.getUTCDate() + 1)
+  while (cursor < max) {
+    const start = cursor
+    const end = Number(adapter.add(start, 1, 'day'))
+    if (!Number.isFinite(end) || end <= start) break
+    const isoDayOfWeek = Number(adapter.format(start, 'i'))
     spans.push({
       start,
-      end: cursor.getTime(),
-      isWeekend: dayOfWeek === 0 || dayOfWeek === 6,
+      end,
+      isWeekend: isoDayOfWeek === 6 || isoDayOfWeek === 7,
     })
+    cursor = end
   }
 
   return spans

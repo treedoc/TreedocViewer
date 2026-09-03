@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch, onBeforeUnmount, onMounted, nextTick } from 'vue'
+import { storeToRefs } from 'pinia'
 import { Bar, Pie } from 'vue-chartjs'
 import {
   Chart as ChartJS,
@@ -26,7 +27,7 @@ import type { TableRow, TableColumn, TimeBucket } from '@/utils/TableUtil'
 import { detectTimeColumns, detectNumericColumns, detectGroupableColumns, detectBucketSize, detectColumnDateFormat } from '@/utils/TableUtil'
 import { formatDateLikeOriginal, formatLocalTooltipDateTime, tryParseDate } from '@/utils/DateUtil'
 import { getHtmlTooltipPosition, getTooltipDatasetLabel } from '@/utils/ChartTooltipUtil'
-import { alignTimeRangeToGrid, getUtcDaySpans, isTimeUnitFinerThanDay, type ChartTimeUnit } from '@/utils/ChartTimeGridUtil'
+import { alignTimeRangeToGrid, getAdapterDaySpans, isTimeUnitFinerThanDay, type ChartCalendarAdapter, type ChartTimeUnit } from '@/utils/ChartTimeGridUtil'
 import Select from 'primevue/select'
 import MultiSelect from 'primevue/multiselect'
 import Button from 'primevue/button'
@@ -34,6 +35,7 @@ import ToggleSwitch from 'primevue/toggleswitch'
 import BasicColumnFilterPopover from './BasicColumnFilterPopover.vue'
 import type { ChartShowStatus, FieldQuery } from '@/models/types'
 import { matchFieldQuery } from '@/utils/QueryUtil'
+import { useThemeStore } from '@/stores/themeStore'
 
 // Register Chart.js components
 ChartJS.register(
@@ -51,6 +53,26 @@ ChartJS.register(
   Tooltip,
   Legend
 )
+
+const { isDarkMode } = storeToRefs(useThemeStore())
+
+const chartThemeColors = computed(() => isDarkMode.value
+  ? {
+      grid: 'rgba(148, 163, 184, 0.20)',
+      dayGrid: 'rgba(226, 232, 240, 0.52)',
+      axisBorder: 'rgba(203, 213, 225, 0.38)',
+      weekend: 'rgba(148, 163, 184, 0.10)',
+      text: '#cbd5e1',
+      crosshair: 'rgba(226, 232, 240, 0.62)',
+    }
+  : {
+      grid: 'rgba(148, 163, 184, 0.25)',
+      dayGrid: 'rgba(71, 85, 105, 0.58)',
+      axisBorder: 'rgba(71, 85, 105, 0.35)',
+      weekend: 'rgba(148, 163, 184, 0.14)',
+      text: '#475569',
+      crosshair: 'rgba(51, 65, 85, 0.58)',
+    })
 
 const props = defineProps<{
   data: TableRow[]
@@ -158,7 +180,7 @@ const crosshairPlugin: Plugin<'bar'> = {
     ctx.beginPath()
     ctx.setLineDash([4, 3])
     ctx.lineWidth = 1
-    ctx.strokeStyle = 'rgba(51, 65, 85, 0.58)'
+    ctx.strokeStyle = chartThemeColors.value.crosshair
     ctx.moveTo(crosshair.x, chartArea.top)
     ctx.lineTo(crosshair.x, chartArea.bottom)
     ctx.moveTo(chartArea.left, crosshair.y)
@@ -170,19 +192,21 @@ const crosshairPlugin: Plugin<'bar'> = {
 
 const timeGridPlugin: Plugin<'bar'> = {
   id: 'treedocTimeGrid',
-  beforeDraw(chart) {
+  beforeDatasetsDraw(chart) {
     const xScale = chart.scales.x
     const { ctx, chartArea } = chart
     const min = Number(xScale?.min)
     const max = Number(xScale?.max)
     if (!xScale || !Number.isFinite(min) || !Number.isFinite(max)) return
+    const adapter = (xScale as TimeScale & { _adapter: ChartCalendarAdapter })._adapter
+    if (!adapter) return
 
     ctx.save()
     ctx.beginPath()
     ctx.rect(chartArea.left, chartArea.top, chartArea.width, chartArea.height)
     ctx.clip()
-    ctx.fillStyle = 'rgba(148, 163, 184, 0.08)'
-    for (const span of getUtcDaySpans(min, max)) {
+    ctx.fillStyle = chartThemeColors.value.weekend
+    for (const span of getAdapterDaySpans(min, max, adapter)) {
       if (!span.isWeekend) continue
       const left = Math.max(chartArea.left, xScale.getPixelForValue(span.start))
       const right = Math.min(chartArea.right, xScale.getPixelForValue(span.end))
@@ -1585,7 +1609,7 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => {
   const isValueStacked = stacked.value && visibleValueSeries.value.length > 0
   const tickConfig = getSafeTimeTickConfig(bucketSize.value, effectiveTimeRange.value)
   const displayTimeRange = alignTimeRangeToGrid(effectiveTimeRange.value, tickConfig.unit, tickConfig.stepSize)
-  const defaultGridColor = ChartJS.defaults.borderColor as string
+  const themeColors = chartThemeColors.value
   
   const options: ChartOptions<'bar'> = {
     responsive: true,
@@ -1684,6 +1708,7 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => {
     scales: {
       x: {
         type: 'time',
+        offset: false,
         stacked: isStacked || isValueStacked,
         min: displayTimeRange.min,
         max: displayTimeRange.max,
@@ -1699,6 +1724,7 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => {
           }
         },
         ticks: {
+          color: themeColors.text,
           source: 'auto',
           autoSkip: true,
           major: {
@@ -1708,11 +1734,15 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => {
           stepSize: tickConfig.stepSize
         },
         grid: {
+          offset: false,
           color: (context: ScriptableScaleContext) => {
             return isTimeUnitFinerThanDay(tickConfig.unit) && context.tick?.major
-              ? 'rgba(71, 85, 105, 0.58)'
-              : defaultGridColor
+              ? themeColors.dayGrid
+              : themeColors.grid
           }
+        },
+        border: {
+          color: themeColors.axisBorder
         }
       },
     }
@@ -1725,10 +1755,20 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => {
         position: 'left',
         title: {
           display: true,
-          text: 'Row Count'
+          text: 'Row Count',
+          color: themeColors.text
+        },
+        ticks: {
+          color: themeColors.text
         },
         beginAtZero: true,
-        stacked: isStacked
+        stacked: isStacked,
+        grid: {
+          color: themeColors.grid
+        },
+        border: {
+          color: themeColors.axisBorder
+        }
     }
   }
   
@@ -1739,10 +1779,18 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => {
       position: 'right',
       title: {
         display: true,
-        text: valueAgg.value.toUpperCase()
+        text: valueAgg.value.toUpperCase(),
+        color: themeColors.text
+      },
+      ticks: {
+        color: themeColors.text
       },
       grid: {
-        drawOnChartArea: false
+        drawOnChartArea: !showCount.value,
+        color: themeColors.grid
+      },
+      border: {
+        color: themeColors.axisBorder
       },
       stacked: isValueStacked
     }
