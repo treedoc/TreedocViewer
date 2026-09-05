@@ -8,51 +8,60 @@ export interface ChartDaySpan {
 
 export interface ChartCalendarAdapter {
   startOf(timestamp: number, unit: 'day'): number | Date
-  add(timestamp: number, amount: number, unit: 'day'): number | Date
+  add(timestamp: number, amount: number, unit: ChartTimeUnit): number | Date
   format(timestamp: number, format: string): string
+}
+
+export interface ChartGridTick {
+  value: number
+  major: boolean
 }
 
 export function isTimeUnitFinerThanDay(unit: ChartTimeUnit | undefined): boolean {
   return unit === 'second' || unit === 'minute' || unit === 'hour'
 }
 
-export function alignTimeRangeToGrid(
-  range: { min?: number; max?: number },
+export function getAdapterGridTicks(
+  min: number,
+  max: number,
   unit: ChartTimeUnit,
-  stepSize = 1,
-): { min?: number; max?: number } {
-  if (!isTimeUnitFinerThanDay(unit) || range.min === undefined || range.max === undefined) return range
-  if (!Number.isFinite(range.min) || !Number.isFinite(range.max) || range.max <= range.min) return range
+  stepSize: number,
+  adapter: ChartCalendarAdapter,
+): ChartGridTick[] {
+  if (!isTimeUnitFinerThanDay(unit) || !Number.isFinite(min) || !Number.isFinite(max) || max <= min) return []
 
   const step = Math.max(1, Math.floor(stepSize))
-  const oneLocalDayLater = new Date(range.min)
-  oneLocalDayLater.setDate(oneLocalDayLater.getDate() + 1)
-  const shouldAnchorToMidnight = range.max >= oneLocalDayLater.getTime()
-  const localMidnight = new Date(range.min)
-  localMidnight.setHours(0, 0, 0, 0)
-  const align = (value: number, roundUp: boolean): number => {
-    const date = new Date(value)
-    if (unit === 'second') {
-      date.setMilliseconds(0)
-      if (roundUp && date.getTime() < value) date.setSeconds(date.getSeconds() + step)
-    } else if (unit === 'minute') {
-      date.setMinutes(Math.floor(date.getMinutes() / step) * step, 0, 0)
-      if (roundUp && date.getTime() < value) date.setMinutes(date.getMinutes() + step)
-    } else {
-      date.setHours(Math.floor(date.getHours() / step) * step, 0, 0, 0)
-      if (roundUp && date.getTime() < value) date.setHours(date.getHours() + step)
-    }
-    return date.getTime()
+  const unitMilliseconds = unit === 'second' ? 1_000 : unit === 'minute' ? 60_000 : 3_600_000
+  const dayStart = Number(adapter.startOf(min, 'day'))
+  if (!Number.isFinite(dayStart)) return []
+
+  const estimatedSteps = Math.max(0, Math.floor((min - dayStart) / (unitMilliseconds * step)))
+  let cursor = Number(adapter.add(dayStart, estimatedSteps * step, unit))
+  if (!Number.isFinite(cursor)) return []
+
+  while (cursor > min) {
+    const previous = Number(adapter.add(cursor, -step, unit))
+    if (!Number.isFinite(previous) || previous >= cursor) return []
+    cursor = previous
+  }
+  while (cursor < min) {
+    const next = Number(adapter.add(cursor, step, unit))
+    if (!Number.isFinite(next) || next <= cursor) return []
+    cursor = next
   }
 
-  const alignedMin = shouldAnchorToMidnight
-    ? localMidnight.getTime()
-    : align(range.min, false)
-
-  return {
-    min: alignedMin,
-    max: align(range.max, true),
+  const ticks: ChartGridTick[] = []
+  while (cursor <= max && ticks.length < 100_000) {
+    ticks.push({
+      value: cursor,
+      major: cursor === Number(adapter.startOf(cursor, 'day')),
+    })
+    const next = Number(adapter.add(cursor, step, unit))
+    if (!Number.isFinite(next) || next <= cursor) break
+    cursor = next
   }
+
+  return ticks
 }
 
 export function getAdapterDaySpans(

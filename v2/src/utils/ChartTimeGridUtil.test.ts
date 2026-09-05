@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { alignTimeRangeToGrid, getAdapterDaySpans, isTimeUnitFinerThanDay, type ChartCalendarAdapter } from './ChartTimeGridUtil'
+import { getAdapterDaySpans, getAdapterGridTicks, isTimeUnitFinerThanDay, type ChartCalendarAdapter } from './ChartTimeGridUtil'
 
 const localAdapter: ChartCalendarAdapter = {
   startOf(timestamp) {
@@ -7,9 +7,14 @@ const localAdapter: ChartCalendarAdapter = {
     date.setHours(0, 0, 0, 0)
     return date
   },
-  add(timestamp, amount) {
+  add(timestamp, amount, unit) {
     const date = new Date(timestamp)
-    date.setDate(date.getDate() + amount)
+    if (unit === 'second') date.setSeconds(date.getSeconds() + amount)
+    else if (unit === 'minute') date.setMinutes(date.getMinutes() + amount)
+    else if (unit === 'hour') date.setHours(date.getHours() + amount)
+    else if (unit === 'day') date.setDate(date.getDate() + amount)
+    else if (unit === 'week') date.setDate(date.getDate() + amount * 7)
+    else date.setMonth(date.getMonth() + amount)
     return date
   },
   format(timestamp, format) {
@@ -44,29 +49,27 @@ describe('ChartTimeGridUtil', () => {
     }
   })
 
-  it('aligns sub-day chart ranges to local grid boundaries', () => {
-    const range = {
-      min: new Date(2026, 7, 7, 10, 7, 42, 250).getTime(),
-      max: new Date(2026, 7, 7, 11, 52, 17, 750).getTime(),
-    }
+  it('anchors sub-day grid ticks to local midnight without expanding the range', () => {
+    const min = new Date(2026, 7, 7, 21).getTime()
+    const max = new Date(2026, 7, 9, 13).getTime()
+    const ticks = getAdapterGridTicks(min, max, 'hour', 12, localAdapter)
 
-    const hourly = alignTimeRangeToGrid(range, 'hour')
-    expect(hourly.min).toBe(new Date(2026, 7, 7, 10).getTime())
-    expect(hourly.max).toBe(new Date(2026, 7, 7, 12).getTime())
-
-    const fiveMinutes = alignTimeRangeToGrid(range, 'minute', 5)
-    expect(fiveMinutes.min).toBe(new Date(2026, 7, 7, 10, 5).getTime())
-    expect(fiveMinutes.max).toBe(new Date(2026, 7, 7, 11, 55).getTime())
+    expect(ticks.map(tick => tick.value)).toEqual([
+      new Date(2026, 7, 8).getTime(),
+      new Date(2026, 7, 8, 12).getTime(),
+      new Date(2026, 7, 9).getTime(),
+      new Date(2026, 7, 9, 12).getTime(),
+    ])
+    expect(ticks.map(tick => tick.major)).toEqual([true, false, true, false])
+    expect(ticks.every(tick => tick.value >= min && tick.value <= max)).toBe(true)
   })
 
-  it('anchors multi-day sub-day grids to local midnight', () => {
-    const aligned = alignTimeRangeToGrid({
-      min: new Date(2026, 7, 7, 6, 17).getTime(),
-      max: new Date(2026, 7, 9, 11, 52).getTime(),
-    }, 'hour')
+  it('aligns minute grid ticks to multiples of the configured step', () => {
+    const min = new Date(2026, 7, 7, 10, 7, 42).getTime()
+    const max = new Date(2026, 7, 7, 10, 18).getTime()
+    const ticks = getAdapterGridTicks(min, max, 'minute', 5, localAdapter)
 
-    expect(aligned.min).toBe(new Date(2026, 7, 7).getTime())
-    expect(aligned.max).toBe(new Date(2026, 7, 9, 12).getTime())
+    expect(ticks.map(tick => new Date(tick.value).getMinutes())).toEqual([10, 15])
   })
 
   it('returns no spans for an invalid or empty range', () => {

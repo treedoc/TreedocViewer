@@ -27,7 +27,7 @@ import type { TableRow, TableColumn, TimeBucket } from '@/utils/TableUtil'
 import { detectTimeColumns, detectNumericColumns, detectGroupableColumns, detectBucketSize, detectColumnDateFormat } from '@/utils/TableUtil'
 import { formatDateLikeOriginal, formatLocalTooltipDateTime, tryParseDate } from '@/utils/DateUtil'
 import { getHtmlTooltipPosition, getTooltipDatasetLabel } from '@/utils/ChartTooltipUtil'
-import { alignTimeRangeToGrid, getAdapterDaySpans, isTimeUnitFinerThanDay, type ChartCalendarAdapter, type ChartTimeUnit } from '@/utils/ChartTimeGridUtil'
+import { getAdapterDaySpans, getAdapterGridTicks, isTimeUnitFinerThanDay, type ChartCalendarAdapter, type ChartTimeUnit } from '@/utils/ChartTimeGridUtil'
 import Select from 'primevue/select'
 import MultiSelect from 'primevue/multiselect'
 import Button from 'primevue/button'
@@ -289,6 +289,7 @@ const timeSelectionEnd = ref<number | null>(props.timeSelectionEndModel ?? null)
 const chartRef = ref<any>(null)
 const chartContainerRef = ref<HTMLElement | null>(null)
 const chartAreaVersion = ref(0)
+const isChartProcessing = ref(false)
 let chartResizeObserver: ResizeObserver | null = null
 const isDraggingSelection = ref(false)
 const dragStartClientX = ref(0)
@@ -308,6 +309,68 @@ let pendingResizeClientX: number | null = null
 let resizingLegendColumnKey: LegendColumnKey | null = null
 let legendColumnResizeStartX = 0
 let legendColumnResizeStartWidth = 0
+let pendingChartActions: Array<() => void> = []
+let chartActionFlushScheduled = false
+let chartProcessingGeneration = 0
+let chartProcessingStartedAt = 0
+const chartActionFrameIds = new Set<number>()
+const chartProcessingTimers = new Set<ReturnType<typeof setTimeout>>()
+
+const MIN_CHART_PROCESSING_INDICATOR_MS = 300
+
+function requestChartActionFrame(callback: () => void) {
+  const frameId = requestAnimationFrame(() => {
+    chartActionFrameIds.delete(frameId)
+    callback()
+  })
+  chartActionFrameIds.add(frameId)
+}
+
+function finishChartProcessing(generation: number) {
+  const delay = Math.max(0, MIN_CHART_PROCESSING_INDICATOR_MS - (performance.now() - chartProcessingStartedAt))
+  const timer = setTimeout(() => {
+    chartProcessingTimers.delete(timer)
+    requestChartActionFrame(() => {
+      if (generation !== chartProcessingGeneration) return
+      if (pendingChartActions.length > 0) {
+        scheduleChartActionFlush()
+        return
+      }
+      isChartProcessing.value = false
+    })
+  }, delay)
+  chartProcessingTimers.add(timer)
+}
+
+function flushChartActions() {
+  chartActionFlushScheduled = false
+  const actions = pendingChartActions.splice(0)
+  const generation = chartProcessingGeneration
+
+  try {
+    for (const action of actions) action()
+  } finally {
+    nextTick(() => finishChartProcessing(generation))
+  }
+}
+
+function scheduleChartActionFlush() {
+  if (chartActionFlushScheduled) return
+  chartActionFlushScheduled = true
+  nextTick(() => {
+    // The second frame lets the processing indicator paint before expensive
+    // computed chart data and Chart.js rendering begin.
+    requestChartActionFrame(() => requestChartActionFrame(flushChartActions))
+  })
+}
+
+function scheduleChartAction(action: () => void) {
+  pendingChartActions.push(action)
+  chartProcessingGeneration++
+  chartProcessingStartedAt = performance.now()
+  isChartProcessing.value = true
+  scheduleChartActionFlush()
+}
 
 function sameStringArray(a: string[], b?: string[]) {
   if (!b || a.length !== b.length) return false
@@ -1131,12 +1194,14 @@ function comparePieLegendRows(a: PieLegendTableRow, b: PieLegendTableRow, field:
 }
 
 function setLegendSort(field: LegendSortField) {
-  if (legendSortField.value === field) {
-    legendSortOrder.value = legendSortOrder.value === 1 ? -1 : 1
-  } else {
-    legendSortField.value = field
-    legendSortOrder.value = field === 'max' || field === 'mean' || field.startsWith('pie:') ? -1 : 1
-  }
+  scheduleChartAction(() => {
+    if (legendSortField.value === field) {
+      legendSortOrder.value = legendSortOrder.value === 1 ? -1 : 1
+    } else {
+      legendSortField.value = field
+      legendSortOrder.value = field === 'max' || field === 'mean' || field.startsWith('pie:') ? -1 : 1
+    }
+  })
 }
 
 function getLegendSortIcon(field: LegendSortField): string {
@@ -1209,18 +1274,20 @@ function onLegendFilterKeydown(event: KeyboardEvent) {
 }
 
 function toggleMaximizedChart() {
-  if (isMaximized.value) {
-    isMaximized.value = false
-    emit('update:showStatus', 'normal')
-    emit('update:chartHeight', previousChartHeight.value ?? 250)
-    previousChartHeight.value = null
-    return
-  }
+  scheduleChartAction(() => {
+    if (isMaximized.value) {
+      isMaximized.value = false
+      emit('update:showStatus', 'normal')
+      emit('update:chartHeight', previousChartHeight.value ?? 250)
+      previousChartHeight.value = null
+      return
+    }
 
-  previousChartHeight.value = props.chartHeight ?? 250
-  isMaximized.value = true
-  emit('update:showStatus', 'maximized')
-  emit('update:chartHeight', Math.max(400, window.innerHeight - 300))
+    previousChartHeight.value = props.chartHeight ?? 250
+    isMaximized.value = true
+    emit('update:showStatus', 'maximized')
+    emit('update:chartHeight', Math.max(400, window.innerHeight - 300))
+  })
 }
 
 // Color palette for stacked bars
@@ -1608,7 +1675,6 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => {
   const isStacked = !!(showCount.value && groupedCountEnabled.value && visibleCountGroupKeys.value.length > 0)
   const isValueStacked = stacked.value && visibleValueSeries.value.length > 0
   const tickConfig = getSafeTimeTickConfig(bucketSize.value, effectiveTimeRange.value)
-  const displayTimeRange = alignTimeRangeToGrid(effectiveTimeRange.value, tickConfig.unit, tickConfig.stepSize)
   const themeColors = chartThemeColors.value
   
   const options: ChartOptions<'bar'> = {
@@ -1710,8 +1776,8 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => {
         type: 'time',
         offset: false,
         stacked: isStacked || isValueStacked,
-        min: displayTimeRange.min,
-        max: displayTimeRange.max,
+        min: effectiveTimeRange.value.min,
+        max: effectiveTimeRange.value.max,
         time: {
           unit: tickConfig.unit,
           displayFormats: {
@@ -1743,6 +1809,13 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => {
         },
         border: {
           color: themeColors.axisBorder
+        },
+        afterBuildTicks: (axis) => {
+          if (!isTimeUnitFinerThanDay(tickConfig.unit)) return
+          if (typeof axis.min !== 'number' || typeof axis.max !== 'number') return
+          const timeScale = axis as TimeScale & { _adapter: ChartCalendarAdapter }
+          const ticks = getAdapterGridTicks(axis.min, axis.max, tickConfig.unit, tickConfig.stepSize ?? 1, timeScale._adapter)
+          if (ticks.length > 0) axis.ticks = ticks
         }
       },
     }
@@ -1827,8 +1900,51 @@ const pieChartsPerRowOptions = [
   { label: '6', value: 6 },
 ]
 
-function onBucketChange() {
-  autoDetectBucket.value = false
+function updateTimeColumn(value: string | null) {
+  scheduleChartAction(() => {
+    timeColumn.value = value ?? ''
+  })
+}
+
+function updateBucketSize(value: TimeBucket) {
+  scheduleChartAction(() => {
+    autoDetectBucket.value = false
+    bucketSize.value = value
+  })
+}
+
+function updateGroupColumns(value: string[] | null) {
+  scheduleChartAction(() => {
+    groupColumns.value = value ? [...value] : []
+  })
+}
+
+function updateValueColumns(value: string[] | null) {
+  scheduleChartAction(() => {
+    valueColumns.value = value ? [...value] : []
+  })
+}
+
+function updateValueAggregation(value: ValueAggregation) {
+  scheduleChartAction(() => {
+    valueAgg.value = value
+  })
+}
+
+function updateBooleanChartOption(target: 'count' | 'sum' | 'stack' | 'bar' | 'pie', value: boolean) {
+  scheduleChartAction(() => {
+    if (target === 'count') showCount.value = value
+    else if (target === 'sum') showValueSum.value = value
+    else if (target === 'stack') stacked.value = value
+    else if (target === 'bar') barChart.value = value
+    else pieChartsControl.value = value
+  })
+}
+
+function updatePieChartsPerRow(value: number) {
+  scheduleChartAction(() => {
+    pieChartsPerRow.value = value
+  })
 }
 
 function formatMetric(value: number): string {
@@ -1837,61 +1953,69 @@ function formatMetric(value: number): string {
 }
 
 function toggleSeriesVisibility(series: SeriesSummary, index: number) {
-  const next = new Set(hiddenGroups.value)
-  const nextExplicitlyShown = new Set(explicitlyShownValueSeries.value)
+  scheduleChartAction(() => {
+    const next = new Set(hiddenGroups.value)
+    const nextExplicitlyShown = new Set(explicitlyShownValueSeries.value)
 
-  if (isValueSeriesVisible(series, index)) {
-    next.add(series.key)
-    nextExplicitlyShown.delete(series.key)
-  } else {
-    next.delete(series.key)
-    if (index >= MAX_RENDERED_SERIES) nextExplicitlyShown.add(series.key)
-  }
+    if (isValueSeriesVisible(series, index)) {
+      next.add(series.key)
+      nextExplicitlyShown.delete(series.key)
+    } else {
+      next.delete(series.key)
+      if (index >= MAX_RENDERED_SERIES) nextExplicitlyShown.add(series.key)
+    }
 
-  hiddenGroups.value = next
-  explicitlyShownValueSeries.value = nextExplicitlyShown
+    hiddenGroups.value = next
+    explicitlyShownValueSeries.value = nextExplicitlyShown
+  })
 }
 
 function toggleAllValueSeries() {
-  const next = new Set(hiddenGroups.value)
-  const nextExplicitlyShown = new Set<string>()
+  scheduleChartAction(() => {
+    const next = new Set(hiddenGroups.value)
+    const nextExplicitlyShown = new Set<string>()
 
-  if (allValueSeriesHidden.value) {
-    filteredLegendRows.value.forEach(({ series, originalIndex }) => {
-      next.delete(series.key)
-      if (originalIndex >= MAX_RENDERED_SERIES) nextExplicitlyShown.add(series.key)
-    })
-  } else {
-    for (const series of valueSeriesSummaries.value) next.add(series.key)
-  }
+    if (allValueSeriesHidden.value) {
+      filteredLegendRows.value.forEach(({ series, originalIndex }) => {
+        next.delete(series.key)
+        if (originalIndex >= MAX_RENDERED_SERIES) nextExplicitlyShown.add(series.key)
+      })
+    } else {
+      for (const series of valueSeriesSummaries.value) next.add(series.key)
+    }
 
-  hiddenGroups.value = next
-  explicitlyShownValueSeries.value = nextExplicitlyShown
+    hiddenGroups.value = next
+    explicitlyShownValueSeries.value = nextExplicitlyShown
+  })
 }
 
 function togglePieSliceVisibility(label: string) {
-  const next = new Set(hiddenGroups.value)
-  const key = getPieHiddenKey(label)
+  scheduleChartAction(() => {
+    const next = new Set(hiddenGroups.value)
+    const key = getPieHiddenKey(label)
 
-  if (next.has(key)) {
-    next.delete(key)
-  } else {
-    next.add(key)
-  }
+    if (next.has(key)) {
+      next.delete(key)
+    } else {
+      next.add(key)
+    }
 
-  hiddenGroups.value = next
+    hiddenGroups.value = next
+  })
 }
 
 function toggleAllPieSlices() {
-  const next = new Set(hiddenGroups.value)
+  scheduleChartAction(() => {
+    const next = new Set(hiddenGroups.value)
 
-  if (allPieSlicesHidden.value) {
-    for (const row of pieLegendRows.value) next.delete(getPieHiddenKey(row.label))
-  } else {
-    for (const row of pieLegendRows.value) next.add(getPieHiddenKey(row.label))
-  }
+    if (allPieSlicesHidden.value) {
+      for (const row of pieLegendRows.value) next.delete(getPieHiddenKey(row.label))
+    } else {
+      for (const row of pieLegendRows.value) next.add(getPieHiddenKey(row.label))
+    }
 
-  hiddenGroups.value = next
+    hiddenGroups.value = next
+  })
 }
 
 function startLegendResize(event: MouseEvent) {
@@ -2021,6 +2145,23 @@ function pageTimeSelection(direction: -1 | 1) {
   timeSelectionEnd.value = nextEnd
 }
 
+function onTimeSelectionKeydown(event: KeyboardEvent) {
+  if (!hasTimeSelection.value || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
+
+  if (event.key === 'Escape') {
+    scheduleChartAction(resetTimeSelection)
+  } else if (event.key === 'ArrowLeft') {
+    scheduleChartAction(() => pageTimeSelection(-1))
+  } else if (event.key === 'ArrowRight') {
+    scheduleChartAction(() => pageTimeSelection(1))
+  } else {
+    return
+  }
+
+  event.preventDefault()
+  event.stopPropagation()
+}
+
 function hasOriginalDataInRange(startMs: number, endMs: number): boolean {
   if (!timeColumn.value) return false
   const rows = props.originalData ?? props.data
@@ -2113,12 +2254,18 @@ function endTimeSelectionDrag() {
   if (!hasOriginalDataInRange(Math.min(startMs, endMs), Math.max(startMs, endMs))) return
   timeSelectionStart.value = Math.min(startMs, endMs)
   timeSelectionEnd.value = Math.max(startMs, endMs)
+  nextTick(() => chartContainerRef.value?.focus({ preventScroll: true }))
 }
 
 onBeforeUnmount(() => {
   if (debounceTimer) clearTimeout(debounceTimer)
   if (resizeTimer) clearTimeout(resizeTimer)
   if (legendFilterHoverTimer) clearTimeout(legendFilterHoverTimer)
+  for (const timer of chartProcessingTimers) clearTimeout(timer)
+  for (const frameId of chartActionFrameIds) cancelAnimationFrame(frameId)
+  chartProcessingTimers.clear()
+  chartActionFrameIds.clear()
+  pendingChartActions = []
   window.removeEventListener('mousemove', updateTimeSelectionDrag)
   window.removeEventListener('mouseup', endTimeSelectionDrag)
   window.removeEventListener('mousemove', updateLegendResize)
@@ -2146,7 +2293,8 @@ onMounted(() => {
       <div class="control-group">
         <label>Time Column:</label>
         <Select
-          v-model="timeColumn"
+          :model-value="timeColumn"
+          @update:model-value="updateTimeColumn"
           :options="timeColumns"
           placeholder="Select time column"
           class="control-select"
@@ -2157,19 +2305,20 @@ onMounted(() => {
       <div class="control-group">
         <label>Aggregation:</label>
         <Select
-          v-model="bucketSize"
+          :model-value="bucketSize"
+          @update:model-value="updateBucketSize"
           :options="bucketOptions"
           optionLabel="label"
           optionValue="value"
           class="control-select"
-          @change="onBucketChange"
         />
       </div>
       
       <div class="control-group">
         <label>Group By:</label>
         <MultiSelect
-          v-model="groupColumns"
+          :model-value="groupColumns"
+          @update:model-value="updateGroupColumns"
           :options="groupMultiSelectOptions"
           optionLabel="label"
           optionValue="value"
@@ -2183,7 +2332,8 @@ onMounted(() => {
       <div class="control-group">
         <label>Values:</label>
         <MultiSelect
-          v-model="valueColumns"
+          :model-value="valueColumns"
+          @update:model-value="updateValueColumns"
           :options="numericColumns"
           placeholder="None"
           class="control-select multi-control"
@@ -2195,7 +2345,8 @@ onMounted(() => {
       <div class="control-group">
         <label>Value Agg:</label>
         <Select
-          v-model="valueAgg"
+          :model-value="valueAgg"
+          @update:model-value="updateValueAggregation"
           :options="valueAggOptions"
           optionLabel="label"
           optionValue="value"
@@ -2205,33 +2356,34 @@ onMounted(() => {
 
       <label class="control-group toggle-control">
         <span>Count</span>
-        <ToggleSwitch v-model="showCount" aria-label="Toggle count" />
+        <ToggleSwitch :model-value="showCount" @update:model-value="updateBooleanChartOption('count', $event)" aria-label="Toggle count" />
       </label>
 
       <label class="control-group toggle-control">
         <span>Sum</span>
-        <ToggleSwitch v-model="showValueSum" :disabled="valueColumns.length === 0 || stacked" aria-label="Toggle sum" />
+        <ToggleSwitch :model-value="showValueSum" @update:model-value="updateBooleanChartOption('sum', $event)" :disabled="valueColumns.length === 0 || stacked" aria-label="Toggle sum" />
       </label>
 
       <label class="control-group toggle-control">
         <span>Stack</span>
-        <ToggleSwitch v-model="stacked" :disabled="valueColumns.length === 0" aria-label="Toggle stacked chart" />
+        <ToggleSwitch :model-value="stacked" @update:model-value="updateBooleanChartOption('stack', $event)" :disabled="valueColumns.length === 0" aria-label="Toggle stacked chart" />
       </label>
 
       <label class="control-group toggle-control">
         <span>Bar</span>
-        <ToggleSwitch v-model="barChart" :disabled="valueColumns.length === 0" aria-label="Toggle bar chart" />
+        <ToggleSwitch :model-value="barChart" @update:model-value="updateBooleanChartOption('bar', $event)" :disabled="valueColumns.length === 0" aria-label="Toggle bar chart" />
       </label>
 
       <label class="control-group toggle-control">
         <span>Pie</span>
-        <ToggleSwitch v-model="pieChartsControl" :disabled="!hasUsableTimeSeriesAxis" aria-label="Toggle pie charts" />
+        <ToggleSwitch :model-value="pieChartsControl" @update:model-value="updateBooleanChartOption('pie', $event)" :disabled="!hasUsableTimeSeriesAxis" aria-label="Toggle pie charts" />
       </label>
 
       <div v-if="renderPieCharts" class="control-group">
         <label>Per Row:</label>
         <Select
-          v-model="pieChartsPerRow"
+          :model-value="pieChartsPerRow"
+          @update:model-value="updatePieChartsPerRow"
           :options="pieChartsPerRowOptions"
           optionLabel="label"
           optionValue="value"
@@ -2264,7 +2416,15 @@ onMounted(() => {
       v-if="chartHasData"
     >
       <div v-if="renderTimeSeriesChart" class="time-series-row">
-        <div ref="chartContainerRef" class="chart-container" @mousedown.capture="startTimeSelectionDrag">
+        <div
+          ref="chartContainerRef"
+          class="chart-container"
+          tabindex="0"
+          aria-label="Time series chart"
+          :aria-busy="isChartProcessing"
+          @mousedown.capture="startTimeSelectionDrag"
+          @keydown="onTimeSelectionKeydown"
+        >
           <Bar
             ref="chartRef"
             :data="chartJsData"
@@ -2275,13 +2435,13 @@ onMounted(() => {
           />
           <div v-if="isDraggingSelection" class="selection-overlay" :style="dragOverlayStyle" />
           <div v-else-if="hasTimeSelection" class="selection-overlay persistent-selection" :style="persistentSelectionStyle">
-            <div class="selection-actions" @mousedown.stop>
+            <div v-show="!isChartProcessing" class="selection-actions" @mousedown.stop>
               <Button
                 icon="pi pi-angle-double-left"
                 rounded
                 outlined
                 severity="secondary"
-                @click.stop="pageTimeSelection(-1)"
+                @click.stop="scheduleChartAction(() => pageTimeSelection(-1))"
                 v-tooltip.top="'Page left by half a page'"
                 aria-label="Page selection left"
               />
@@ -2290,7 +2450,7 @@ onMounted(() => {
                 rounded
                 outlined
                 severity="secondary"
-                @click.stop="resetTimeSelection"
+                @click.stop="scheduleChartAction(resetTimeSelection)"
                 v-tooltip.top="'Cancel selection'"
                 aria-label="Cancel selection"
               />
@@ -2299,11 +2459,19 @@ onMounted(() => {
                 rounded
                 outlined
                 severity="secondary"
-                @click.stop="pageTimeSelection(1)"
+                @click.stop="scheduleChartAction(() => pageTimeSelection(1))"
                 v-tooltip.top="'Page right by half a page'"
                 aria-label="Page selection right"
               />
             </div>
+          </div>
+          <div
+            v-if="isChartProcessing"
+            class="chart-processing-indicator"
+            role="status"
+            aria-label="Rendering chart"
+          >
+            <i class="pi pi-spinner pi-spin" aria-hidden="true" />
           </div>
         </div>
 
@@ -3028,6 +3196,22 @@ onMounted(() => {
 .chart-container:hover .selection-actions,
 .selection-actions:focus-within {
   opacity: 1;
+}
+
+.chart-processing-indicator {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 6;
+  display: grid;
+  width: 2.25rem;
+  height: 2.25rem;
+  place-items: center;
+  color: var(--tdv-primary-color);
+  background: color-mix(in srgb, var(--tdv-surface) 72%, transparent);
+  border: 1px solid var(--tdv-surface-border);
+  border-radius: 50%;
+  pointer-events: none;
 }
 
 :deep(.selection-actions .p-button) {
