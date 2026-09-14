@@ -14,6 +14,7 @@ import {
   LineElement,
   LineController,
   PointElement,
+  Filler,
   Title,
   Tooltip,
   Legend,
@@ -49,6 +50,7 @@ ChartJS.register(
   LineElement,
   LineController,
   PointElement,
+  Filler,
   Title,
   Tooltip,
   Legend
@@ -291,6 +293,8 @@ const chartContainerRef = ref<HTMLElement | null>(null)
 const chartAreaVersion = ref(0)
 const isChartProcessing = ref(false)
 let chartResizeObserver: ResizeObserver | null = null
+let selectionOverlaySyncFrame: number | null = null
+let lastSelectionOverlayGeometry = ''
 const isDraggingSelection = ref(false)
 const dragStartClientX = ref(0)
 const dragCurrentClientX = ref(0)
@@ -324,6 +328,40 @@ function requestChartActionFrame(callback: () => void) {
     callback()
   })
   chartActionFrameIds.add(frameId)
+}
+
+function syncSelectionOverlayGeometry(chart = chartRef.value?.chart) {
+  const area = chart?.chartArea
+  const canvas = chart?.canvas as HTMLCanvasElement | undefined
+  const container = chartContainerRef.value
+  if (!area || !canvas || !container) return
+
+  const canvasRect = canvas.getBoundingClientRect()
+  const containerRect = container.getBoundingClientRect()
+  const geometry = [
+    canvasRect.left - containerRect.left,
+    area.left,
+    area.right,
+  ].map(value => value.toFixed(2)).join(':')
+
+  if (geometry === lastSelectionOverlayGeometry) return
+  lastSelectionOverlayGeometry = geometry
+  chartAreaVersion.value++
+}
+
+function scheduleSelectionOverlaySync(chart = chartRef.value?.chart) {
+  if (selectionOverlaySyncFrame != null) cancelAnimationFrame(selectionOverlaySyncFrame)
+  selectionOverlaySyncFrame = requestAnimationFrame(() => {
+    selectionOverlaySyncFrame = null
+    syncSelectionOverlayGeometry(chart)
+  })
+}
+
+const selectionOverlaySyncPlugin: Plugin<'bar'> = {
+  id: 'treedocSelectionOverlaySync',
+  afterLayout(chart) {
+    scheduleSelectionOverlaySync(chart)
+  },
 }
 
 function finishChartProcessing(generation: number) {
@@ -2263,6 +2301,7 @@ onBeforeUnmount(() => {
   if (legendFilterHoverTimer) clearTimeout(legendFilterHoverTimer)
   for (const timer of chartProcessingTimers) clearTimeout(timer)
   for (const frameId of chartActionFrameIds) cancelAnimationFrame(frameId)
+  if (selectionOverlaySyncFrame != null) cancelAnimationFrame(selectionOverlaySyncFrame)
   chartProcessingTimers.clear()
   chartActionFrameIds.clear()
   pendingChartActions = []
@@ -2279,9 +2318,7 @@ onBeforeUnmount(() => {
 onMounted(() => {
   if (typeof ResizeObserver === 'undefined' || !chartContainerRef.value) return
   chartResizeObserver = new ResizeObserver(() => {
-    requestAnimationFrame(() => {
-      chartAreaVersion.value++
-    })
+    scheduleSelectionOverlaySync()
   })
   chartResizeObserver.observe(chartContainerRef.value)
 })
@@ -2429,7 +2466,7 @@ onMounted(() => {
             ref="chartRef"
             :data="chartJsData"
             :options="chartOptions"
-            :plugins="[timeGridPlugin, crosshairPlugin]"
+            :plugins="[timeGridPlugin, crosshairPlugin, selectionOverlaySyncPlugin]"
             dataset-id-key="seriesKey"
             :update-mode="CHART_UPDATE_MODE"
           />
