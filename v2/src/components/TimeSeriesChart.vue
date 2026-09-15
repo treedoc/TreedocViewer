@@ -2347,6 +2347,7 @@ onMounted(() => {
           :options="bucketOptions"
           optionLabel="label"
           optionValue="value"
+          scrollHeight="22rem"
           class="control-select"
         />
       </div>
