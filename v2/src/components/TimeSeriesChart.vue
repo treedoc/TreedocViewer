@@ -1655,6 +1655,8 @@ const chartJsData = computed<ChartData<'bar'>>(() => {
         return { x: bucket.time.getTime(), y: value }
       }),
       type: barChart.value ? 'bar' as const : 'line' as const,
+      // Connect observations across missing buckets without filling their values.
+      spanGaps: true,
       borderColor: color.border,
       backgroundColor: color.bg,
       borderWidth: 2,
@@ -1694,6 +1696,7 @@ const chartJsData = computed<ChartData<'bar'>>(() => {
         return { x: bucket.time.getTime(), y: count > 0 ? sum : null }
       }),
       type: 'line' as const,
+      spanGaps: true,
       borderColor: 'rgba(17, 24, 39, 1)',
       backgroundColor: 'rgba(17, 24, 39, 0.14)',
       borderWidth: 3,
