@@ -120,6 +120,12 @@ export const DATE_PATTERNS: DatePattern[] = [
     // Date only: 2026-03-23
     name: 'Date only',
     regex: /^\d{4}-\d{2}-\d{2}$/,
+    parse: (match) => {
+      // A calendar date has no timezone; match the chart's local calendar buckets.
+      const [year, month, day] = match[0].split('-').map(Number)
+      const d = new Date(year, month - 1, day)
+      return isValidDate(d) ? d : null
+    },
     format: (date) => formatLocalDateTime(date, '-', false, ''),
     sortable: true,
   },

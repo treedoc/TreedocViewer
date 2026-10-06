@@ -66,3 +66,21 @@ describe('DateUtil date format metadata', () => {
     expect(result).toContain('UTC')
   })
 })
+
+
+describe('date-only calendar values', () => {
+  it.each(['2026-09-05', '2026-03-08', '2026-11-01', '2026-01-01'])(
+    'keeps %s at local midnight and preserves its calendar label', (value) => {
+      const date = tryParseDate(value)!
+      const [year, month, day] = value.split('-').map(Number)
+      expect([date.getFullYear(), date.getMonth() + 1, date.getDate(), date.getHours()])
+        .toEqual([year, month, day, 0])
+      expect(formatDateLikeOriginal(date, detectDateFormat(value))).toBe(value)
+    },
+  )
+
+  it('still treats explicit UTC timestamps as instants', () => {
+    expect(tryParseDate('2026-09-05T00:00:00Z')!.toISOString())
+      .toBe('2026-09-05T00:00:00.000Z')
+  })
+})
