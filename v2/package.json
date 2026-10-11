@@ -30,6 +30,7 @@
     "chartjs-adapter-date-fns": "^3.0.0",
     "codemirror": "^6.0.1",
     "date-fns": "^4.4.0",
+    "hcl2-parser": "^1.0.3",
     "lodash-es": "^4.18.1",
     "pinia": "^3.0.4",
     "primeicons": "^7.0.0",

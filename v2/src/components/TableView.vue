@@ -2159,7 +2159,7 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
     <input
       ref="fileInputRef"
       type="file"
-      accept=".json,.txt,.xml,.yaml,.yml,.csv,.log,*"
+      accept=".json,.txt,.xml,.yaml,.yml,.csv,.log,.hcl,.tf,.tfvars,*"
       style="display: none"
       @change="handleFileSelect"
     />

@@ -12,7 +12,7 @@ export interface ParseResult {
   message: string
 }
 
-export type ParserSyntax = 'json' | 'xml' | 'yaml' | 'text' | 'csv' | 'prometheus'
+export type ParserSyntax = 'json' | 'xml' | 'yaml' | 'text' | 'csv' | 'prometheus' | 'hcl'
 
 export interface ParserPlugin<TOpt = unknown> {
   name: string

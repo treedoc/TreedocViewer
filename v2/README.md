@@ -1,6 +1,6 @@
 # TreeDoc Viewer v2
 
-A modern, feature-rich viewer for hierarchical data formats (JSON, YAML, XML, CSV) built with Vue 3, PrimeVue, and TypeScript.
+A modern, feature-rich viewer for hierarchical data formats (JSON, YAML, XML, CSV, HCL) built with Vue 3, PrimeVue, and TypeScript.
 
 ![TreeDoc Viewer Screenshot](screenshot.png)
 
@@ -20,6 +20,7 @@ A modern, feature-rich viewer for hierarchical data formats (JSON, YAML, XML, CS
 ### Multiple Format Support
 - JSON / JSON5 / JSONEX
 - YAML (including multi-document)
+- HCL2 / Terraform (`.hcl`, `.tf`, `.tfvars`): auto-detection, labeled and repeated blocks, collections, comments, and heredocs. Expressions are preserved as strings, not evaluated. Blocks become arrays grouped by type and labels; parsed data is exported as JSON. HCL source downloads retain the original text.
 - XML / HTML
 - CSV / TSV / SSV (space-separated)
 - Java `Map.toString()` format

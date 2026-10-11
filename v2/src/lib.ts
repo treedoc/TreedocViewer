@@ -1,3 +1,4 @@
+import HCLParserPlugin from './parsers/HCLParserPlugin'
 // TreeDoc Viewer v2 - Library exports
 import type { App } from 'vue'
 
@@ -67,6 +68,7 @@ export {
   JSONParserPlugin,
   JSONParserType,
   YAMLParserPlugin,
+  HCLParserPlugin,
   XMLParserPlugin,
   CSVParserPlugin,
 }

@@ -84,6 +84,9 @@ const extensions = computed(() => {
   
   const syntax = selectedParser.value?.syntax || 'json'
   switch (syntax) {
+    case 'hcl':
+      // HCL source stays plain text; JavaScript highlighting mislabels its syntax.
+      break
     case 'xml':
       exts.push(xml())
       break
@@ -191,6 +194,7 @@ function saveAs() {
       const syntax = selectedParser.value.syntax?.toLowerCase();
       if (syntax === 'xml') extension = 'xml';
       else if (syntax === 'yaml') extension = 'yaml';
+      else if (syntax === 'hcl') extension = 'hcl';
       else if (syntax === 'csv') extension = 'csv';
       else if (selectedParser.value.name.toLowerCase().includes('prometheus')) extension = 'prom';
       else if (selectedParser.value.name.toLowerCase().includes('textproto')) extension = 'textproto';
