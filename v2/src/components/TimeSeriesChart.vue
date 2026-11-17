@@ -145,7 +145,6 @@ interface SeriesSummary {
   name: string
   valueColumn?: string
   groupParts: string[]
-  colorIndex: number
   max: number
   mean: number
   last: number
@@ -305,7 +304,6 @@ const MAX_RENDERED_SERIES = 200
 const MIN_BAR_WIDTH_PX = 4
 const TOOLTIP_SINGLE_SERIES_THRESHOLD = 50
 const DEBOUNCE_MS = 250
-const CHART_UPDATE_MODE = 'none'
 const LEGEND_VISIBILITY_COL_WIDTH = 26
 const LEGEND_COLOR_COL_WIDTH = 16
 const LEGEND_COLUMN_DEFAULT_WIDTHS: Record<string, number> = {
@@ -866,6 +864,12 @@ const groupedCountEnabled = computed(() => {
     && visibleCountGroupKeys.value.length <= MAX_RENDERED_SERIES
 })
 
+// Derive palette slots from full data and stable keys, never selected-range ranks.
+const paletteGroupKeys = computed(() => {
+  const keys = new Set((props.originalData ?? props.data).map(row => getGroupKey(getGroupParts(row))))
+  return new Map([...keys].sort().map((key, index) => [key, index]))
+})
+
 const pieGroupLabels = computed(() => {
   const labels = new Set<string>()
   for (const row of props.data) labels.add(getGroupKey(getGroupParts(row)))
@@ -1050,16 +1054,12 @@ const valueSeriesSummaries = computed<SeriesSummary[]>(() => {
       name: data.groupParts.length ? `${data.valueColumn} | ${data.groupParts.join(' | ')}` : data.valueColumn,
       valueColumn: data.valueColumn,
       groupParts: data.groupParts,
-      colorIndex: 0,
       max: stats.max,
       mean: stats.mean,
       last: stats.last,
       increase: stats.increase
     }
-  }).sort((a, b) => b.max - a.max).map((summary, index) => ({
-    ...summary,
-    colorIndex: index,
-  }))
+  }).sort((a, b) => b.max - a.max)
 })
 
 function isValueSeriesVisible(series: SeriesSummary, index: number): boolean {
@@ -1492,11 +1492,14 @@ function getUnitDuration(unit: TimeUnit): number {
 }
 
 function getSeriesColor(series: SeriesSummary) {
-  return customizedColor(series.key, colorPalette[(series.colorIndex + 2) % colorPalette.length])
+  const groupIndex = paletteGroupKeys.value.get(getGroupKey(series.groupParts)) ?? 0
+  const columnIndex = Math.max(0, effectiveValueColumns.value.indexOf(series.valueColumn || ''))
+  const index = columnIndex * paletteGroupKeys.value.size + groupIndex
+  return customizedColor(series.key, colorPalette[(index + 2) % colorPalette.length])
 }
 
 function getPieGroupColor(label: string) {
-  const index = Math.max(0, pieGroupLabels.value.indexOf(label))
+  const index = paletteGroupKeys.value.get(label) ?? 0
   return customizedColor(`pie:${label}`, colorPalette[index % colorPalette.length])
 }
 
@@ -1729,7 +1732,7 @@ const chartJsData = computed<ChartData<'bar'>>(() => {
   if (showCount.value) {
     if (groupedCountEnabled.value) {
       visibleCountGroupKeys.value.forEach((group, index) => {
-        const color = colorPalette[index % colorPalette.length]
+        const color = colorPalette[(paletteGroupKeys.value.get(group) ?? 0) % colorPalette.length]
         const key = `count:${group}`
         datasets.push({
           label: group,
@@ -1774,6 +1777,8 @@ const chartJsData = computed<ChartData<'bar'>>(() => {
       spanGaps: true,
       borderColor: color.border,
       backgroundColor: color.bg,
+      hoverBackgroundColor: color.bg,
+      hoverBorderColor: color.border,
       borderWidth: 2,
       pointRadius: 2,
       pointBackgroundColor: color.border,
@@ -1835,6 +1840,7 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => {
   const options: ChartOptions<'bar'> = {
     responsive: true,
     maintainAspectRatio: false,
+    // Normal updates refresh Chart.js shared point/bar styles; animation stays off.
     animation: false,
     parsing: false,
     normalized: true,
@@ -1875,7 +1881,7 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => {
 
       if (chart.$tdvHighlightedTooltipDatasetIndex !== nextDatasetIndex) {
         chart.$tdvHighlightedTooltipDatasetIndex = nextDatasetIndex
-        chart.update('none')
+        chart.update()
       }
     },
     plugins: {
@@ -2591,7 +2597,6 @@ onMounted(() => {
             :options="chartOptions"
             :plugins="[timeGridPlugin, thresholdPlugin, crosshairPlugin, selectionOverlaySyncPlugin]"
             dataset-id-key="seriesKey"
-            :update-mode="CHART_UPDATE_MODE"
           />
           <div v-if="isDraggingSelection" class="selection-overlay" :style="dragOverlayStyle" />
           <div v-else-if="hasTimeSelection" class="selection-overlay persistent-selection" :style="persistentSelectionStyle">
@@ -2828,7 +2833,6 @@ onMounted(() => {
                 :data="pieChart.data"
                 :options="pieOptions"
                 dataset-id-key="label"
-                :update-mode="CHART_UPDATE_MODE"
               />
             </div>
           </section>

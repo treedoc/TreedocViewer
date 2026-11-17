@@ -315,3 +315,7 @@ Each threshold has an eye toggle in its legend row and in Legend settings. Hidde
 thresholds retain their name, color, value, bounds and guards, and remain listed
 so they can be shown again. Hiding a threshold removes its line, band and axis
 range contribution. Visibility persists as `thresholds[].visible` (default true).
+
+Series palette assignments follow stable keys from the full dataset, so zooming
+or changing legend rankings preserves each series' color. Custom colors update
+line points, lines, bars and pie slices together with their legend swatches.

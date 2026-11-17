@@ -180,3 +180,62 @@ test('threshold visibility can be toggled from legend and settings while preserv
   await thresholds.getByRole('button', { name: 'Show threshold High', exact: true }).click();
   await expect(thresholds.locator('tbody tr.hidden')).toHaveCount(0);
 });
+
+for (const barChart of [false, true]) {
+  test(`${barChart ? 'bars' : 'line points'} keep rendered colors in sync through edits, hover and zoom`, async ({ page }) => {
+    await openChart(page, { barChart });
+    const canvas = page.locator('.time-series-chart canvas').first();
+    const swatch = page.getByRole('button', { name: 'Change color for cost | east | SavingsPlan', exact: true });
+    const otherSwatch = page.getByRole('button', { name: 'Change color for cost | east | OnDemand', exact: true });
+    const originalOtherColor = await otherSwatch.evaluate(element => getComputedStyle(element).backgroundColor);
+    for (const color of ['123abc', 'a12543']) {
+      await swatch.click();
+      await page.getByRole('textbox', { name: 'Hex color', exact: true }).fill(color);
+      await page.getByRole('textbox', { name: 'Hex color', exact: true }).press('Escape');
+      await expect.poll(() => renderedSeriesColors(canvas, 'value:cost:east | SavingsPlan')).toEqual({
+        border: `#${color}`, elements: [barChart ? `#${color}66` : `#${color}`],
+      });
+    }
+    // Zoom to the final day, reversing the two series' Max ranking.
+    const selection = await canvas.evaluate((element: any) => {
+      const chart = element.__vueParentComponent.exposed.chart.value;
+      const x = chart.scales.x;
+      const bounds = element.getBoundingClientRect();
+      const time = new Date(2026, 9, 3).getTime();
+      return { left: bounds.left + x.getPixelForValue(time - 3600000),
+        right: bounds.left + x.getPixelForValue(time + 3600000), y: bounds.top + chart.chartArea.top + 30 };
+    });
+    await page.mouse.move(selection.left, selection.y);
+    await page.mouse.down();
+    await page.mouse.move(selection.right, selection.y);
+    await page.mouse.up();
+    await expect(page.locator('.persistent-selection')).toBeVisible();
+    await expect(otherSwatch).toHaveCSS('background-color', originalOtherColor);
+    await expect(swatch).toHaveCSS('background-color', 'rgb(161, 37, 67)');
+    await expect.poll(() => renderedSeriesColors(canvas, 'value:cost:east | SavingsPlan')).toEqual({
+      border: '#a12543', elements: ['#a12543' + (barChart ? '66' : '')],
+    });
+    // Pointer hover must not reintroduce cached colors.
+    const bounds = (await canvas.boundingBox())!;
+    await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+    await expect.poll(() => renderedSeriesColors(canvas, 'value:cost:east | SavingsPlan')).toEqual({
+      border: '#a12543', elements: ['#a12543' + (barChart ? '66' : '')],
+    });
+    await page.getByRole('button', { name: 'Cancel selection', exact: true }).click();
+    await expect(otherSwatch).toHaveCSS('background-color', originalOtherColor);
+    await page.getByRole('switch', { name: 'Toggle bar chart', exact: true }).click();
+    await expect.poll(() => renderedSeriesColors(canvas, 'value:cost:east | SavingsPlan')).toEqual({
+      border: '#a12543', elements: ['#a12543' + (barChart ? '' : '66')],
+    });
+  });
+}
+
+async function renderedSeriesColors(canvas: any, key: string) {
+  return canvas.evaluate((element: any, seriesKey: string) => {
+    const chart = element.__vueParentComponent.exposed.chart.value;
+    const index = chart.data.datasets.findIndex((dataset: any) => dataset.seriesKey === seriesKey);
+    const meta = chart.getDatasetMeta(index);
+    return { border: chart.data.datasets[index].borderColor,
+      elements: [...new Set(meta.data.map((point: any) => point.options.backgroundColor))] };
+  }, key);
+}
