@@ -161,6 +161,9 @@ const chartPieChartsPerRow = ref(3)
 const chartTimeSelectionStart = ref<number | null>(null)
 const chartTimeSelectionEnd = ref<number | null>(null)
 const chartTimeSelectionColumn = ref('')
+const chartSeriesColors = ref<Record<string, string>>({})
+const chartThresholds = ref<ChartState['thresholds']>([])
+const chartLegendColumns = ref<string[] | undefined>()
 const chartHeight = ref(250)
 const isResizingChartHeight = ref(false)
 let chartResizeStartY = 0
@@ -444,6 +447,9 @@ const isApplyingPreset = ref(false)
 // Apply a ChartState (from per-node cache or from a preset/share-link) to the
 // chart-related refs. Centralized so the restore path and preset path stay in sync.
 function applyChartState(cs: ChartState) {
+  chartSeriesColors.value = cs.seriesColors ?? {}
+  chartThresholds.value = cs.thresholds ?? []
+  chartLegendColumns.value = cs.legendColumns
   chartTimeColumn.value = cs.timeColumn ?? ''
   chartValueColumns.value = cs.valueColumns ?? []
   chartGroupColumns.value = cs.groupColumns ?? []
@@ -2051,6 +2057,9 @@ function saveCurrentTableState() {
         timeSelectionStart: chartTimeSelectionStart.value,
         timeSelectionEnd: chartTimeSelectionEnd.value,
         timeSelectionColumn: chartTimeSelectionColumn.value,
+        thresholds: chartThresholds.value,
+        seriesColors: chartSeriesColors.value,
+        legendColumns: chartLegendColumns.value,
         chartHeight: chartHeight.value
       }
     }
@@ -2387,6 +2396,12 @@ const whiteSpaceStyle = computed(() => (textWrap.value ? 'pre-wrap' : 'pre'))
       :original-data="tableData as any"
       :columns="columns as any"
       :show-status-model="chartShowStatus"
+      :thresholds="chartThresholds"
+      :series-colors="chartSeriesColors"
+      @update:thresholds="chartThresholds = $event"
+      @update:series-colors="chartSeriesColors = $event"
+      :legend-columns-model="chartLegendColumns"
+      @update:legend-columns="chartLegendColumns = $event"
       :chart-height="chartHeight"
       :time-column-model="chartTimeColumn"
       :value-columns-model="chartValueColumns"

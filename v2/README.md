@@ -266,3 +266,45 @@ v2/
 MIT License - See [LICENSE](../LICENSE.txt) for details.
 
 Copyright 2019-2026 Jianwu Chen
+
+### Chart thresholds and legend columns
+
+Pass thresholds through `option.globalRule.chartState.thresholds` (also supported
+by embedded `tdv-setOptions` and saved chart state):
+
+```json
+{
+  "thresholds": [
+    { "name": "Commitment", "value": 13272, "color": "#f59e0b", "start": "2026-10-04", "end": "2029-09-30", "valueColumn": "Cost", "bucketSize": "day", "valueAgg": "sum", "groupColumn": "PricingModel" },
+    { "name": "High", "value": 15000, "color": "#ef4444" }
+  ]
+}
+```
+
+Each threshold draws a dashed line and a translucent band up to the next higher
+active threshold (or the top of the value axis). The axis includes the thresholds.
+Name, color and value appear below the series legend. Optional start/end bounds
+are inclusive/exclusive; date-only bounds use the same local calendar as date-only
+chart data, while timestamps retain their explicit timezone. Optional metric,
+bucket, aggregation and grouping guards hide overlays when their units no longer
+match the chart. A guarded valueColumn requires it to be the sole selected metric.
+Thresholds use the value axis, not the row-count axis.
+
+The legend defaults to **Max** and **Last**. Its toolbar settings icon offers **Mean**,
+**Increase**, and all key columns. Increase is the last minus first observed value
+within the selected range, in the original units; gaps are not zero-filled and
+counter resets are not adjusted. A single observation has zero Increase.
+Single-valued key columns are hidden by default and omitted from hover labels.
+The header hover filter popup includes **Hide column**; use the toolbar picker to
+restore it. Column choices survive chart remounts and can be supplied as
+`chartState.legendColumns` (`name`, `group:0`, `group:1`, `max`, `last`, `mean`,
+`increase`; pie metrics use their `pie:*` keys).
+
+The **Legend settings** toolbar popup also adds, edits and removes threshold
+entries. **Apply thresholds** validates names and numeric values before updating
+the chart; existing date bounds and unit guards are retained. Click any series,
+pie-slice or threshold color swatch to open the color selector, with a hex input
+for exact colors. Colors update immediately and persist in chart state
+(`seriesColors` maps stable series keys to CSS colors). These viewer edits do not
+change the upstream Azure plan configuration. Bar charts automatically size bars
+to occupy available category space, leaving a small gap between neighboring bars.

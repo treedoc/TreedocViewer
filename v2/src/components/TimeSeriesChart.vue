@@ -29,12 +29,16 @@ import { detectTimeColumns, detectNumericColumns, detectGroupableColumns, detect
 import { formatDateLikeOriginal, formatLocalTooltipDateTime, tryParseDate } from '@/utils/DateUtil'
 import { getHtmlTooltipPosition, getTooltipDatasetLabel } from '@/utils/ChartTooltipUtil'
 import { getAdapterDaySpans, getAdapterGridTicks, isTimeUnitFinerThanDay, type ChartCalendarAdapter, type ChartTimeUnit } from '@/utils/ChartTimeGridUtil'
+import { thresholdBands } from '@/utils/ChartThresholdUtil'
+import ChartLegendConfig from './ChartLegendConfig.vue'
+import ChartColorPicker from './ChartColorPicker.vue'
+import { summarizeChartValues } from '@/utils/ChartLegendUtil'
 import Select from 'primevue/select'
 import MultiSelect from 'primevue/multiselect'
 import Button from 'primevue/button'
 import ToggleSwitch from 'primevue/toggleswitch'
 import BasicColumnFilterPopover from './BasicColumnFilterPopover.vue'
-import type { ChartShowStatus, FieldQuery } from '@/models/types'
+import type { ChartShowStatus, ChartThreshold, FieldQuery } from '@/models/types'
 import { matchFieldQuery } from '@/utils/QueryUtil'
 import { useThemeStore } from '@/stores/themeStore'
 
@@ -97,10 +101,16 @@ const props = defineProps<{
   pieChartsPerRowModel?: number
   timeSelectionStartModel?: number | null
   timeSelectionEndModel?: number | null
+  thresholds?: ChartThreshold[]
+  seriesColors?: Record<string, string>
+  legendColumnsModel?: string[]
   chartHeight?: number
 }>()
 
 const emit = defineEmits<{
+  'update:thresholds': [value: ChartThreshold[]]
+  'update:seriesColors': [value: Record<string, string>]
+  'update:legendColumns': [value: string[]]
   close: []
   'update:showStatus': [value: ChartShowStatus]
   'update:timeColumn': [value: string]
@@ -138,6 +148,8 @@ interface SeriesSummary {
   colorIndex: number
   max: number
   mean: number
+  last: number
+  increase: number
 }
 
 interface LegendRow {
@@ -218,6 +230,47 @@ const timeGridPlugin: Plugin<'bar'> = {
   },
 }
 
+const activeThresholds = computed(() => (props.thresholds ?? []).filter(threshold =>
+  Number.isFinite(threshold.value)
+  && (!threshold.valueColumn || (effectiveValueColumns.value.length === 1 && effectiveValueColumns.value.includes(threshold.valueColumn)))
+  && (!threshold.bucketSize || threshold.bucketSize === bucketSize.value)
+  && (!threshold.valueAgg || threshold.valueAgg === valueAgg.value)
+  && (!threshold.groupColumn || effectiveGroupColumns.value.includes(threshold.groupColumn))
+  && (!threshold.start || (tryParseDate(threshold.start)?.getTime() ?? NaN) <= (effectiveTimeRange.value.max ?? Infinity))
+  && (!threshold.end || (tryParseDate(threshold.end)?.getTime() ?? NaN) > (effectiveTimeRange.value.min ?? -Infinity))
+))
+
+const thresholdPlugin: Plugin<'bar'> = {
+  id: 'treedocThresholds',
+  beforeDatasetsDraw(chart) {
+    const { ctx, chartArea, scales } = chart
+    const x = scales.x, y = scales.y1
+    if (!x || !y) return
+    const bands = thresholdBands(activeThresholds.value, Number(x.min), Number(x.max))
+    ctx.save()
+    ctx.beginPath()
+    ctx.rect(chartArea.left, chartArea.top, chartArea.width, chartArea.height)
+    ctx.clip()
+    for (const band of bands) {
+      const left = x.getPixelForValue(band.start), right = x.getPixelForValue(band.end)
+      const bottom = y.getPixelForValue(band.value)
+      const top = band.upper == null ? chartArea.top : y.getPixelForValue(band.upper)
+      ctx.fillStyle = band.color
+      ctx.globalAlpha = 0.12
+      ctx.fillRect(left, top, right - left, bottom - top)
+      ctx.globalAlpha = 0.85
+      ctx.strokeStyle = band.color
+      ctx.lineWidth = 1
+      ctx.setLineDash([5, 3])
+      ctx.beginPath()
+      ctx.moveTo(left, bottom)
+      ctx.lineTo(right, bottom)
+      ctx.stroke()
+    }
+    ctx.restore()
+  },
+}
+
 interface PieChartConfig {
   key: string
   title: string
@@ -242,7 +295,7 @@ interface PieLegendTableRow {
   originalIndex: number
 }
 
-type LegendSortField = 'name' | 'max' | 'mean' | `group:${number}` | `pie:${string}`
+type LegendSortField = 'name' | 'max' | 'mean' | 'last' | 'increase' | `group:${number}` | `pie:${string}`
 type LegendSortOrder = 1 | -1
 type LegendColumnKey = LegendSortField
 
@@ -257,6 +310,8 @@ const LEGEND_COLUMN_DEFAULT_WIDTHS: Record<string, number> = {
   name: 130,
   max: 58,
   mean: 58,
+  last: 58,
+  increase: 72,
 }
 const LEGEND_COLUMN_MIN_WIDTHS: Record<string, number> = {
   name: 80,
@@ -907,13 +962,13 @@ const pieChartSources = computed<PieChartSource[]>(() => {
   return charts
 })
 
-const pieLegendMetricColumns = computed(() => pieChartSources.value.map(source => ({
+const allPieLegendMetricColumns = computed(() => pieChartSources.value.map(source => ({
   key: source.key as LegendSortField,
   title: source.title,
 })))
 
 const pieLegendRows = computed<PieLegendRow[]>(() => {
-  const metricKeys = pieLegendMetricColumns.value.map(column => column.key)
+  const metricKeys = allPieLegendMetricColumns.value.map(column => column.key)
 
   return pieSlices.value.map(slice => {
     const values: Record<string, number> = {}
@@ -934,11 +989,12 @@ const pieLegendRows = computed<PieLegendRow[]>(() => {
 })
 
 const allPieSlicesHidden = computed(() => pieLegendRows.value.length > 0 && pieLegendRows.value.every(row => !isPieSliceVisible(row.label)))
-const showPieLegendNameColumn = computed(() => effectiveGroupColumns.value.length === 0)
+const showPieLegendNameColumn = computed(() => selectedLegendColumns.value.includes('name'))
+const pieLegendMetricColumns = computed(() => allPieLegendMetricColumns.value.filter(column => selectedLegendColumns.value.includes(column.key)))
 
 const pieLegendResizableColumnKeys = computed<LegendColumnKey[]>(() => [
   ...(showPieLegendNameColumn.value ? ['name' as const] : []),
-  ...effectiveGroupColumns.value.map((_, index) => `group:${index}` as const),
+  ...visibleLegendGroups.value.map(column => column.key),
   ...pieLegendMetricColumns.value.map(column => column.key),
 ])
 
@@ -948,17 +1004,9 @@ const pieLegendTableWidth = computed(() => {
 })
 const pieLegendColumnCount = computed(() => {
   return 2
-    + (showPieLegendNameColumn.value ? 1 : effectiveGroupColumns.value.length)
+    + (showPieLegendNameColumn.value ? 1 : 0) + visibleLegendGroups.value.length
     + pieLegendMetricColumns.value.length
 })
-
-function aggregateValues(values: number[]): { max: number; mean: number } {
-  if (values.length === 0) return { max: 0, mean: 0 }
-  return {
-    max: Math.max(...values),
-    mean: values.reduce((sum, value) => sum + value, 0) / values.length
-  }
-}
 
 function getValueForStats(stats: { sum: number; count: number; max: number } | undefined): number | null {
   if (!stats || stats.count === 0) return null
@@ -971,6 +1019,9 @@ const valueSeriesSummaries = computed<SeriesSummary[]>(() => {
   const series = new Map<string, { valueColumn: string; groupParts: string[]; values: number[] }>()
 
   for (const bucket of chartBuckets.value) {
+    if (timeSelectionStart.value != null && timeSelectionEnd.value != null
+      && (bucket.time.getTime() < Math.min(timeSelectionStart.value, timeSelectionEnd.value)
+        || bucket.time.getTime() > Math.max(timeSelectionStart.value, timeSelectionEnd.value))) continue
     for (const column of effectiveValueColumns.value) {
       const groups = bucket.valueGroups[column] || {}
       for (const [groupKey, stats] of Object.entries(groups)) {
@@ -990,7 +1041,7 @@ const valueSeriesSummaries = computed<SeriesSummary[]>(() => {
   }
 
   return Array.from(series.entries()).map(([key, data]) => {
-    const stats = aggregateValues(data.values)
+    const stats = summarizeChartValues(data.values)
     return {
       key,
       kind: 'value' as const,
@@ -999,7 +1050,9 @@ const valueSeriesSummaries = computed<SeriesSummary[]>(() => {
       groupParts: data.groupParts,
       colorIndex: 0,
       max: stats.max,
-      mean: stats.mean
+      mean: stats.mean,
+      last: stats.last,
+      increase: stats.increase
     }
   }).sort((a, b) => b.max - a.max).map((summary, index) => ({
     ...summary,
@@ -1041,14 +1094,50 @@ const unstackedBarSeriesKeysByBucket = computed(() => {
 const hasVisibleValueSeries = computed(() => visibleValueSeries.value.length > 0)
 const totalSeriesCount = computed(() => countSeriesCount.value + visibleValueSeries.value.length + (showValueSum.value && hasVisibleValueSeries.value ? 1 : 0))
 const allValueSeriesHidden = computed(() => valueSeriesSummaries.value.length > 0 && valueSeriesSummaries.value.every((series, index) => !isValueSeriesVisible(series, index)))
-const showLegendNameColumn = computed(() => effectiveValueColumns.value.length > 1)
-
+const legendColumnSelection = ref<string[] | undefined>(props.legendColumnsModel)
+watch(() => props.legendColumnsModel, value => { legendColumnSelection.value = value })
+const metricColumns = [
+  { key: 'max', title: 'Max' }, { key: 'last', title: 'Last' },
+  { key: 'mean', title: 'Mean' }, { key: 'increase', title: 'Increase' },
+] as const
+const groupLegendColumns = computed(() => effectiveGroupColumns.value.map((title, index) => ({
+  title, index, key: `group:${index}` as const,
+  varying: new Set(props.data.map(row => getStringValue(row, title))).size > 1,
+})))
+const legendColumnOptions = computed(() => [
+  { key: 'name', title: 'Name' }, ...groupLegendColumns.value, ...metricColumns,
+  ...(showPieCharts.value ? allPieLegendMetricColumns.value : []),
+])
+const selectedLegendColumns = computed({
+  get: () => legendColumnSelection.value ?? [
+    ...(effectiveValueColumns.value.length > 1 || (showPieCharts.value && !effectiveGroupColumns.value.length) ? ['name'] : []),
+    ...groupLegendColumns.value.filter(column => column.varying).map(column => column.key), 'max', 'last',
+    ...allPieLegendMetricColumns.value.map(column => column.key),
+  ],
+  set: (value: string[]) => {
+    legendColumnSelection.value = value
+    emit('update:legendColumns', value)
+  },
+})
+const visibleLegendGroups = computed(() => groupLegendColumns.value.filter(column => selectedLegendColumns.value.includes(column.key)))
+const visibleLegendMetrics = computed(() => metricColumns.filter(column => selectedLegendColumns.value.includes(column.key)))
+const showLegendNameColumn = computed(() => selectedLegendColumns.value.includes('name'))
 const legendResizableColumnKeys = computed<LegendColumnKey[]>(() => [
   ...(showLegendNameColumn.value ? ['name' as const] : []),
-  ...effectiveGroupColumns.value.map((_, index) => `group:${index}` as const),
-  'max',
-  'mean',
+  ...visibleLegendGroups.value.map(column => column.key),
+  ...visibleLegendMetrics.value.map(column => column.key),
 ])
+
+function hideLegendColumn() {
+  selectedLegendColumns.value = selectedLegendColumns.value.filter(key => key !== activeLegendFilterField.value)
+  legendFilterPopoverRef.value?.hide()
+}
+
+function seriesTooltipLabel(series: SeriesSummary): string {
+  const parts = groupLegendColumns.value.filter(column => column.varying).map(column => series.groupParts[column.index])
+  if (effectiveValueColumns.value.length > 1) parts.unshift(series.valueColumn || '')
+  return parts.filter(Boolean).join(' | ') || series.valueColumn || 'Value'
+}
 
 function getLegendColumnWidth(key: LegendColumnKey): number {
   return legendColumnWidths.value[key] ?? LEGEND_COLUMN_DEFAULT_WIDTHS[key] ?? 120
@@ -1075,6 +1164,8 @@ const filteredLegendRows = computed<LegendRow[]>(() => {
 
       if (!matchesLegendMetricFilter('max', series.max)) return false
       if (!matchesLegendMetricFilter('mean', series.mean)) return false
+      if (!matchesLegendMetricFilter('last', series.last)) return false
+      if (!matchesLegendMetricFilter('increase', series.increase)) return false
       return true
     })
 
@@ -1102,7 +1193,7 @@ const filteredPieLegendRows = computed<PieLegendTableRow[]>(() => {
 
   let field = legendSortField.value
   if (!showPieLegendNameColumn.value && field === 'name') field = pieLegendMetricColumns.value[0]?.key || 'name'
-  if ((field === 'max' || field === 'mean' || field.startsWith('pie:')) && !metricKeys.has(field)) {
+  if ((field === 'max' || field === 'mean' || field === 'last' || field === 'increase' || field.startsWith('pie:')) && !metricKeys.has(field)) {
     field = pieLegendMetricColumns.value[0]?.key || 'name'
   }
   const order = legendSortOrder.value
@@ -1192,7 +1283,7 @@ function matchesLegendMetricFilter(field: LegendSortField, value: number): boole
 }
 
 function compareLegendRows(a: LegendRow, b: LegendRow, field: LegendSortField): number {
-  if (field === 'max' || field === 'mean') {
+  if (field === 'max' || field === 'mean' || field === 'last' || field === 'increase') {
     const diff = a.series[field] - b.series[field]
     return diff === 0 ? a.originalIndex - b.originalIndex : diff
   }
@@ -1237,7 +1328,7 @@ function setLegendSort(field: LegendSortField) {
       legendSortOrder.value = legendSortOrder.value === 1 ? -1 : 1
     } else {
       legendSortField.value = field
-      legendSortOrder.value = field === 'max' || field === 'mean' || field.startsWith('pie:') ? -1 : 1
+      legendSortOrder.value = field === 'max' || field === 'mean' || field === 'last' || field === 'increase' || field.startsWith('pie:') ? -1 : 1
     }
   })
 }
@@ -1399,12 +1490,25 @@ function getUnitDuration(unit: TimeUnit): number {
 }
 
 function getSeriesColor(series: SeriesSummary) {
-  return colorPalette[(series.colorIndex + 2) % colorPalette.length]
+  return customizedColor(series.key, colorPalette[(series.colorIndex + 2) % colorPalette.length])
 }
 
 function getPieGroupColor(label: string) {
   const index = Math.max(0, pieGroupLabels.value.indexOf(label))
-  return colorPalette[index % colorPalette.length]
+  return customizedColor(`pie:${label}`, colorPalette[index % colorPalette.length])
+}
+
+function setSeriesColor(key: string, color: string) {
+  emit('update:seriesColors', { ...props.seriesColors, [key]: color })
+}
+
+function setThresholdColor(threshold: ChartThreshold, color: string) {
+  emit('update:thresholds', (props.thresholds ?? []).map(item => item === threshold ? { ...item, color } : item))
+}
+
+function customizedColor(key: string, fallback: { bg: string; border: string }) {
+  const color = props.seriesColors?.[key]
+  return color ? { border: color, bg: /^#[0-9a-f]{6}$/i.test(color) ? `${color}66` : color } : fallback
 }
 
 function getPieData(title: string, valuesByLabel: Map<string, number>): ChartData<'pie'> {
@@ -1461,11 +1565,14 @@ const pieOptions = computed<ChartOptions<'pie'>>(() => ({
       borderColor: 'rgba(255, 255, 255, 0.18)',
       borderWidth: 1,
       callbacks: {
+        title: () => '',
         label: (item: any) => {
+          const parts = String(item.label).split(' | ')
+          const label = groupLegendColumns.value.filter(column => column.varying).map(column => parts[column.index]).join(' | ') || item.dataset.label
           const value = Number(item.raw || 0)
           const total = item.dataset.data.reduce((sum: number, next: number) => sum + Number(next || 0), 0)
           const percent = total > 0 ? ` (${((value / total) * 100).toFixed(1)}%)` : ''
-          return `${item.label}: ${formatMetric(value)}${percent}`
+          return `${label}: ${formatMetric(value)}${percent}`
         }
       }
     }
@@ -1619,6 +1726,7 @@ const chartJsData = computed<ChartData<'bar'>>(() => {
         const key = `count:${group}`
         datasets.push({
           label: group,
+          tooltipLabel: groupLegendColumns.value.filter(column => column.varying).map(column => group.split(' | ')[column.index]).join(' | ') || 'Row Count',
           data: chartBuckets.value.map(d => ({ x: d.time.getTime(), y: d.countGroups[group] || 0 })),
           backgroundColor: color.bg,
           borderColor: color.border,
@@ -1645,7 +1753,7 @@ const chartJsData = computed<ChartData<'bar'>>(() => {
     const color = getSeriesColor(series)
     datasets.push({
       label: `${valueAgg.value.toUpperCase()} ${series.name}`,
-      tooltipLabel: series.name,
+      tooltipLabel: seriesTooltipLabel(series),
       data: chartBuckets.value.map(bucket => {
         if (barChart.value && !stacked.value && !unstackedBarSeriesKeysByBucket.value.get(bucket.time.getTime())?.has(series.key)) {
           return { x: bucket.time.getTime(), y: null }
@@ -1671,10 +1779,9 @@ const chartJsData = computed<ChartData<'bar'>>(() => {
       tension: 0.1,
       fill: stacked.value,
       stack: stacked.value ? 'value-stack' : undefined,
-      barThickness: barChart.value ? MIN_BAR_WIDTH_PX : undefined,
-      maxBarThickness: barChart.value ? 18 : undefined,
+      // Let Chart.js fill available category space; skipNull keeps sparse groups wide.
       categoryPercentage: barChart.value ? 0.9 : undefined,
-      barPercentage: barChart.value ? 0.9 : undefined,
+      barPercentage: barChart.value ? 0.95 : undefined,
       skipNull: barChart.value && !stacked.value
     })
   })
@@ -1888,6 +1995,8 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => {
   
   if (effectiveValueColumns.value.length > 0) {
     (options.scales as any).y1 = {
+      suggestedMax: activeThresholds.value.length ? Math.max(...activeThresholds.value.map(t => t.value + Math.abs(t.value) * 0.05 + 1)) : undefined,
+      suggestedMin: activeThresholds.value.length ? Math.min(0, ...activeThresholds.value.map(t => t.value)) : undefined,
       type: 'linear',
       display: true,
       position: 'right',
@@ -2433,6 +2542,9 @@ onMounted(() => {
       </div>
 
       <div class="chart-actions">
+        <ChartLegendConfig :columns="legendColumnOptions" :selected-columns="selectedLegendColumns"
+          :thresholds="props.thresholds ?? []" @update:columns="selectedLegendColumns = $event"
+          @update:thresholds="emit('update:thresholds', $event)" />
         <Button
           :icon="isMaximized ? 'pi pi-window-minimize' : 'pi pi-window-maximize'"
           text
@@ -2470,7 +2582,7 @@ onMounted(() => {
             ref="chartRef"
             :data="chartJsData"
             :options="chartOptions"
-            :plugins="[timeGridPlugin, crosshairPlugin, selectionOverlaySyncPlugin]"
+            :plugins="[timeGridPlugin, thresholdPlugin, crosshairPlugin, selectionOverlaySyncPlugin]"
             dataset-id-key="seriesKey"
             :update-mode="CHART_UPDATE_MODE"
           />
@@ -2528,18 +2640,18 @@ onMounted(() => {
           class="value-legend"
           :style="{ width: `${legendWidth}px` }"
         >
+          <div class="legend-series-scroll">
           <table :style="{ minWidth: `${legendTableWidth}px` }">
             <colgroup>
               <col :style="{ width: `${LEGEND_VISIBILITY_COL_WIDTH}px` }" />
               <col :style="{ width: `${LEGEND_COLOR_COL_WIDTH}px` }" />
               <col v-if="showLegendNameColumn" :style="{ width: `${getLegendColumnWidth('name')}px` }" />
               <col
-                v-for="(_, groupIndex) in effectiveGroupColumns"
+                v-for="{ index: groupIndex } in visibleLegendGroups"
                 :key="`group-col:${groupIndex}`"
                 :style="{ width: `${getLegendColumnWidth(`group:${groupIndex}`)}px` }"
               />
-              <col :style="{ width: `${getLegendColumnWidth('max')}px` }" />
-              <col :style="{ width: `${getLegendColumnWidth('mean')}px` }" />
+              <col v-for="column in visibleLegendMetrics" :key="column.key" :style="{ width: `${getLegendColumnWidth(column.key)}px` }" />
             </colgroup>
             <thead>
               <tr>
@@ -2582,7 +2694,7 @@ onMounted(() => {
                   />
                 </th>
                 <th
-                  v-for="(groupColumnName, groupIndex) in effectiveGroupColumns"
+                  v-for="{ title: groupColumnName, index: groupIndex } in visibleLegendGroups"
                   :key="groupColumnName"
                   class="legend-filterable-header legend-resizable-header"
                   @mouseenter="onLegendHeaderMouseEnter($event, `group:${groupIndex}`, groupColumnName)"
@@ -2609,63 +2721,37 @@ onMounted(() => {
                     @mousedown="startLegendColumnResize($event, `group:${groupIndex}`)"
                   />
                 </th>
-                <th
+                <th v-for="column in visibleLegendMetrics" :key="column.key"
                   class="numeric-col legend-filterable-header legend-resizable-header"
-                  @mouseenter="onLegendHeaderMouseEnter($event, 'max', 'Max')"
+                  @mouseenter="onLegendHeaderMouseEnter($event, column.key, column.title)"
                   @mouseleave="cancelLegendFilterHover"
                 >
                   <div class="legend-header-content">
                     <button
                       type="button"
                       class="legend-sort-button numeric-sort"
-                      :class="{ 'has-filter': isLegendFilterActive('max'), 'has-disabled-filter': isLegendFilterDisabled('max') }"
-                      @click="setLegendSort('max')"
+                      :class="{ 'has-filter': isLegendFilterActive(column.key), 'has-disabled-filter': isLegendFilterDisabled(column.key) }"
+                      @click="setLegendSort(column.key)"
                     >
-                      <span>Max</span>
-                      <i :class="getLegendSortIcon('max')"></i>
+                      <span>{{ column.title }}</span>
+                      <i :class="getLegendSortIcon(column.key)"></i>
                     </button>
                     <i
                       class="pi pi-filter legend-filter-indicator"
-                      :class="{ active: isLegendFilterActive('max'), 'filter-disabled': isLegendFilterDisabled('max') }"
-                      @click.stop="showLegendFilterPopover($event, 'max', 'Max')"
+                      :class="{ active: isLegendFilterActive(column.key), 'filter-disabled': isLegendFilterDisabled(column.key) }"
+                      @click.stop="showLegendFilterPopover($event, column.key, column.title)"
                     ></i>
                   </div>
                   <span
                     class="legend-column-resize-handle"
-                    @mousedown="startLegendColumnResize($event, 'max')"
-                  />
-                </th>
-                <th
-                  class="numeric-col legend-filterable-header legend-resizable-header"
-                  @mouseenter="onLegendHeaderMouseEnter($event, 'mean', 'Mean')"
-                  @mouseleave="cancelLegendFilterHover"
-                >
-                  <div class="legend-header-content">
-                    <button
-                      type="button"
-                      class="legend-sort-button numeric-sort"
-                      :class="{ 'has-filter': isLegendFilterActive('mean'), 'has-disabled-filter': isLegendFilterDisabled('mean') }"
-                      @click="setLegendSort('mean')"
-                    >
-                      <span>Mean</span>
-                      <i :class="getLegendSortIcon('mean')"></i>
-                    </button>
-                    <i
-                      class="pi pi-filter legend-filter-indicator"
-                      :class="{ active: isLegendFilterActive('mean'), 'filter-disabled': isLegendFilterDisabled('mean') }"
-                      @click.stop="showLegendFilterPopover($event, 'mean', 'Mean')"
-                    ></i>
-                  </div>
-                  <span
-                    class="legend-column-resize-handle"
-                    @mousedown="startLegendColumnResize($event, 'mean')"
+                    @mousedown="startLegendColumnResize($event, column.key)"
                   />
                 </th>
               </tr>
             </thead>
             <tbody>
               <tr v-if="filteredLegendRows.length === 0">
-                <td class="legend-empty" :colspan="effectiveGroupColumns.length + (showLegendNameColumn ? 5 : 4)">
+                <td class="legend-empty" :colspan="legendResizableColumnKeys.length + 2">
                   No series match the legend filters
                 </td>
               </tr>
@@ -2686,24 +2772,31 @@ onMounted(() => {
                     />
                   </td>
                   <td class="color-col">
-                    <span
-                      class="series-color"
-                      :style="{ backgroundColor: getSeriesColor(series).border }"
-                    />
+                    <ChartColorPicker :color="getSeriesColor(series).border" :label="series.name"
+                      @change="setSeriesColor(series.key, $event)" />
                   </td>
                   <td v-if="showLegendNameColumn" class="series-name" :title="series.name">{{ series.valueColumn }}</td>
                   <td
-                    v-for="(_, index) in effectiveGroupColumns"
+                    v-for="{ index } in visibleLegendGroups"
                     :key="`${series.key}:${index}`"
                     :title="series.groupParts[index] || ''"
                   >
                     {{ series.groupParts[index] || '' }}
                   </td>
-                  <td class="numeric-col">{{ formatMetric(series.max) }}</td>
-                  <td class="numeric-col">{{ formatMetric(series.mean) }}</td>
+                  <td v-for="column in visibleLegendMetrics" :key="column.key" class="numeric-col">{{ formatMetric(series[column.key]) }}</td>
                 </tr>
               </template>
             </tbody>
+          </table>
+          </div>
+          <table v-if="activeThresholds.length" class="threshold-legend" aria-label="Thresholds">
+            <caption>Thresholds</caption>
+            <thead><tr><th>Color</th><th>Name</th><th class="numeric-col">Value</th></tr></thead>
+            <tbody><tr v-for="(threshold, index) in activeThresholds" :key="index">
+              <td><ChartColorPicker :color="threshold.color" :label="threshold.name" @change="setThresholdColor(threshold, $event)" /></td>
+              <td :title="threshold.name">{{ threshold.name }}</td>
+              <td class="numeric-col">{{ formatMetric(threshold.value) }}</td>
+            </tr></tbody>
           </table>
         </aside>
       </div>
@@ -2752,7 +2845,7 @@ onMounted(() => {
               <col :style="{ width: `${LEGEND_VISIBILITY_COL_WIDTH}px` }" />
               <col :style="{ width: `${LEGEND_COLOR_COL_WIDTH}px` }" />
               <col
-                v-for="(_, groupIndex) in effectiveGroupColumns"
+                v-for="{ index: groupIndex } in visibleLegendGroups"
                 :key="`pie-group-col:${groupIndex}`"
                 :style="{ width: `${getLegendColumnWidth(`group:${groupIndex}`)}px` }"
               />
@@ -2777,7 +2870,7 @@ onMounted(() => {
                 </th>
                 <th class="color-col"></th>
                 <th
-                  v-for="(groupColumnName, groupIndex) in effectiveGroupColumns"
+                  v-for="{ title: groupColumnName, index: groupIndex } in visibleLegendGroups"
                   :key="`pie-header:${groupColumnName}`"
                   class="legend-filterable-header legend-resizable-header"
                   @mouseenter="onLegendHeaderMouseEnter($event, `group:${groupIndex}`, groupColumnName)"
@@ -2883,19 +2976,17 @@ onMounted(() => {
                   />
                 </td>
                 <td class="color-col">
-                  <span
-                    class="series-color"
-                    :style="{ backgroundColor: getPieGroupColor(row.label).border }"
-                  />
+                  <ChartColorPicker :color="getPieGroupColor(row.label).border" :label="row.label"
+                    @change="setSeriesColor(`pie:${row.label}`, $event)" />
                 </td>
                 <td
-                  v-for="(_, index) in effectiveGroupColumns"
+                  v-for="{ index } in visibleLegendGroups"
                   :key="`${row.label}:${index}`"
                   :title="row.groupParts[index] || ''"
                 >
                   {{ row.groupParts[index] || '' }}
                 </td>
-                <td v-if="effectiveGroupColumns.length === 0" :title="row.label">{{ row.label }}</td>
+                <td v-if="showPieLegendNameColumn" :title="row.label">{{ row.label }}</td>
                 <td
                   v-for="metricColumn in pieLegendMetricColumns"
                   :key="`${row.label}:${metricColumn.key}`"
@@ -2936,7 +3027,8 @@ onMounted(() => {
       v-model:is-js="activeLegendFilterIsJs"
       :field="activeLegendFilterTitle"
       :show-js="true"
-      :show-hide-column="false"
+      :show-hide-column="true"
+      @hide-column="hideLegendColumn"
       popover-class="legend-filter-popover"
       :width="320"
       @clear="clearActiveLegendFilter"
@@ -2946,6 +3038,12 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.legend-series-scroll { overflow-x: auto; }
+.threshold-legend td:nth-child(2) { white-space: normal; overflow-wrap: anywhere; }
+.threshold-legend { margin-top: 12px; }
+.threshold-legend caption { text-align: left; padding: 4px; font-size: 0.75rem; font-weight: 600; }
+.threshold-legend th:first-child { width: 36px; }
+.threshold-legend th:last-child { width: 80px; }
 .time-series-chart {
   display: flex;
   flex-direction: column;

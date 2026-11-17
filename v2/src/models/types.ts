@@ -95,7 +95,22 @@ export interface Query {
 
 export type ChartShowStatus = 'hidden' | 'normal' | 'maximized'
 
+export interface ChartThreshold {
+  name: string
+  value: number
+  color: string
+  start?: string // Inclusive timestamp or calendar date
+  end?: string // Exclusive timestamp or calendar date
+  valueColumn?: string
+  bucketSize?: string
+  valueAgg?: 'avg' | 'sum' | 'max'
+  groupColumn?: string
+}
+
 export interface ChartState {
+  thresholds?: ChartThreshold[]
+  legendColumns?: string[]
+  seriesColors?: Record<string, string>
   showStatus?: ChartShowStatus
   timeColumn?: string
   valueColumns?: string[]
