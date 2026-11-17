@@ -310,3 +310,8 @@ for exact colors. Colors update immediately and persist in chart state
 (`seriesColors` maps stable series keys to CSS colors). These viewer edits do not
 change the upstream Azure plan configuration. Bar charts automatically size bars
 to occupy available category space, leaving a small gap between neighboring bars.
+
+Each threshold has an eye toggle in its legend row and in Legend settings. Hidden
+thresholds retain their name, color, value, bounds and guards, and remain listed
+so they can be shown again. Hiding a threshold removes its line, band and axis
+range contribution. Visibility persists as `thresholds[].visible` (default true).

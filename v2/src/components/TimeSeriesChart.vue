@@ -230,7 +230,7 @@ const timeGridPlugin: Plugin<'bar'> = {
   },
 }
 
-const activeThresholds = computed(() => (props.thresholds ?? []).filter(threshold =>
+const applicableThresholds = computed(() => (props.thresholds ?? []).filter(threshold =>
   Number.isFinite(threshold.value)
   && (!threshold.valueColumn || (effectiveValueColumns.value.length === 1 && effectiveValueColumns.value.includes(threshold.valueColumn)))
   && (!threshold.bucketSize || threshold.bucketSize === bucketSize.value)
@@ -239,6 +239,8 @@ const activeThresholds = computed(() => (props.thresholds ?? []).filter(threshol
   && (!threshold.start || (tryParseDate(threshold.start)?.getTime() ?? NaN) <= (effectiveTimeRange.value.max ?? Infinity))
   && (!threshold.end || (tryParseDate(threshold.end)?.getTime() ?? NaN) > (effectiveTimeRange.value.min ?? -Infinity))
 ))
+
+const activeThresholds = computed(() => applicableThresholds.value.filter(threshold => threshold.visible !== false))
 
 const thresholdPlugin: Plugin<'bar'> = {
   id: 'treedocThresholds',
@@ -1504,6 +1506,11 @@ function setSeriesColor(key: string, color: string) {
 
 function setThresholdColor(threshold: ChartThreshold, color: string) {
   emit('update:thresholds', (props.thresholds ?? []).map(item => item === threshold ? { ...item, color } : item))
+}
+
+function toggleThresholdVisibility(threshold: ChartThreshold) {
+  emit('update:thresholds', (props.thresholds ?? []).map(item => item === threshold
+    ? { ...item, visible: item.visible === false } : item))
 }
 
 function customizedColor(key: string, fallback: { bg: string; border: string }) {
@@ -2789,10 +2796,14 @@ onMounted(() => {
             </tbody>
           </table>
           </div>
-          <table v-if="activeThresholds.length" class="threshold-legend" aria-label="Thresholds">
+          <table v-if="applicableThresholds.length" class="threshold-legend" aria-label="Thresholds">
             <caption>Thresholds</caption>
-            <thead><tr><th>Color</th><th>Name</th><th class="numeric-col">Value</th></tr></thead>
-            <tbody><tr v-for="(threshold, index) in activeThresholds" :key="index">
+            <thead><tr><th class="visibility-col"></th><th>Color</th><th>Name</th><th class="numeric-col">Value</th></tr></thead>
+            <tbody><tr v-for="(threshold, index) in applicableThresholds" :key="index" :class="{ hidden: threshold.visible === false }">
+              <td class="visibility-col"><Button :icon="threshold.visible === false ? 'pi pi-eye-slash' : 'pi pi-eye'"
+                text size="small" severity="secondary" :aria-label="`${threshold.visible === false ? 'Show' : 'Hide'} threshold ${threshold.name}`"
+                :aria-pressed="threshold.visible !== false" v-tooltip.top="threshold.visible === false ? 'Show threshold' : 'Hide threshold'"
+                @click="toggleThresholdVisibility(threshold)" /></td>
               <td><ChartColorPicker :color="threshold.color" :label="threshold.name" @change="setThresholdColor(threshold, $event)" /></td>
               <td :title="threshold.name">{{ threshold.name }}</td>
               <td class="numeric-col">{{ formatMetric(threshold.value) }}</td>
@@ -3039,10 +3050,11 @@ onMounted(() => {
 
 <style scoped>
 .legend-series-scroll { overflow-x: auto; }
-.threshold-legend td:nth-child(2) { white-space: normal; overflow-wrap: anywhere; }
+.threshold-legend td:nth-child(3) { white-space: normal; overflow-wrap: anywhere; }
 .threshold-legend { margin-top: 12px; }
 .threshold-legend caption { text-align: left; padding: 4px; font-size: 0.75rem; font-weight: 600; }
-.threshold-legend th:first-child { width: 36px; }
+.threshold-legend th:first-child { width: 26px; }
+.threshold-legend th:nth-child(2) { width: 36px; }
 .threshold-legend th:last-child { width: 80px; }
 .time-series-chart {
   display: flex;

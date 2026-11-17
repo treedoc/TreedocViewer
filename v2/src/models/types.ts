@@ -96,6 +96,7 @@ export interface Query {
 export type ChartShowStatus = 'hidden' | 'normal' | 'maximized'
 
 export interface ChartThreshold {
+  visible?: boolean // Defaults to true
   name: string
   value: number
   color: string

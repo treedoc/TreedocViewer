@@ -163,3 +163,20 @@ test('bar chart fills available category width', async ({ page }) => {
   expect(Math.max(...widths)).toBeGreaterThan(30);
   await page.screenshot({ path: '/tmp/treedoc-wide-bars.png', fullPage: true });
 });
+
+test('threshold visibility can be toggled from legend and settings while preserving entries', async ({ page }) => {
+  await openChart(page);
+  const thresholds = page.getByRole('table', { name: 'Thresholds' });
+  await thresholds.getByRole('button', { name: 'Hide threshold Commitment', exact: true }).click();
+  await expect(thresholds.getByRole('button', { name: 'Show threshold Commitment', exact: true })).toHaveAttribute('aria-pressed', 'false');
+  await thresholds.getByRole('button', { name: 'Hide threshold High', exact: true }).click();
+  await expect(thresholds.locator('tbody tr')).toHaveCount(2);
+  await expect(thresholds.locator('tbody tr.hidden')).toHaveCount(2);
+  await page.getByRole('button', { name: 'Legend settings', exact: true }).click();
+  await page.getByRole('button', { name: 'Show threshold 1', exact: true }).click();
+  await page.getByRole('button', { name: 'Apply thresholds', exact: true }).click();
+  await expect(thresholds.getByRole('button', { name: 'Hide threshold Commitment', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(thresholds.locator('tbody tr.hidden')).toHaveCount(1);
+  await thresholds.getByRole('button', { name: 'Show threshold High', exact: true }).click();
+  await expect(thresholds.locator('tbody tr.hidden')).toHaveCount(0);
+});

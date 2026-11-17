@@ -2,6 +2,14 @@ import { describe, expect, it } from 'vitest'
 import { thresholdBands } from './ChartThresholdUtil'
 
 describe('threshold bands', () => {
+  it('omits hidden thresholds from both bands and band boundaries', () => {
+    expect(thresholdBands([
+      { name: 'Low', value: 10, color: 'amber' },
+      { name: 'Hidden', value: 20, color: 'red', visible: false },
+    ], 0, 100)).toEqual([
+      { start: 0, end: 100, value: 10, upper: undefined, color: 'amber' },
+    ])
+  })
   it('sorts multiple thresholds into nonoverlapping colored bands', () => {
     expect(thresholdBands([
       { name: 'High', value: 20, color: 'red' }, { name: 'Low', value: 10, color: 'amber' },

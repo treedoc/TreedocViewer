@@ -59,6 +59,10 @@ function applyThresholds() {
       </div>
       <div v-if="!drafts.length" class="threshold-empty">No thresholds configured.</div>
       <div v-for="(threshold, index) in drafts" :key="index" class="threshold-editor">
+        <Button :icon="threshold.visible === false ? 'pi pi-eye-slash' : 'pi pi-eye'" text size="small" severity="secondary"
+          :aria-label="`${threshold.visible === false ? 'Show' : 'Hide'} threshold ${index + 1}`" :aria-pressed="threshold.visible !== false"
+          v-tooltip.top="threshold.visible === false ? 'Show threshold' : 'Hide threshold'"
+          @click="threshold.visible = threshold.visible === false" />
         <ChartColorPicker :color="threshold.color" :label="`threshold ${index + 1}`" @change="threshold.color = $event" />
         <label>Name<input v-model="threshold.name" :aria-label="`Threshold ${index + 1} name`" /></label>
         <label>Value<input v-model.number="threshold.value" type="number" step="any" :aria-label="`Threshold ${index + 1} value`" /></label>
@@ -75,9 +79,9 @@ function applyThresholds() {
 .legend-settings { display: grid; gap: 10px; width: min(430px, calc(100vw - 60px)); max-height: 70vh; overflow-y: auto; font-size: 0.8rem; }
 .legend-column-picker { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .threshold-heading { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--tdv-surface-border); padding-top: 6px; }
-.threshold-editor { display: grid; grid-template-columns: 18px minmax(0, 1fr) 95px 30px; gap: 6px; align-items: center; }
+.threshold-editor { display: grid; grid-template-columns: 26px 18px minmax(0, 1fr) 85px 30px; gap: 6px; align-items: center; }
 .threshold-editor label { display: grid; gap: 3px; }
 .threshold-editor input { width: 100%; min-width: 0; box-sizing: border-box; border: 1px solid var(--tdv-surface-border); border-radius: 4px; background: var(--tdv-surface); color: var(--tdv-text); padding: 5px; }
-.threshold-editor small { grid-column: 2 / -1; color: var(--tdv-text-muted); }
+.threshold-editor small { grid-column: 3 / -1; color: var(--tdv-text-muted); }
 [role=alert] { color: var(--tdv-danger, #dc2626); }
 </style>

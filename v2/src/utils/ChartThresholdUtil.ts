@@ -4,7 +4,7 @@ import type { ChartThreshold } from '@/models/types'
 // Each threshold colors the band from its value to the next higher active value.
 // Time bounds are optional, inclusive start and exclusive end.
 export function thresholdBands(thresholds: ChartThreshold[], min: number, max: number) {
-  const valid = thresholds.map(threshold => ({
+  const valid = thresholds.filter(threshold => threshold.visible !== false).map(threshold => ({
     ...threshold,
     startMs: threshold.start ? (tryParseDate(threshold.start)?.getTime() ?? NaN) : min,
     endMs: threshold.end ? (tryParseDate(threshold.end)?.getTime() ?? NaN) : max,
