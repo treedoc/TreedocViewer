@@ -25,7 +25,7 @@
         "application/json": [".json"],
         "text/csv": [".csv"],
         "text/tab-separated-values": [".tsv"],
-        "text/plain": [".txt", ".log", ".yaml", ".yml", ".xml", ".prometheus", ".hcl", ".tf", ".tfvars"]
+        "text/plain": [".txt", ".log", ".yaml", ".yml", ".xml", ".prometheus"]
       }
     }
   ]

@@ -1,20 +1,3 @@
-export const hclStr = `# Terraform configuration
-variable "region" {
-  default = "us-west-2"
-}
-resource "aws_instance" "web" {
-  ami = "ami-example"
-  instance_type = "t3.micro"
-  tags = {
-    Name = "web"
-    Environment = "demo"
-  }
-}
-output "instance_id" {
-  value = aws_instance.web.id
-}
-`
-
 export const jsonStr = `
 {
   refundAmtMoney:"USD 15.32",
@@ -210,7 +193,6 @@ export const sampleData: SampleDataItem[] = [
   "backwardsCompatible": "with JSON",
 }`,
   },
-  { text: 'HCL / Terraform', value: hclStr },
   { text: 'YAML', value: yamlStr },
   { text: 'YAML Multi-Doc', value: yamlMultiDocStr },
   { text: 'XML', value: xmlStr },

@@ -1,4 +1,3 @@
-import HCLParserPlugin from '../parsers/HCLParserPlugin'
 import { defineStore } from 'pinia'
 import { ref, computed, shallowRef, watch, markRaw, toRaw } from 'vue'
 import type { TDNode, TreeDoc } from 'treedoc'
@@ -65,7 +64,6 @@ export const useTreeStore = defineStore('tree', () => {
   const selectedParser = ref<ParserPlugin>(defaultParser)
   
   const availableParsers = computed<ParserPlugin[]>(() => [
-    new HCLParserPlugin(),
     defaultParser,
     new JSONParserPlugin('Lombok.toString', JSONParserType.LOMBOK_TO_STRING),
     new JSONParserPlugin('Map.toString', JSONParserType.JAVA_MAP_TO_STRING),
