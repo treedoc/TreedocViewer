@@ -37,7 +37,7 @@ test('legend defaults, column picker, hover hide and uncluttered tooltip', async
   await page.getByLabel('region', { exact: true }).check();
   await page.getByRole('button', { name: 'Legend settings', exact: true }).click();
   await expect(headers).toHaveText(['', '', 'region', 'model', 'Max', 'Last', 'Increase']);
-  await expect(legend.locator('tbody tr').first().locator('td').last()).toHaveText('-3');
+  await expect(legend.locator('tbody tr').first().locator('td').last()).toHaveText('40');
 
   await headers.filter({ hasText: /^Last$/ }).hover();
   await page.locator('.legend-filter-popover .hide-column-btn').click();
@@ -63,7 +63,7 @@ test('legend endpoints use the selected range', async ({ page }) => {
     timeSelectionColumn: 'day', legendColumns: ['group:1', 'max', 'last', 'increase'],
   });
   const row = page.locator('.value-legend').first().locator('tbody tr').filter({ hasText: 'SavingsPlan' });
-  await expect(row.locator('td').last()).toHaveText('-43');
+  await expect(row.locator('td').last()).toHaveText('0');
 });
 
 

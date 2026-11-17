@@ -291,9 +291,11 @@ match the chart. A guarded valueColumn requires it to be the sole selected metri
 Thresholds use the value axis, not the row-count axis.
 
 The legend defaults to **Max** and **Last**. Its toolbar settings icon offers **Mean**,
-**Increase**, and all key columns. Increase is the last minus first observed value
-within the selected range, in the original units; gaps are not zero-filled and
-counter resets are not adjusted. A single observation has zero Increase.
+**Increase**, and all key columns. Increase excludes the latest observation
+(which may be partial), then subtracts the first observed value from the last
+remaining value within the selected range. Last still shows the latest observation.
+Increase uses the original units; gaps are not zero-filled and counter resets are
+not adjusted. Fewer than three observations produce zero Increase.
 Single-valued key columns are hidden by default and omitted from hover labels.
 The header hover filter popup includes **Hide column**; use the toolbar picker to
 restore it. Column choices survive chart remounts and can be supplied as
